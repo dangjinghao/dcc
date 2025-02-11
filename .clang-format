@@ -1,0 +1,5 @@
+ColumnLimit: 80
+
+CommentPragmas: ''
+ReflowComments: false
+UseTab: Never
