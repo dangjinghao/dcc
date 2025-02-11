@@ -1,0 +1,8 @@
+*.o
+*.d
+dcc
+/.gdbinit
+compile_commands.json
+/.cache
+/.vscode
+*.out
