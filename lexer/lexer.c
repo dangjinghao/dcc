@@ -1,9 +1,9 @@
 #include "lexer.h"
 #include "sds/sds.h"
 #include <assert.h>
-#include <errno.h>
 #include <convert/convert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -36,7 +36,7 @@ void lexer_from_file(struct lexer *lexer, char *filename) {
   log_debug("Open file: %s", filename);
   FILE *f = fopen(filename, "r");
   if (!f) {
-    log_error("Failed to open file %s:%s", filename,strerror(errno));
+    log_error("Failed to open file %s:%s", filename, strerror(errno));
     exit(EXIT_FAILURE);
   }
   lexer_from_fp(lexer, f);
@@ -157,7 +157,7 @@ struct token_table_entry token_kw_table[] = {
     {NULL, TOK_UNKNOWN},
 };
 
-struct token_table_entry token_sym_table[] = {
+struct token_table_entry token_multi_char_sym_table[] = {
     {.str = "...", .type = TOK_KW_VARARGS}, // high token level
     {.str = "<=", .type = TOK_SYM_LEQ},
     {.str = ">=", .type = TOK_SYM_GEQ},
@@ -172,9 +172,9 @@ struct token_table_entry token_sym_table[] = {
     {.str = "*=", .type = TOK_SYM_SELF_MUL},
     {.str = "/=", .type = TOK_SYM_SELF_DIV},
     {.str = "%=", .type = TOK_SYM_SELF_MOD},
-    {.str = "|=", .type = TOK_SYM_BIT_SELF_OR},
-    {.str = "^=", .type = TOK_SYM_BIT_SELF_XOR},
-    {.str = "&=", .type = TOK_SYM_BIT_SELF_AND},
+    {.str = "|=", .type = TOK_SYM_SELF_BIT_OR},
+    {.str = "^=", .type = TOK_SYM_SELF_BIT_XOR},
+    {.str = "&=", .type = TOK_SYM_SELF_BIT_AND},
     {.str = "++", .type = TOK_SYM_SELF_INC},
     {.str = "--", .type = TOK_SYM_SELF_DEC},
     {.str = "->", .type = TOK_SYM_ARROW},
@@ -199,7 +199,7 @@ lexer_get_token_type_in_token_table(char *str,
 char *lexer_get_token_str_in_token_table(enum tok_type type,
                                          struct token_table_entry *table) {
   if (table == NULL) {
-    table = token_sym_table;
+    table = token_multi_char_sym_table;
     while (table->str) {
       if (type == table->type) {
         return table->str;
@@ -225,16 +225,15 @@ char *lexer_get_token_str_in_token_table(enum tok_type type,
   return NULL;
 }
 
-char*token_string(enum tok_type type) {
+char *token_string(enum tok_type type) {
   static char buf[16] = {0};
-  if(type < 256) {
+  if (type < 256) {
     memset(buf, 0, sizeof(buf));
     buf[0] = type;
     return buf;
   }
   return lexer_get_token_str_in_token_table(type, NULL);
 }
-
 
 static inline bool lexer_is_ident_start(char c) {
   return isalpha(c) || c == '_' || c == '$';
@@ -463,7 +462,7 @@ int lexer_next_token(struct lexer *lexer) {
     return lexer_next_string(lexer);
   }
   // multi-char symbol
-  struct token_table_entry *table = token_sym_table;
+  struct token_table_entry *table = token_multi_char_sym_table;
   while (table->str) {
     if (lexer_try_eat_str(lexer, table->str)) {
       return table->type;

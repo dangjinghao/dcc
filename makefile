@@ -3,7 +3,7 @@ SRCS := $(shell find . -name "*.c" ! -name "test*")
 OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
 INCS := libs lexer parser
-CFLAGS := -ggdb -Og -MMD $(addprefix -I,$(INCS)) 
+CFLAGS := -ggdb -Og -MMD -std=gnu99 $(addprefix -I,$(INCS)) 
 CFLAGS += -Wall -Wno-stringop-truncation -Wno-format-truncation -Wno-unused-but-set-variable -Wunused-function
 LDFLAGS :=
 

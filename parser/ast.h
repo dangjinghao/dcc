@@ -5,11 +5,10 @@
 #include "sds/sds.h"
 #include <stdlib.h>
 enum ast_type {
-  ast_ident = 1,
-  ast_expr_unary,
+  ast_expr_unary = 1,
   ast_expr_binop,
   ast_expr_ternary,
-  ast_expr_value,
+  ast_expr_primary,
 };
 
 typedef struct ast_node {
@@ -18,12 +17,12 @@ typedef struct ast_node {
   union {
     sds ident;
     struct unary {
-      char op;
+      int op;
       char postfix;
       struct ast_node *expr;
     } unary;
     struct binop {
-      char op;
+      int op;
       struct ast_node *lhs, *rhs;
     } binop;
     struct ternary {
@@ -35,7 +34,7 @@ typedef struct ast_node {
       union token v;
     } value;
   };
-} *ast_node_ptr;
+} *astn;
 
 static inline struct ast_node *ast_new(enum ast_type type) {
   struct ast_node *node = malloc(sizeof(struct ast_node));
