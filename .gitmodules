@@ -10,3 +10,6 @@
 [submodule "libs/log"]
 	path = libs/log
 	url = mygit:djh/clog
+[submodule "libs/macro"]
+	path = libs/macro
+	url = mygit:djh/cmacro
