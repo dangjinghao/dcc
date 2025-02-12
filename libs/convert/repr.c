@@ -149,7 +149,7 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
         buf = sdscatlen(buf, "--", 2);
         break;
       default:
-        assert(0 && "this unary postfix op is not supported");
+        assert(0 && "this unary postfix op is not supported yet");
       }
     }
     break;
@@ -160,6 +160,11 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
     buf = convert_expr_obj_to_repr(n->binop.rhs, buf);
     break;
   case ast_expr_ternary:
+    buf = convert_expr_obj_to_repr(n->ternary.cond, buf);
+    buf = sdscatlen(buf, "?", 1);
+    buf = convert_expr_obj_to_repr(n->ternary._t, buf);
+    buf = sdscatlen(buf, ":", 1);
+    buf = convert_expr_obj_to_repr(n->ternary._f, buf);
     break;
   }
   buf = sdscatlen(buf, ")", 1);

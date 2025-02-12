@@ -26,7 +26,7 @@ typedef struct ast_node {
       struct ast_node *lhs, *rhs;
     } binop;
     struct ternary {
-      struct ast_node *cond, *lhs, *rhs;
+      struct ast_node *cond, *_t, *_f;
     } ternary;
     struct {
       // tok_lit_*, tok_ident

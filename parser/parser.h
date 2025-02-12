@@ -9,7 +9,7 @@ struct parser {
 };
 void parser_from_lexer(struct parser *parser, struct lexer *lexer);
 int parser_consume(struct parser *parser);
-
+int parser_consume_with(struct parser *parser, int token);
 astn parse_expr(struct parser *parser);
 astn __parse_expr(struct parser *parser, int ctx_prec);
 #endif

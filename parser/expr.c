@@ -84,6 +84,16 @@ static astn __binop_normal_handle(astn left, struct parser *parser,
   return n;
 }
 
+static astn __binop_ternary_handle(astn left, struct parser *parser,
+                                   struct infix_parselet *self) {
+  astn n = ast_new(ast_expr_ternary);
+  n->ternary.cond = left;
+  n->ternary._t = parse_expr(parser);
+  parser_consume_with(parser, ':');
+  n->ternary._f = parse_expr(parser);
+  return n;
+}
+
 struct infix_parselet infix_parselets[] = {
     {
         '%',
@@ -192,6 +202,12 @@ struct infix_parselet infix_parselets[] = {
         120,
         false,
         __binop_normal_handle,
+    },
+    {
+        '?',
+        110,
+        true,
+        __binop_ternary_handle,
     },
     {
         '=',
