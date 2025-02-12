@@ -177,7 +177,7 @@ struct token_table_entry token_sym_table[] = {
     {.str = "&=", .type = TOK_SYM_BIT_SELF_AND},
     {.str = "++", .type = TOK_SYM_SELF_INC},
     {.str = "--", .type = TOK_SYM_SELF_DEC},
-    {.str = "->", .type = TOK_SYM_GET_MEMBER},
+    {.str = "->", .type = TOK_SYM_ARROW},
     {.str = "||", .type = TOK_SYM_LOGIC_OR},
     {.str = "&&", .type = TOK_SYM_LOGIC_AND}, // low token level
     {NULL, TOK_UNKNOWN},
@@ -235,7 +235,6 @@ char*token_string(enum tok_type type) {
   return lexer_get_token_str_in_token_table(type, NULL);
 }
 
-union token lex_token;
 
 static inline bool lexer_is_ident_start(char c) {
   return isalpha(c) || c == '_' || c == '$';
@@ -259,7 +258,7 @@ int lexer_next_ident(struct lexer *lexer) {
     sdsfree(ident);
     return kw_type;
   }
-  lex_token._ident = ident;
+  lexer->lex_token._ident = ident;
   return TOK_IDENT;
 }
 
@@ -350,15 +349,15 @@ int lexer_next_number(struct lexer *lexer, bool decimal_only) {
   }
 
   if (is_fp && has_f) {
-    lex_token._float = strtof(number, NULL);
+    lexer->lex_token._float = strtof(number, NULL);
   } else if (is_fp && !has_f) {
-    lex_token._double = strtod(number, NULL);
+    lexer->lex_token._double = strtod(number, NULL);
   } else if (has_u) {
-    lex_token._uint = strtoul(number, NULL, base);
+    lexer->lex_token._uint = strtoul(number, NULL, base);
   } else if (has_l) {
-    lex_token._int = strtol(number, NULL, base);
+    lexer->lex_token._int = strtol(number, NULL, base);
   } else {
-    lex_token._int = strtol(number, NULL, base);
+    lexer->lex_token._int = strtol(number, NULL, base);
   }
   sdsfree(number);
   if (is_fp) {
@@ -378,12 +377,12 @@ int lexer_next_number(struct lexer *lexer, bool decimal_only) {
   } else if (has_l) {
     return TOK_LIT_LONG;
   } else if (has_u) {
-    if (lex_token._uint > LONG_MAX) {
+    if (lexer->lex_token._uint > LONG_MAX) {
       return TOK_LIT_ULONG;
     }
     return TOK_LIT_UINT;
   }
-  if (lex_token._int > INT_MAX || lex_token._int < INT_MIN) {
+  if (lexer->lex_token._int > INT_MAX || lexer->lex_token._int < INT_MIN) {
     return TOK_LIT_LONG;
   }
   return TOK_LIT_INT;
@@ -418,7 +417,7 @@ int lexer_next_char(struct lexer *lexer) {
     compiler_error(lexer, "Multi-character constant starts without '\\':%s",
                    buf);
   }
-  lex_token._char = buf[0];
+  lexer->lex_token._char = buf[0];
   return TOK_LIT_CHAR;
 }
 
@@ -438,7 +437,7 @@ int lexer_next_string(struct lexer *lexer) {
     lexer_consume(lexer);
   }
   lexer_eat(lexer, '"');
-  lex_token._str = str;
+  lexer->lex_token._str = str;
   return TOK_LIT_STRING;
 }
 

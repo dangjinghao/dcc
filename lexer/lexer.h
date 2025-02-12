@@ -3,6 +3,7 @@
 #include "log/log.h"
 #include "sds/sds.h"
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include <stdio.h>
 enum tok_type {
@@ -76,7 +77,7 @@ enum tok_type {
   TOK_SYM_SELF_LSHIFT,
   TOK_SYM_SELF_INC,
   TOK_SYM_SELF_DEC,
-  TOK_SYM_GET_MEMBER,
+  TOK_SYM_ARROW,
   TOK_SYM_LOGIC_OR,
   TOK_SYM_LOGIC_AND,
 
@@ -87,18 +88,17 @@ struct lexer {
   char filename[FILENAME_MAX];
   // TODO: use a double tiny buffer to store the source code rather than a sds buffer which is too large
   sds src;
+  union token {
+    char _char;
+    double _double;
+    float _float;
+    unsigned long _uint;
+    long _int;
+    sds _str;
+    sds _ident;
+  } lex_token;
   size_t pos;
 };
-
-extern union token {
-  char _char;
-  double _double;
-  float _float;
-  unsigned long _uint;
-  long _int;
-  sds _str;
-  sds _ident;
-} lex_token;
 
 void lexer_from_string(struct lexer *lexer, char *src);
 void lexer_from_file(struct lexer *lexer, char *filename);

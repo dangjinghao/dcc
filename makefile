@@ -4,7 +4,7 @@ OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
 INCS := libs lexer parser
 CFLAGS := -ggdb -Og -MMD $(addprefix -I,$(INCS)) 
-CFLAGS += -Wall -Wno-stringop-truncation -Wno-format-truncation -Wno-unused-but-set-variable
+CFLAGS += -Wall -Wno-stringop-truncation -Wno-format-truncation -Wno-unused-but-set-variable -Wunused-function
 LDFLAGS :=
 
 ARGS :=

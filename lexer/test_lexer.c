@@ -11,27 +11,27 @@ void process(struct lexer *lexer) {
     if (X)
       printf("<%s>\n", X);
     else if (tok == TOK_IDENT) {
-      printf("<id-%s>\n", lex_token._ident);
-      sdsfree(lex_token._ident);
+      printf("<id-%s>\n", lexer->lex_token._ident);
+      sdsfree(lexer->lex_token._ident);
     } else if (tok < 256) {
       printf("<sym-%c>\n", tok);
     } else if (tok == TOK_LIT_INT) {
-      printf("<%ldi>\n", lex_token._int);
+      printf("<%ldi>\n", lexer->lex_token._int);
     } else if (tok == TOK_LIT_UINT) {
-      printf("<%luu>\n", lex_token._uint);
+      printf("<%luu>\n", lexer->lex_token._uint);
     } else if (tok == TOK_LIT_LONG) {
-      printf("<%ldl>\n", lex_token._int);
+      printf("<%ldl>\n", lexer->lex_token._int);
     } else if (tok == TOK_LIT_ULONG) {
-      printf("<%luul>\n", lex_token._uint);
+      printf("<%luul>\n", lexer->lex_token._uint);
     } else if (tok == TOK_LIT_FLOAT) {
-      printf("<%ff>\n", lex_token._float);
+      printf("<%ff>\n", lexer->lex_token._float);
     } else if (tok == TOK_LIT_DOUBLE) {
-      printf("<%fd>\n", lex_token._double);
+      printf("<%fd>\n", lexer->lex_token._double);
     } else if (tok == TOK_LIT_CHAR) {
-      printf("<char-%c-%d>\n", lex_token._char, lex_token._char);
+      printf("<char-%c-%d>\n", lexer->lex_token._char, lexer->lex_token._char);
     } else if (tok == TOK_LIT_STRING) {
-      printf("<str-%s>\n", lex_token._str);
-      sdsfree(lex_token._str);
+      printf("<str-%s>\n", lexer->lex_token._str);
+      sdsfree(lexer->lex_token._str);
     }
   }
 }
@@ -66,4 +66,4 @@ int stdin_main() {
   return 0;
 }
 
-int main() { return str_char_main(); }
+int main() { return file_main(); }
