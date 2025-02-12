@@ -1,8 +1,8 @@
 #ifndef LEXER_H
 #define LEXER_H
+#include "log/log.h"
 #include "sds/sds.h"
 #include <stdbool.h>
-#include "log/log.h"
 
 #include <stdio.h>
 enum tok_type {
@@ -76,7 +76,7 @@ enum tok_type {
   TOK_SYM_SELF_LSHIFT,
   TOK_SYM_SELF_INC,
   TOK_SYM_SELF_DEC,
-  TOK_SYM_MEMBER,
+  TOK_SYM_GET_MEMBER,
   TOK_SYM_LOGIC_OR,
   TOK_SYM_LOGIC_AND,
 
@@ -90,7 +90,7 @@ struct lexer {
   size_t pos;
 };
 
-extern union literal {
+extern union token {
   char _char;
   double _double;
   float _float;
@@ -98,7 +98,7 @@ extern union literal {
   long _int;
   sds _str;
   sds _ident;
-} literal;
+} lex_token;
 
 void lexer_from_string(struct lexer *lexer, char *src);
 void lexer_from_file(struct lexer *lexer, char *filename);
@@ -119,7 +119,7 @@ enum tok_type
 lexer_get_token_type_in_token_table(char *str, struct token_table_entry *table);
 char *lexer_get_token_str_in_token_table(enum tok_type type,
                                          struct token_table_entry *table);
-
+char *token_string(enum tok_type type);
 int lexer_next_token(struct lexer *lexer);
 #define compiler_error(lexer, fmt, ...)                                        \
   do {                                                                         \

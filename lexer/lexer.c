@@ -177,7 +177,7 @@ struct token_table_entry token_sym_table[] = {
     {.str = "&=", .type = TOK_SYM_BIT_SELF_AND},
     {.str = "++", .type = TOK_SYM_SELF_INC},
     {.str = "--", .type = TOK_SYM_SELF_DEC},
-    {.str = "->", .type = TOK_SYM_MEMBER},
+    {.str = "->", .type = TOK_SYM_GET_MEMBER},
     {.str = "||", .type = TOK_SYM_LOGIC_OR},
     {.str = "&&", .type = TOK_SYM_LOGIC_AND}, // low token level
     {NULL, TOK_UNKNOWN},
@@ -225,7 +225,17 @@ char *lexer_get_token_str_in_token_table(enum tok_type type,
   return NULL;
 }
 
-union literal literal;
+char*token_string(enum tok_type type) {
+  static char buf[16] = {0};
+  if(type < 256) {
+    memset(buf, 0, sizeof(buf));
+    buf[0] = type;
+    return buf;
+  }
+  return lexer_get_token_str_in_token_table(type, NULL);
+}
+
+union token lex_token;
 
 static inline bool lexer_is_ident_start(char c) {
   return isalpha(c) || c == '_' || c == '$';
@@ -249,7 +259,7 @@ int lexer_next_ident(struct lexer *lexer) {
     sdsfree(ident);
     return kw_type;
   }
-  literal._ident = ident;
+  lex_token._ident = ident;
   return TOK_IDENT;
 }
 
@@ -340,15 +350,15 @@ int lexer_next_number(struct lexer *lexer, bool decimal_only) {
   }
 
   if (is_fp && has_f) {
-    literal._float = strtof(number, NULL);
+    lex_token._float = strtof(number, NULL);
   } else if (is_fp && !has_f) {
-    literal._double = strtod(number, NULL);
+    lex_token._double = strtod(number, NULL);
   } else if (has_u) {
-    literal._uint = strtoul(number, NULL, base);
+    lex_token._uint = strtoul(number, NULL, base);
   } else if (has_l) {
-    literal._int = strtol(number, NULL, base);
+    lex_token._int = strtol(number, NULL, base);
   } else {
-    literal._int = strtol(number, NULL, base);
+    lex_token._int = strtol(number, NULL, base);
   }
   sdsfree(number);
   if (is_fp) {
@@ -368,12 +378,12 @@ int lexer_next_number(struct lexer *lexer, bool decimal_only) {
   } else if (has_l) {
     return TOK_LIT_LONG;
   } else if (has_u) {
-    if (literal._uint > LONG_MAX) {
+    if (lex_token._uint > LONG_MAX) {
       return TOK_LIT_ULONG;
     }
     return TOK_LIT_UINT;
   }
-  if (literal._int > INT_MAX || literal._int < INT_MIN) {
+  if (lex_token._int > INT_MAX || lex_token._int < INT_MIN) {
     return TOK_LIT_LONG;
   }
   return TOK_LIT_INT;
@@ -408,7 +418,7 @@ int lexer_next_char(struct lexer *lexer) {
     compiler_error(lexer, "Multi-character constant starts without '\\':%s",
                    buf);
   }
-  literal._char = buf[0];
+  lex_token._char = buf[0];
   return TOK_LIT_CHAR;
 }
 
@@ -428,7 +438,7 @@ int lexer_next_string(struct lexer *lexer) {
     lexer_consume(lexer);
   }
   lexer_eat(lexer, '"');
-  literal._str = str;
+  lex_token._str = str;
   return TOK_LIT_STRING;
 }
 

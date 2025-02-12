@@ -11,27 +11,27 @@ void process(struct lexer *lexer) {
     if (X)
       printf("<%s>\n", X);
     else if (tok == TOK_IDENT) {
-      printf("<id-%s>\n", literal._ident);
-      sdsfree(literal._ident);
+      printf("<id-%s>\n", lex_token._ident);
+      sdsfree(lex_token._ident);
     } else if (tok < 256) {
       printf("<sym-%c>\n", tok);
     } else if (tok == TOK_LIT_INT) {
-      printf("<%ldi>\n", literal._int);
+      printf("<%ldi>\n", lex_token._int);
     } else if (tok == TOK_LIT_UINT) {
-      printf("<%luu>\n", literal._uint);
+      printf("<%luu>\n", lex_token._uint);
     } else if (tok == TOK_LIT_LONG) {
-      printf("<%ldl>\n", literal._int);
+      printf("<%ldl>\n", lex_token._int);
     } else if (tok == TOK_LIT_ULONG) {
-      printf("<%luul>\n", literal._uint);
+      printf("<%luul>\n", lex_token._uint);
     } else if (tok == TOK_LIT_FLOAT) {
-      printf("<%ff>\n", literal._float);
+      printf("<%ff>\n", lex_token._float);
     } else if (tok == TOK_LIT_DOUBLE) {
-      printf("<%fd>\n", literal._double);
+      printf("<%fd>\n", lex_token._double);
     } else if (tok == TOK_LIT_CHAR) {
-      printf("<char-%c-%d>\n", literal._char, literal._char);
+      printf("<char-%c-%d>\n", lex_token._char, lex_token._char);
     } else if (tok == TOK_LIT_STRING) {
-      printf("<str-%s>\n", literal._str);
-      sdsfree(literal._str);
+      printf("<str-%s>\n", lex_token._str);
+      sdsfree(lex_token._str);
     }
   }
 }
@@ -58,12 +58,11 @@ int str_char_main() {
   return 0;
 }
 
-int stdin_main(){
+int stdin_main() {
   struct lexer lexer;
   lexer_from_fp(&lexer, stdin);
   process(&lexer);
   lexer_destroy(&lexer);
-
   return 0;
 }
 
