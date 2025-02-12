@@ -8,13 +8,25 @@
 
 astn parse_primary_expr(struct parser *parser) {
   // TODO: support (expr)
-  astn node = ast_new(ast_expr_primary);
-  assert((parser->current_token > __TOK_LIT_START &&
-          parser->current_token < __TOK_LIT_END) ||
-         parser->current_token == TOK_IDENT);
-  node->value.type = parser->current_token;
-  node->value.v = parser->lexer->lex_token;
-  parser_consume(parser);
+  astn node = NULL;
+  switch (parser->current_token) {
+  case (__TOK_LIT_START + 1)...(__TOK_LIT_END - 1):
+  case TOK_IDENT:
+    node = ast_new(ast_expr_primary);
+    node->value.type = parser->current_token;
+    node->value.v = parser->lexer->lex_token;
+    parser_consume(parser);
+    break;
+  case '(':
+    parser_consume(parser);
+    node = parse_expr(parser);
+    parser_consume_with(parser, ')');
+    break;
+  default:
+    compiler_error(parser->lexer, "Unexpected token %s",
+                   token_string(parser->current_token));
+  }
+
   return node;
 }
 

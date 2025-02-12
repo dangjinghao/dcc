@@ -86,7 +86,6 @@ enum tok_type {
 struct lexer {
   size_t ln;
   char filename[FILENAME_MAX];
-  // TODO: use a double tiny buffer to store the source code rather than a sds buffer which is too large
   sds src;
   union token {
     char _char;

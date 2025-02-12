@@ -20,3 +20,24 @@ int parser_consume_with(struct parser *parser, int token) {
                  token_string(token), token_string(parser->current_token));
   return 0;
 }
+
+void parser_free_ast(astn node) {
+  if (!node)
+    return;
+  if (node->type == ast_expr_unary) {
+    parser_free_ast(node->unary.expr);
+  } else if (node->type == ast_expr_binop) {
+    parser_free_ast(node->binop.lhs);
+    parser_free_ast(node->binop.rhs);
+  } else if (node->type == ast_expr_ternary) {
+    parser_free_ast(node->ternary.cond);
+    parser_free_ast(node->ternary._t);
+    parser_free_ast(node->ternary._f);
+  } else if (node->type == ast_expr_primary) {
+    if (node->value.type == TOK_LIT_STRING || node->value.type == TOK_IDENT) {
+      sdsfree(node->value.v._str);
+    }
+  }
+
+  free(node);
+}
