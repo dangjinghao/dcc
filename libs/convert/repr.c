@@ -3,6 +3,7 @@
 #include "sds/sds.h"
 #include <assert.h>
 #include <stdlib.h>
+#include "macro/macro.h"
 /**
  * @brief input the decoded char part,
  * e.g. convert '\n' -> input 'n' -> return 0x10, \777 -> 777 -> 0x1ff
@@ -161,6 +162,9 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
     buf = convert_expr_obj_to_repr(n->ternary._t, buf);
     buf = sdscatlen(buf, ":", 1);
     buf = convert_expr_obj_to_repr(n->ternary._f, buf);
+    break;
+  case ast_trans_unit:
+    BUILDING();
     break;
   }
   buf = sdscatlen(buf, ")", 1);

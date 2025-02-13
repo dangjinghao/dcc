@@ -118,7 +118,7 @@ enum tok_type
 lexer_get_token_type_in_token_table(char *str, struct token_table_entry *table);
 char *lexer_get_token_str_in_token_table(enum tok_type type,
                                          struct token_table_entry *table);
-char *token_string(int type);
+char *lexer_token_to_string(int type);
 int lexer_next_token(struct lexer *lexer);
 #define compiler_error(lexer, fmt, ...)                                        \
   do {                                                                         \

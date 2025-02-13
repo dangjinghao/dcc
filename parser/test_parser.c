@@ -33,7 +33,7 @@ int str_paren_parse() {
 
 int str_combine(){
   struct lexer lexer;
-  lexer_from_string(&lexer, "1 + \"123\" \"456\" + '\\'' ");
+  lexer_from_string(&lexer, ".1f + \"123\" \"456\" + '\\'' ");
   process(&lexer);
   lexer_destroy(&lexer);
 

@@ -27,7 +27,7 @@ build: $(TARGET)
 gdb: $(TARGET)
 	@gdb $(TARGET)
 
-compile_commands.json: makefile
+compile_commands.json: makefile $(SRCS)
 	@make clean
 	@bear -- make build -j
 

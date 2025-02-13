@@ -43,7 +43,7 @@ astn parse_primary_expr(struct parser *parser) {
     break;
   default:
     compiler_error(parser->lexer, "Unexpected token %s",
-                   token_string(parser->current_token));
+      lexer_token_to_string(parser->current_token));
   }
 
   return node;
