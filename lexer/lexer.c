@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <convert/convert.h>
 #include <ctype.h>
-#include <errno.h>
+#include <errno.h> // IWYU pragma: keep
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -17,7 +17,7 @@ void lexer_from_string(struct lexer *lexer, char *src) {
 }
 
 void lexer_from_fp(struct lexer *lexer, FILE *fp) {
-  log_debug_str("Reading file from fp");
+  log_debug("Reading file from fp");
   assert(fp);
   lexer->ln = 1;
   lexer->pos = 0;
@@ -36,7 +36,7 @@ void lexer_from_file(struct lexer *lexer, char *filename) {
   log_debug("Open file: %s", filename);
   FILE *f = fopen(filename, "r");
   if (!f) {
-    log_error("Failed to open file %s:%s", filename, strerror(errno));
+    log_error("Failed to open file %s: %s", filename, strerror(errno));
     exit(EXIT_FAILURE);
   }
   lexer_from_fp(lexer, f);

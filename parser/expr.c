@@ -3,23 +3,42 @@
 #include "lexer.h"
 #include "macro/macro.h"
 #include "parser.h"
+#include "sds/sds.h"
 #include <assert.h>
 #include <stdbool.h>
 
+static astn __parse_primary_expr_combine_str(struct parser *parser) {
+  astn node = ast_new(ast_expr_primary);
+  node->primary.type = TOK_LIT_STRING;
+  node->primary.v = parser->lexer->lex_token;
+  parser_consume(parser);
+  while (parser->current_token == TOK_LIT_STRING) {
+    node->primary.v._str =
+        sdscatsds(node->primary.v._str, parser->lexer->lex_token._str);
+    sdsfree(parser->lexer->lex_token._str);
+    parser_consume(parser);
+  }
+  return node;
+}
+
 astn parse_primary_expr(struct parser *parser) {
-  // TODO: support (expr)
   astn node = NULL;
   switch (parser->current_token) {
-  case (__TOK_LIT_START + 1)...(__TOK_LIT_END - 1):
+  case TOK_LIT_STRING:
+    node = __parse_primary_expr_combine_str(parser);
+    break;
+  // gnu switch case range extension
+  case (__TOK_LIT_START + 1)...(TOK_LIT_STRING - 1):
+  case (TOK_LIT_STRING + 1)...(TOK_SYM_LEQ - 1):
   case TOK_IDENT:
     node = ast_new(ast_expr_primary);
-    node->value.type = parser->current_token;
-    node->value.v = parser->lexer->lex_token;
+    node->primary.type = parser->current_token;
+    node->primary.v = parser->lexer->lex_token;
     parser_consume(parser);
     break;
   case '(':
     parser_consume(parser);
-    node = parse_expr(parser);
+    node = parse_comma_expr(parser);
     parser_consume_with(parser, ')');
     break;
   default:
@@ -91,8 +110,8 @@ static astn __binop_normal_handle(astn left, struct parser *parser,
   astn n = ast_new(ast_expr_binop);
   n->binop.op = self->token;
   n->binop.lhs = left;
-  n->binop.rhs =
-      __parse_expr(parser, self->right_assoc ? self->prec - 1 : self->prec);
+  n->binop.rhs = __parse_assign_expr(parser, self->right_assoc ? self->prec - 1
+                                                               : self->prec);
   return n;
 }
 
@@ -100,9 +119,9 @@ static astn __binop_ternary_handle(astn left, struct parser *parser,
                                    struct infix_parselet *self) {
   astn n = ast_new(ast_expr_ternary);
   n->ternary.cond = left;
-  n->ternary._t = parse_expr(parser);
+  n->ternary._t = parse_assign_expr(parser);
   parser_consume_with(parser, ':');
-  n->ternary._f = parse_expr(parser);
+  n->ternary._f = parse_assign_expr(parser);
   return n;
 }
 
@@ -287,29 +306,23 @@ struct infix_parselet infix_parselets[] = {
         true,
         __binop_normal_handle,
     },
-    {
-        ',',
-        50,
-        false,
-        __binop_normal_handle,
-    },
+
 };
 
 /* Pratt algorithm parser */
-astn __parse_expr(struct parser *parser, int ctx_prec) {
+astn __parse_assign_expr(struct parser *parser, int ctx_prec) {
   astn left = parse_unary(parser);
 
   while (true) {
-    const int infix_token = parser->current_token;
+    int infix_token = parser->current_token;
     if (!infix_token)
       break;
-    struct infix_parselet *parselet = NULL;
-    for (size_t i = 0; i < ARRAY_SIZE(infix_parselets); i++) {
-      if (infix_parselets[i].token == infix_token) {
-        parselet = &infix_parselets[i];
-        break;
-      }
-    }
+
+#define EQ_TOKEN(a, b) ((a).token == (b))
+    struct infix_parselet *parselet =
+        ARRAY_GET(infix_parselets, infix_token, EQ_TOKEN);
+#undef EQ_TOKEN
+
     if (!parselet) {
       break;
     }
@@ -323,4 +336,27 @@ astn __parse_expr(struct parser *parser, int ctx_prec) {
   return left;
 }
 
-astn parse_expr(struct parser *parser) { return __parse_expr(parser, 0); }
+astn parse_assign_expr(struct parser *parser) {
+  return __parse_assign_expr(parser, 0);
+}
+
+/**
+ * @brief the comma expression is a sequence of expressions separated by commas,
+ * it enjoys the lowest precedence in C operators.
+ * We split it from pratt expr parser because we need to handle the comma-separated variables initialization
+ * which has another syntax.
+ * @param parser 
+ * @return comma 
+ */
+astn parse_comma_expr(struct parser *parser) {
+  astn node = parse_assign_expr(parser);
+  while (parser->current_token == ',') {
+    astn n = ast_new(ast_expr_binop);
+    n->binop.op = ',';
+    n->binop.lhs = node;
+    parser_consume(parser);
+    n->binop.rhs = parse_assign_expr(parser);
+    node = n;
+  }
+  return node;
+}

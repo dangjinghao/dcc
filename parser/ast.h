@@ -32,7 +32,7 @@ typedef struct ast_node {
       // tok_lit_*, tok_ident
       enum tok_type type;
       union token v;
-    } value;
+    } primary;
   };
 } *astn;
 

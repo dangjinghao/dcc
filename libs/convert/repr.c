@@ -66,37 +66,33 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
 
   switch (n->type) {
   case ast_expr_primary:
-    switch (n->value.type) {
+    switch (n->primary.type) {
     case TOK_LIT_INT:
-      buf = sdscatprintf(buf, "%ldi", n->value.v._int);
+      buf = sdscatprintf(buf, "%ldi", n->primary.v._int);
       break;
     case TOK_LIT_UINT:
-      buf = sdscatprintf(buf, "%luu", n->value.v._uint);
+      buf = sdscatprintf(buf, "%luu", n->primary.v._uint);
       break;
     case TOK_LIT_LONG:
-      buf = sdscatprintf(buf, "%ldl", n->value.v._int);
+      buf = sdscatprintf(buf, "%ldl", n->primary.v._int);
       break;
     case TOK_LIT_ULONG:
-      buf = sdscatprintf(buf, "%luul", n->value.v._uint);
+      buf = sdscatprintf(buf, "%luul", n->primary.v._uint);
       break;
     case TOK_LIT_FLOAT:
-      buf = sdscatprintf(buf, "%f", n->value.v._float);
+      buf = sdscatprintf(buf, "%f", n->primary.v._float);
       break;
     case TOK_LIT_DOUBLE:
-      buf = sdscatprintf(buf, "%f", n->value.v._double);
+      buf = sdscatprintf(buf, "%f", n->primary.v._double);
       break;
     case TOK_LIT_CHAR:
-      buf = sdscatlen(buf, "'", 1);
-      buf = sdscatrepr(buf, &n->value.v._char, 1);
-      buf = sdscatlen(buf, "'", 1);
+      buf = sdscatrepr(buf, &n->primary.v._char, 1);
       break;
     case TOK_LIT_STRING:
-      buf = sdscatlen(buf, "\"", 1);
-      buf = sdscatrepr(buf, n->value.v._str, sdslen(n->value.v._str));
-      buf = sdscatlen(buf, "\"", 1);
+      buf = sdscatrepr(buf, n->primary.v._str, sdslen(n->primary.v._str));
       break;
     case TOK_IDENT:
-      buf = sdscatlen(buf, n->value.v._ident, sdslen(n->value.v._ident));
+      buf = sdscatlen(buf, n->primary.v._ident, sdslen(n->primary.v._ident));
       break;
     default:
       break;
