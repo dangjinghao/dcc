@@ -1,9 +1,11 @@
 #include "ast.h"
 #include "lexer.h"
+#include "log/log.h"
+#include "macro/macro.h"
 #include "sds/sds.h"
 #include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
-#include "macro/macro.h"
 /**
  * @brief input the decoded char part,
  * e.g. convert '\n' -> input 'n' -> return 0x10, \777 -> 777 -> 0x1ff
@@ -164,9 +166,128 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
     buf = convert_expr_obj_to_repr(n->ternary._f, buf);
     break;
   case ast_trans_unit:
+  case ast_declaration:
     BUILDING();
     break;
   }
   buf = sdscatlen(buf, ")", 1);
   return buf;
+}
+
+enum type_qualifier convert_token_type_to_qualifier(enum tok_type tok) {
+  switch (tok) {
+  case TOK_KW_CONST:
+    return TYPE_QUAL_CONST;
+  case TOK_KW_VOLATILE:
+    return TYPE_QUAL_VOLATILE;
+  // case TOK_KW_RESTRICT:
+  //   return TYPE_QUAL_RESTRICT;
+  // case TOK_KW_INLINE:
+  //   return TYPE_QUAL_INLINE;
+  default:
+    log_error("invalid type qualifier token");
+    exit(EXIT_FAILURE);
+    return TYPE_QUAL_NONE;
+  }
+}
+
+char *convert_token_type_to_string(enum tok_type tok) {
+  switch (tok) {
+    STRCASE(TOK_UNKNOWN);
+    STRCASE(TOK_IDENT);
+    STRCASE(TOK_KW_INT);
+    STRCASE(TOK_KW_FLOAT);
+    STRCASE(TOK_KW_VOID);
+    STRCASE(TOK_KW_CHAR);
+    STRCASE(TOK_KW_ENUM);
+    STRCASE(TOK_KW_SIZEOF);
+    STRCASE(TOK_KW_AUTO);
+    STRCASE(TOK_KW_CASE);
+    STRCASE(TOK_KW_CONST);
+    STRCASE(TOK_KW_CONTINUE);
+    STRCASE(TOK_KW_DEFAULT);
+    STRCASE(TOK_KW_DO);
+    STRCASE(TOK_KW_DOUBLE);
+    STRCASE(TOK_KW_ELSE);
+    STRCASE(TOK_KW_EXTERN);
+    STRCASE(TOK_KW_FOR);
+    STRCASE(TOK_KW_GOTO);
+    STRCASE(TOK_KW_IF);
+    STRCASE(TOK_KW_LONG);
+    STRCASE(TOK_KW_REGISTER);
+    STRCASE(TOK_KW_RETURN);
+    STRCASE(TOK_KW_SHORT);
+    STRCASE(TOK_KW_SIGNED);
+    STRCASE(TOK_KW_STATIC);
+    STRCASE(TOK_KW_STRUCT);
+    STRCASE(TOK_KW_SWITCH);
+    STRCASE(TOK_KW_TYPEDEF);
+    STRCASE(TOK_KW_UNION);
+    STRCASE(TOK_KW_UNSIGNED);
+    STRCASE(TOK_KW_VOLATILE);
+    STRCASE(TOK_KW_WHILE);
+    STRCASE(TOK_SYM_LEQ);
+    STRCASE(TOK_SYM_GEQ);
+    STRCASE(TOK_SYM_EQ);
+    STRCASE(TOK_SYM_NEQ);
+    STRCASE(TOK_SYM_SELF_ADD);
+    STRCASE(TOK_SYM_SELF_SUB);
+    STRCASE(TOK_SYM_SELF_MUL);
+    STRCASE(TOK_SYM_SELF_DIV);
+    STRCASE(TOK_SYM_SELF_MOD);
+    STRCASE(TOK_SYM_SELF_BIT_OR);
+    STRCASE(TOK_SYM_SELF_BIT_XOR);
+    STRCASE(TOK_SYM_SELF_BIT_AND);
+    STRCASE(TOK_SYM_RSHIFT);
+    STRCASE(TOK_SYM_SELF_RSHIFT);
+    STRCASE(TOK_SYM_LSHIFT);
+    STRCASE(TOK_SYM_SELF_LSHIFT);
+    STRCASE(TOK_SYM_ARROW);
+    STRCASE(TOK_SYM_SELF_INC);
+    STRCASE(TOK_SYM_SELF_DEC);
+    STRCASE(TOK_SYM_LOGIC_OR);
+    STRCASE(TOK_SYM_LOGIC_AND);
+    STRCASE(TOK_KW_BREAK);
+    STRCASE(TOK_KW_VARARGS);
+
+  case TOK_EOF:
+  case __TOK_KW_START:
+  case __TOK_KW_END:
+  case __TOK_LIT_START:
+  case TOK_LIT_INT:
+  case TOK_LIT_UINT:
+  case TOK_LIT_LONG:
+  case TOK_LIT_ULONG:
+  case TOK_LIT_FLOAT:
+  case TOK_LIT_DOUBLE:
+  case TOK_LIT_CHAR:
+  case TOK_LIT_STRING:
+  case __TOK_LIT_END:
+    log_error("invalid token type: %d", tok);
+    exit(EXIT_FAILURE);
+    break;
+  }
+  return NULL;
+}
+
+size_t convert_token_type_to_size(enum tok_type t) {
+  switch (t) {
+  case TOK_KW_INT:
+    return sizeof(int);
+  case TOK_KW_CHAR:
+    return sizeof(char);
+  case TOK_KW_FLOAT:
+    return sizeof(float);
+  case TOK_KW_DOUBLE:
+    return sizeof(double);
+  case TOK_KW_LONG:
+    return sizeof(long);
+  case TOK_KW_SHORT:
+    return sizeof(short);
+  case TOK_KW_VOID:
+    return sizeof(void);
+  default:
+    log_error("unsupported type:`%s`", convert_token_type_to_string(t));
+  }
+  return 0;
 }
