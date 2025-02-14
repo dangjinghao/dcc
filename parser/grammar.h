@@ -138,18 +138,23 @@ static inline bool g_is_pointer_firstset(parser parser) {
 
 /**
  * @brief 
- * @grammar, left-combining and right-recursive
+ * @grammar, left recursive.
  * <direct-declarator> ::= <identifier>
- *                    | ( <declarator> ) <direct-declarator>
- *                    | [ {<constant-expression>}? ] <direct-declarator>
- *                    |( <parameter-type-list> ) <direct-declarator>
- *                    | ( {<identifier>}* ) <direct-declarator>
- *                    | <epsilon>
-
+ *                      | ( <declarator> )
+ *                      | <direct-declarator> [ {<constant-expression>}? ]
+ *                      | <direct-declarator> ( {<parameter-type-list>}? )
+ *
+ * @grammar, right recursive.
+ *<direct-declarator> ::= <identifier> <direct-declarator-suffix>
+ *                     | ( <declarator> ) <direct-declarator-suffix>
+ *
+ *<direct-declarator-suffix> ::= [ {<constant-expression>}? ] <direct-declarator-suffix>
+ *                            | ( {<parameter-type-list>}? ) <direct-declarator-suffix>
+ *                            | ε
  */
 static inline bool g_is_direct_declarator_firstset(parser parser) {
   int token = parser->current_token;
-  return token == TOK_IDENT || token == '(' || token == '[' || token == TOK_EOF;
+  return token == TOK_IDENT || token == '(';
 }
 
 /**

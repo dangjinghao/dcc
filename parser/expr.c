@@ -23,6 +23,7 @@ static astn __parse_primary_expr_combine_str(parser parser) {
 }
 
 astn parse_primary_expr(parser parser) {
+  assert(g_is_primary_expression_firstset(parser));
   astn node = NULL;
   switch (parser->current_token) {
   case TOK_LIT_STRING:
@@ -31,10 +32,14 @@ astn parse_primary_expr(parser parser) {
   // gnu switch case range extension
   case (__TOK_LIT_START + 1)...(TOK_LIT_STRING - 1):
   case (TOK_LIT_STRING + 1)...(TOK_SYM_LEQ - 1):
-  case TOK_IDENT:
     node = ast_new(ast_expr_primary);
     node->primary.type = parser->current_token;
     node->primary.v = parser->lexer->lex_token;
+    parser_consume(parser);
+    break;
+  case TOK_IDENT:
+    node = ast_new(ast_ident);
+    node->ident = parser->lexer->lex_token._ident;
     parser_consume(parser);
     break;
   case '(':
@@ -341,9 +346,7 @@ astn __parse_assign_expr(parser parser, int ctx_prec) {
   return left;
 }
 
-astn parse_assign_expr(parser parser) {
-  return __parse_assign_expr(parser, 0);
-}
+astn parse_assign_expr(parser parser) { return __parse_assign_expr(parser, 0); }
 
 /**
  * @brief the comma expression is a sequence of expressions separated by commas,

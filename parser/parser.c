@@ -38,7 +38,11 @@ int parser_consume_with(parser parser, int token) {
                  lexer_token_to_string(parser->current_token));
   return 0;
 }
-
+/**
+ * @brief Free the ast node, if the content is in heap memory, it would be skipped.
+ * 
+ * @param node 
+ */
 void parser_free_ast(astn node) {
   if (!node)
     return;
@@ -80,8 +84,7 @@ void parser_pop_scope(parser parser) {
   }
 }
 
-struct declaration *parser_find_in_all_scope_table(sds ident,
-                                                   dynamic_array tab) {
+struct declaration *parser_find_in_all_scope_table(sds ident, dynarray tab) {
   struct declaration **ref;
   dynarray_foreach_reverse(tab, ref) {
     if (*ref == NULL) {
@@ -94,7 +97,7 @@ struct declaration *parser_find_in_all_scope_table(sds ident,
 }
 
 struct declaration *parser_find_in_current_scope_table(sds ident,
-                                                       dynamic_array tab) {
+                                                       dynarray tab) {
   struct declaration **ref;
   dynarray_foreach_reverse(tab, ref) {
     if (*ref == NULL) {
@@ -106,7 +109,6 @@ struct declaration *parser_find_in_current_scope_table(sds ident,
   return NULL;
 }
 
-void parser_add_to_current_scope_table(struct declaration *decl,
-                                       dynamic_array tab) {
+void parser_add_to_current_scope_table(struct declaration *decl, dynarray tab) {
   dynarray_add(tab, &decl);
 }

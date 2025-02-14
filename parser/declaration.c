@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "log/log.h"
 #include "parser.h"
+#include "sds/sds.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
@@ -34,11 +35,12 @@ astn parse_translation_unit(parser parser) {
   return n;
 }
 
-static void parse_set_type_qualifier(ctype tn, enum type_qualifier qualifier) {
+static void parse_set_type_qualifier(struct ctype *tn,
+                                     enum type_qualifier qualifier) {
   tn->qualifier |= qualifier;
 }
 
-void parse_set_normal_type_specifier(ctype t, parser parser) {
+void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
   enum tok_type tok = parser->current_token;
   enum tok_type prev_type = t->type;
   if (g_is_sign_tok(tok)) {
@@ -63,9 +65,10 @@ void parse_set_normal_type_specifier(ctype t, parser parser) {
 }
 
 /* {<declaration-specifier>}+ */
-ctype parse_declaration_specifiers(parser parser) {
+astn parse_declaration_specifiers(parser parser) {
   assert(g_is_declaration_specifier_firstset(parser));
-  ctype tn = ctype_new();
+  astn n = ast_new(ast_ctype);
+  struct ctype *tn = &n->ctype;
 
   while (g_is_declaration_specifier_firstset(parser)) {
     if (g_is_type_qualifier_firstset(parser)) {
@@ -101,7 +104,7 @@ ctype parse_declaration_specifiers(parser parser) {
   if (tn->signint != TOK_UNKNOWN && tn->type == TOK_UNKNOWN) {
     tn->type = TOK_KW_INT;
   }
-  return tn;
+  return n;
 }
 
 astn parse_initializer(parser parser) {
@@ -112,12 +115,58 @@ astn parse_initializer(parser parser) {
   return parse_assign_expr(parser);
 }
 
-astn parse_init_declarator(parser parser, ctype decl_specs) {
+astn parse_pointers(parser parser, astn declaration) {
+  assert(g_is_pointer_firstset(parser));
+  while (g_is_pointer_firstset(parser)) {
+    parser_consume_with(parser, '*');
+    astn p = ast_new(ast_ctype);
+    p->ctype.type = '*';
+    while (g_is_type_qualifier_firstset(parser)) {
+      parse_set_type_qualifier(&p->ctype, parser->current_token);
+      parser_consume(parser);
+    }
+    dynarray_add(&declaration->declaration.type_chain, &p);
+  }
+  return declaration;
+}
+
+astn parse_direct_declarator(parser parser, astn declaration) {
+  assert(g_is_direct_declarator_firstset(parser));
+  // temporary save <identifier> and add it in the end to
+  // make sure that the <identifier> is the last element in the chain
+}
+
+astn parse_declarator(parser parser, astn declaration) {
+  assert(g_is_declarator_firstset(parser));
+  assert(declaration->type == ast_declaration);
+  if (g_is_pointer_firstset(parser)) {
+    parse_pointers(parser, declaration);
+  }
+
+  return parse_direct_declarator(parser, declaration);
+}
+
+sds parse_remove_declarator_ident(astn declarator) {
+  assert(declarator->type == ast_declaration);
+  astn last;
+  dynarray_pop(&declarator->declaration.type_chain, &last);
+  if(last->type != ast_ident) {
+    // for the abstract declarator, it doesn't have an identifier
+    return NULL;
+  }
+  sds r = last->ident;
+  parser_free_ast(last);
+  return r;
+}
+
+astn parse_init_declarator(parser parser, astn decl_specs) {
   assert(g_is_init_declarator_firstset(parser));
   astn n = ast_new(ast_declaration);
-  astn declarator = parse_declarator(parser, decl_specs);
+  dynarray_default(&n->declaration.type_chain, sizeof(astn));
+  dynarray_add(&n->declaration.type_chain, &decl_specs);
+  astn declarator = parse_declarator(parser, n);
   n->declaration.ident = parse_remove_declarator_ident(declarator);
-  n->declaration.type_chain = declarator;
+  n->declaration.type_chain = declarator->declaration.type_chain;
   if (parser->current_token == '=') {
     parser_consume(parser);
     n->declaration.extdata = parse_initializer(parser);
@@ -125,9 +174,9 @@ astn parse_init_declarator(parser parser, ctype decl_specs) {
   return n;
 }
 
-astn parse_declaration(parser parser, astn symtab) {
+astn parse_declaration(parser parser) {
   assert(g_is_declaration_firstset(parser));
-  ctype decl_specs = parse_declaration_specifiers(parser);
+  astn decl_specs = parse_declaration_specifiers(parser);
   // we would reduce the grammar complexity,
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
@@ -137,7 +186,7 @@ astn parse_declaration(parser parser, astn symtab) {
     parser_consume(parser);
     init_declarator = parse_init_declarator(parser, decl_specs);
   }
-
-  parser_consume_with(parser, ';');
+  // TODO: add those declarations to the symbol table
   BUILDING();
+  parser_consume_with(parser, ';');
 }
