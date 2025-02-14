@@ -1,13 +1,14 @@
 
 #include "ast.h"
+#include "grammar.h"
 #include "lexer.h"
 #include "macro/macro.h"
 #include "parser.h"
 #include "sds/sds.h"
 #include <assert.h>
 #include <stdbool.h>
-
-static astn __parse_primary_expr_combine_str(struct parser *parser) {
+static astn __parse_primary_expr_combine_str(parser parser) {
+  assert(parser->current_token == TOK_LIT_STRING);
   astn node = ast_new(ast_expr_primary);
   node->primary.type = TOK_LIT_STRING;
   node->primary.v = parser->lexer->lex_token;
@@ -21,7 +22,7 @@ static astn __parse_primary_expr_combine_str(struct parser *parser) {
   return node;
 }
 
-astn parse_primary_expr(struct parser *parser) {
+astn parse_primary_expr(parser parser) {
   astn node = NULL;
   switch (parser->current_token) {
   case TOK_LIT_STRING:
@@ -43,16 +44,16 @@ astn parse_primary_expr(struct parser *parser) {
     break;
   default:
     compiler_error(parser->lexer, "Unexpected token %s",
-      lexer_token_to_string(parser->current_token));
+                   lexer_token_to_string(parser->current_token));
   }
 
   return node;
 }
 
-// static ast_node_ptr parse_unary_advanced_postfix(struct parser *parser) {
+// static ast_node_ptr parse_unary_advanced_postfix(parser parser) {
 // }
 
-astn parse_unary_postfix(struct parser *parser) {
+astn parse_unary_postfix(parser parser) {
   static int postfix_ops[] = {
       TOK_SYM_SELF_INC, TOK_SYM_SELF_DEC, TOK_SYM_ARROW, '[', '(', '.'};
   astn v = parse_primary_expr(parser);
@@ -72,8 +73,8 @@ astn parse_unary_postfix(struct parser *parser) {
   return v;
 }
 
-astn parse_unary_prefix(struct parser *parser) {
-  static int prefix_ops[] = {
+astn parse_unary_prefix(parser parser) {
+  static int prefix_uops[] = {
       TOK_SYM_SELF_INC,
       TOK_SYM_SELF_DEC,
       TOK_KW_SIZEOF,
@@ -84,7 +85,8 @@ astn parse_unary_prefix(struct parser *parser) {
       '*',
       '&',
   };
-  if (ARRAY_IN(prefix_ops, parser->current_token, EQ_EQ)) {
+
+  if (ARRAY_IN(prefix_uops, parser->current_token, EQ_EQ)) {
     astn node = ast_new(ast_expr_unary);
     node->unary.op = parser->current_token;
     node->unary.postfix = false;
@@ -96,16 +98,19 @@ astn parse_unary_prefix(struct parser *parser) {
   return parse_unary_postfix(parser);
 }
 
-astn parse_unary(struct parser *parser) { return parse_unary_prefix(parser); }
+astn parse_unary(parser parser) {
+  assert(g_is_unary_expression_firstset(parser));
+  return parse_unary_prefix(parser);
+}
 
 struct infix_parselet {
   int token;
   int prec;
   bool right_assoc;
-  astn (*handle)(astn left, struct parser *parser, struct infix_parselet *self);
+  astn (*handle)(astn left, parser parser, struct infix_parselet *self);
 };
 
-static astn __binop_normal_handle(astn left, struct parser *parser,
+static astn __binop_normal_handle(astn left, parser parser,
                                   struct infix_parselet *self) {
   astn n = ast_new(ast_expr_binop);
   n->binop.op = self->token;
@@ -115,7 +120,7 @@ static astn __binop_normal_handle(astn left, struct parser *parser,
   return n;
 }
 
-static astn __binop_ternary_handle(astn left, struct parser *parser,
+static astn __binop_ternary_handle(astn left, parser parser,
                                    struct infix_parselet *self) {
   astn n = ast_new(ast_expr_ternary);
   n->ternary.cond = left;
@@ -310,7 +315,7 @@ struct infix_parselet infix_parselets[] = {
 };
 
 /* Pratt algorithm parser */
-astn __parse_assign_expr(struct parser *parser, int ctx_prec) {
+astn __parse_assign_expr(parser parser, int ctx_prec) {
   astn left = parse_unary(parser);
 
   while (true) {
@@ -336,7 +341,7 @@ astn __parse_assign_expr(struct parser *parser, int ctx_prec) {
   return left;
 }
 
-astn parse_assign_expr(struct parser *parser) {
+astn parse_assign_expr(parser parser) {
   return __parse_assign_expr(parser, 0);
 }
 
@@ -348,7 +353,7 @@ astn parse_assign_expr(struct parser *parser) {
  * @param parser 
  * @return comma 
  */
-astn parse_comma_expr(struct parser *parser) {
+astn parse_comma_expr(parser parser) {
   astn node = parse_assign_expr(parser);
   while (parser->current_token == ',') {
     astn n = ast_new(ast_expr_binop);

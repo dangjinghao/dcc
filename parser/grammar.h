@@ -12,7 +12,7 @@
  *                   | volatile
  * @param parser 
  */
-static inline bool g_is_type_qualifier_firstset(struct parser *parser) {
+static inline bool g_is_type_qualifier_firstset(parser parser) {
   int token = parser->current_token;
   return token == TOK_KW_CONST || token == TOK_KW_VOLATILE;
 }
@@ -27,8 +27,7 @@ static inline bool g_is_type_qualifier_firstset(struct parser *parser) {
  *                            | typedef
  * @param parser
  */
-static inline bool
-g_is_storage_class_specifier_firstset(struct parser *parser) {
+static inline bool g_is_storage_class_specifier_firstset(parser parser) {
   static int reserved_kw[] = {TOK_KW_AUTO, TOK_KW_REGISTER, TOK_KW_STATIC,
                               TOK_KW_EXTERN, TOK_KW_TYPEDEF};
   int token = parser->current_token;
@@ -41,9 +40,9 @@ g_is_storage_class_specifier_firstset(struct parser *parser) {
  * <typedef-name> ::= identifier
  * @param parser 
  */
-static inline bool g_is_typedef_name_firstset(struct parser *parser) {
-  BUILDING();
+static inline bool g_is_typedef_name_firstset(parser parser) {
   return false;
+  BUILDING();
 }
 
 /**
@@ -54,7 +53,7 @@ static inline bool g_is_typedef_name_firstset(struct parser *parser) {
  *                    | enum <identifier>
  * @param parser 
  */
-static inline bool g_is_enum_specifier(struct parser *parser) {
+static inline bool g_is_enum_specifier(parser parser) {
   return parser->current_token == TOK_KW_ENUM;
 }
 
@@ -65,7 +64,7 @@ static inline bool g_is_enum_specifier(struct parser *parser) {
  *                    | union
  * @param parser 
  */
-static inline bool g_is_struct_or_union_firstset(struct parser *parser) {
+static inline bool g_is_struct_or_union_firstset(parser parser) {
   int token = parser->current_token;
   return token == TOK_KW_STRUCT || token == TOK_KW_UNION;
 }
@@ -76,7 +75,7 @@ static inline bool g_is_struct_or_union_firstset(struct parser *parser) {
  * <struct-or-union-specifier> ::= <struct-or-union>
  * @param parser 
  */
-static inline bool g_is_struct_or_union_specifier(struct parser *parser) {
+static inline bool g_is_struct_or_union_specifier(parser parser) {
   return g_is_struct_or_union_firstset(parser);
 }
 
@@ -97,7 +96,7 @@ static inline bool g_is_struct_or_union_specifier(struct parser *parser) {
  *                   | <typedef-name>
  * @param token 
  */
-static inline bool g_is_type_specifier_firstset(struct parser *parser) {
+static inline bool g_is_type_specifier_firstset(parser parser) {
   int token = parser->current_token;
   static int reserved_kw[] = {TOK_KW_VOID,   TOK_KW_CHAR,   TOK_KW_SHORT,
                               TOK_KW_INT,    TOK_KW_LONG,   TOK_KW_FLOAT,
@@ -121,7 +120,7 @@ static inline bool g_is_type_specifier_firstset(struct parser *parser) {
  *                          | <type-specifier>
  *                          | <type-qualifier>
  */
-static inline bool g_is_declaration_specifier_firstset(struct parser *parser) {
+static inline bool g_is_declaration_specifier_firstset(parser parser) {
   return g_is_storage_class_specifier_firstset(parser) ||
          g_is_type_specifier_firstset(parser) ||
          g_is_type_qualifier_firstset(parser);
@@ -133,7 +132,7 @@ static inline bool g_is_declaration_specifier_firstset(struct parser *parser) {
  * <pointer> ::= * {<type-qualifier>}* {<pointer>}?
  * 
  */
-static inline bool g_is_pointer_firstset(struct parser *parser) {
+static inline bool g_is_pointer_firstset(parser parser) {
   return parser->current_token == '*';
 }
 
@@ -148,7 +147,7 @@ static inline bool g_is_pointer_firstset(struct parser *parser) {
  *                    | <epsilon>
 
  */
-static inline bool g_is_direct_declarator_firstset(struct parser *parser) {
+static inline bool g_is_direct_declarator_firstset(parser parser) {
   int token = parser->current_token;
   return token == TOK_IDENT || token == '(' || token == '[' || token == TOK_EOF;
 }
@@ -158,7 +157,7 @@ static inline bool g_is_direct_declarator_firstset(struct parser *parser) {
  * @grammar
  * <declarator> ::= {<pointer>}? <direct-declarator>
  */
-static inline bool g_is_declarator_firstset(struct parser *parser) {
+static inline bool g_is_declarator_firstset(parser parser) {
   if (g_is_pointer_firstset(parser)) {
     return true;
   }
@@ -174,17 +173,17 @@ static inline bool g_is_declarator_firstset(struct parser *parser) {
  * <function-definition> ::= {<declaration-specifier>}+ <declarator> {<declaration>}* <compound-statement>
  * 
  */
-static inline bool g_is_function_definition_firstset(struct parser *parser) {
+static inline bool g_is_function_definition_firstset(parser parser) {
   return g_is_declaration_specifier_firstset(parser);
 }
 
 /**
  * @brief 
  * @grammar
- * <declaration> ::=  {<declaration-specifier>}+ {<init-declarator>}* ;
+ * <declaration> ::=  {<declaration-specifier>}+ {{<init-declarator>} {, <init-declarator>}*}? ;
  */
 
-static inline bool g_is_declaration_firstset(struct parser *parser) {
+static inline bool g_is_declaration_firstset(parser parser) {
   return g_is_declaration_specifier_firstset(parser);
 }
 
@@ -195,7 +194,7 @@ static inline bool g_is_declaration_firstset(struct parser *parser) {
  *                         | <declaration>
  * @param parser 
  */
-static inline bool g_is_external_declaration_firstset(struct parser *parser) {
+static inline bool g_is_external_declaration_firstset(parser parser) {
   return g_is_function_definition_firstset(parser) ||
          g_is_declaration_firstset(parser);
 }
@@ -206,7 +205,7 @@ static inline bool g_is_external_declaration_firstset(struct parser *parser) {
  * <translation-unit> ::= {<external-declaration>}*
  */
 
-static inline bool g_is_translation_unit_firstset(struct parser *parser) {
+static inline bool g_is_translation_unit_firstset(parser parser) {
   int token = parser->current_token;
   if (token == TOK_EOF)
     return true;
@@ -232,8 +231,50 @@ static inline bool g_is_int_family_tok(enum tok_type tok) {
  * <init-declarator> ::= <declarator>
  *                    | <declarator> = <initializer>
  */
-static inline bool g_is_init_declarator_firstset(struct parser *parser) {
+static inline bool g_is_init_declarator_firstset(parser parser) {
   return g_is_declarator_firstset(parser);
+}
+
+static inline bool g_is_primary_expression_firstset(parser parser) {
+  return parser->current_token == TOK_IDENT || parser->current_token == '(' ||
+         (parser->current_token > __TOK_LIT_START &&
+          parser->current_token < TOK_SYM_LEQ);
+}
+
+static inline bool g_is_unary_expression_firstset(parser parser) {
+  int prefix_uops[] = {
+      TOK_SYM_SELF_INC,
+      TOK_SYM_SELF_DEC,
+      TOK_KW_SIZEOF,
+      '-',
+      '+',
+      '!',
+      '~',
+      '*',
+      '&',
+  };
+  return ARRAY_IN(prefix_uops, parser->current_token, EQ_EQ) ||
+         g_is_primary_expression_firstset(parser);
+}
+
+static inline bool g_is_assignment_expression_firstset(parser parser) {
+  return g_is_unary_expression_firstset(parser);
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <initializer> ::= <assignment-expression>
+ *                | { <initializer-list> }
+ *                | { <initializer-list> , }
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_initializer_firstset(parser parser) {
+  return g_is_assignment_expression_firstset(parser) ||
+         parser->current_token == '{';
+  BUILDING();
 }
 
 #endif

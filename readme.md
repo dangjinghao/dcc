@@ -7,3 +7,5 @@
 ## expression parser
 
 - Pratt parser expression
+
+## scope and symbol table

@@ -1,19 +1,23 @@
 #ifndef PARSER_H
 #define PARSER_H
 #include "ast.h"
+#include "dynarray/dynarray.h"
 #include "lexer.h"
-struct parser {
+typedef struct parser {
   struct lexer *lexer;
   int current_token;
-  struct ast_node *root;
-};
-void parser_from_lexer(struct parser *parser, struct lexer *lexer);
-void parser_snapshot(struct parser *_new, struct parser *_old);
-int parser_consume(struct parser *parser);
-int parser_consume_with(struct parser *parser, int token);
+  // add NULL if we meet a new scope
+  struct dynarray idtab;
+  struct dynarray tagtab; //enum, struct, union
+} *parser;
+void parser_from_lexer(parser parser, struct lexer *lexer);
+void parser_snapshot(parser _new, parser _old);
+void parser_free(parser parser);
+int parser_consume(parser parser);
+int parser_consume_with(parser parser, int token);
 void parser_free_ast(astn node);
-astn parse_assign_expr(struct parser *parser);
-astn __parse_assign_expr(struct parser *parser, int ctx_prec);
-astn parse_comma_expr(struct parser *parser);
+astn parse_assign_expr(parser parser);
+astn __parse_assign_expr(parser parser, int ctx_prec);
+astn parse_comma_expr(parser parser);
 
 #endif

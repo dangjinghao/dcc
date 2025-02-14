@@ -1,61 +1,44 @@
 #include "ast.h"
-#include "chable/hash_table.h"
 #include "convert/convert.h"
-#include "ext/ext.h"
+#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "parser.h"
-#include "sds/sds.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
-astn parse_external_declaration(struct parser *parser) {
+astn parse_external_declaration(parser parser) {
   assert(g_is_external_declaration_firstset(parser));
   BUILDING();
   // try-resoume algorithm
 }
 
-static uint64_t chable_hash(const void *data, struct chable *table) {
-  astn astdata = (astn)data;
-  assert(astdata->type == ast_declaration);
-  return sdshash(astdata->declaration.ident);
-}
-
-static int chable_declaration_cmp(const void *a, const void *b) {
-  astn asta = (astn)a;
-  astn astb = (astn)b;
-  assert(asta->type == ast_declaration && astb->type == ast_declaration);
-  return sdscmp(asta->declaration.ident, astb->declaration.ident);
-}
 /**
  * @brief using the chable to store all declarations
  * 
  * @param parser 
- * @return astn 
+ * @return dynnarray
  */
-astn parse_translation_unit(struct parser *parser) {
+astn parse_translation_unit(parser parser) {
   assert(g_is_translation_unit_firstset(parser));
   if (parser->current_token == TOK_EOF) {
     return NULL;
   }
-  astn astobj = ast_new(ast_trans_unit);
-  chable_default(&astobj->trans_unit.symtab, chable_hash,
-                 chable_declaration_cmp);
+  astn n = ast_new(ast_trans_unit);
   while (g_is_external_declaration_firstset(parser)) {
-    astn d = parse_external_declaration(parser);
-    assert(d->type == ast_declaration);
-    chable_insert(&astobj->trans_unit.symtab, d);
+    parse_external_declaration(parser);
   }
-  return astobj;
+  dynarray_copy(&n->trans_unit.declarations, &parser->idtab);
+  return n;
 }
 
 static void parse_set_type_qualifier(ctype tn, enum type_qualifier qualifier) {
   tn->qualifier |= qualifier;
 }
 
-void parse_set_normal_type_specifier(ctype t, struct parser *parser) {
+void parse_set_normal_type_specifier(ctype t, parser parser) {
   enum tok_type tok = parser->current_token;
   enum tok_type prev_type = t->type;
   if (g_is_sign_tok(tok)) {
@@ -80,7 +63,7 @@ void parse_set_normal_type_specifier(ctype t, struct parser *parser) {
 }
 
 /* {<declaration-specifier>}+ */
-ctype parse_declaration_specifiers(struct parser *parser) {
+ctype parse_declaration_specifiers(parser parser) {
   assert(g_is_declaration_specifier_firstset(parser));
   ctype tn = ctype_new();
 
@@ -97,8 +80,10 @@ ctype parse_declaration_specifiers(struct parser *parser) {
                        lexer_token_to_string(parser->current_token));
         exit(EXIT_FAILURE);
       }
+      tn->storage = parser->current_token;
       parser_consume(parser);
-    } else if (g_is_type_specifier_firstset(parser)) {
+    } else {
+      assert(g_is_type_specifier_firstset(parser));
       if (g_is_typedef_name_firstset(parser)) {
         BUILDING();
       } else if (g_is_struct_or_union_specifier(parser)) {
@@ -106,6 +91,9 @@ ctype parse_declaration_specifiers(struct parser *parser) {
       } else if (g_is_enum_specifier(parser)) {
         // we should convert enum to int when we meet it
         BUILDING();
+      } else {
+        parse_set_normal_type_specifier(tn, parser);
+        parser_consume(parser);
       }
     }
   }
@@ -116,9 +104,40 @@ ctype parse_declaration_specifiers(struct parser *parser) {
   return tn;
 }
 
-astn parse_declaration(struct parser *parser) {
-  assert(g_is_declaration_firstset(parser));
-  ctype type = parse_declaration_specifiers(parser);
+astn parse_initializer(parser parser) {
+  assert(g_is_initializer_firstset(parser));
+  if (parser->current_token == '{') {
+    BUILDING();
+  }
+  return parse_assign_expr(parser);
+}
 
+astn parse_init_declarator(parser parser, ctype decl_specs) {
+  assert(g_is_init_declarator_firstset(parser));
+  astn n = ast_new(ast_declaration);
+  astn declarator = parse_declarator(parser, decl_specs);
+  n->declaration.ident = parse_remove_declarator_ident(declarator);
+  n->declaration.type_chain = declarator;
+  if (parser->current_token == '=') {
+    parser_consume(parser);
+    n->declaration.extdata = parse_initializer(parser);
+  }
+  return n;
+}
+
+astn parse_declaration(parser parser, astn symtab) {
+  assert(g_is_declaration_firstset(parser));
+  ctype decl_specs = parse_declaration_specifiers(parser);
+  // we would reduce the grammar complexity,
+  // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
+  astn init_declarator;
+  if (g_is_init_declarator_firstset(parser))
+    init_declarator = parse_init_declarator(parser, decl_specs);
+  while (parser->current_token == ',') {
+    parser_consume(parser);
+    init_declarator = parse_init_declarator(parser, decl_specs);
+  }
+
+  parser_consume_with(parser, ';');
   BUILDING();
 }

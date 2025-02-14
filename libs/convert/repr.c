@@ -5,6 +5,7 @@
 #include "sds/sds.h"
 #include <assert.h>
 #include <stddef.h>
+#include "convert.h"
 #include <stdlib.h>
 /**
  * @brief input the decoded char part,
@@ -165,9 +166,10 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
     buf = sdscatlen(buf, ":", 1);
     buf = convert_expr_obj_to_repr(n->ternary._f, buf);
     break;
-  case ast_trans_unit:
   case ast_declaration:
-    BUILDING();
+    log_error(
+        "unsupported ast type when converting expression object to repr: %d",
+        convert_ast_type_to_string(n->type));
     break;
   }
   buf = sdscatlen(buf, ")", 1);
@@ -290,4 +292,15 @@ size_t convert_token_type_to_size(enum tok_type t) {
     log_error("unsupported type:`%s`", convert_token_type_to_string(t));
   }
   return 0;
+}
+
+char *convert_ast_type_to_string(enum ast_type t) {
+  switch (t) {
+    STRCASE(ast_declaration);
+    STRCASE(ast_expr_binop);
+    STRCASE(ast_expr_primary);
+    STRCASE(ast_expr_ternary);
+    STRCASE(ast_expr_unary);
+  }
+  return NULL;
 }

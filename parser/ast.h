@@ -1,7 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
-#include "chable/hash_table.h"
+#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "sds/sds.h"
 #include <stdlib.h>
@@ -10,8 +10,8 @@ enum ast_type {
   ast_expr_binop,
   ast_expr_ternary,
   ast_expr_primary,
-  ast_trans_unit,
   ast_declaration,
+  ast_trans_unit,
 };
 
 enum type_qualifier {
@@ -53,9 +53,8 @@ typedef struct ast_node {
       union token v;
     } primary;
     struct trans_unit {
-      struct chable symtab;
+      struct dynarray declarations;
     } trans_unit;
-
     struct declaration {
       sds ident;
       // initializer/function body
