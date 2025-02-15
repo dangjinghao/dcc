@@ -137,15 +137,15 @@ static inline bool g_is_pointer_firstset(parser parser) {
 }
 
 /**
- * @brief 
+ * @brief also support abstract direct-declarator
  * @grammar, left recursive.
- * <direct-declarator> ::= <identifier>
+ * <direct-declarator> ::= {<identifier>}?
  *                      | ( <declarator> )
  *                      | <direct-declarator> [ {<constant-expression>}? ]
  *                      | <direct-declarator> ( {<parameter-type-list>}? )
  *
  * @grammar, right recursive.
- *<direct-declarator> ::= <identifier> <direct-declarator-suffix>
+ *<direct-declarator> ::= {<identifier>}? <direct-declarator-suffix>
  *                     | ( <declarator> ) <direct-declarator-suffix>
  *
  *<direct-declarator-suffix> ::= [ {<constant-expression>}? ] <direct-declarator-suffix>

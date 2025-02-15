@@ -19,5 +19,9 @@ void parser_free_ast(astn node);
 astn parse_assign_expr(parser parser);
 astn __parse_assign_expr(parser parser, int ctx_prec);
 astn parse_comma_expr(parser parser);
-
+astn parse_ident(parser parser);
+dynarray parse_declarator(parser parser, dynarray type_chain);
+bool parser_check_constant_expr(astn expr);
+astn parse_constant_expr(parser parser);
+astn parse_declaration(parser parser);
 #endif

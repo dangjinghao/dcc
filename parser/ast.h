@@ -4,14 +4,13 @@
 #include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "sds/sds.h"
-#include <stdlib.h>
 enum ast_type {
   ast_expr_unary = 1,
   ast_expr_binop,
   ast_expr_ternary,
   ast_expr_primary,
   ast_declaration,
-  ast_trans_unit,
+  ast_block,
   ast_ctype,
   ast_ident,
 };
@@ -26,7 +25,6 @@ enum type_qualifier {
 
 typedef struct ast_node {
   enum ast_type type;
-  unsigned int ln, col;
   union {
     sds ident;
     struct unary {
@@ -46,9 +44,9 @@ typedef struct ast_node {
       enum tok_type type;
       union token v;
     } primary;
-    struct trans_unit {
-      struct dynarray declarations;
-    } trans_unit;
+    struct block {
+      struct dynarray *decls, *stmts;
+    } block;
     struct ctype {
       enum type_qualifier qualifier;
       // trick: fill token_type with 0 or TOK_UNKNOWN
@@ -59,15 +57,11 @@ typedef struct ast_node {
       sds ident;
       // initializer/function body
       struct ast_node *extdata;
-      struct dynarray type_chain;
+      struct dynarray *type_chain;
     } declaration;
   };
 } *astn;
 
-static inline struct ast_node *ast_new(enum ast_type type) {
-  struct ast_node *node = calloc(1, sizeof(struct ast_node));
-  node->type = type;
-  return node;
-}
+struct ast_node *ast_new(enum ast_type type);
 
 #endif

@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "log/log.h"
 #include "sds/sds.h"
 #include <assert.h>
 #include <convert/convert.h>
@@ -36,8 +37,7 @@ void lexer_from_file(struct lexer *lexer, char *filename) {
   log_debug("Open file: %s", filename);
   FILE *f = fopen(filename, "r");
   if (!f) {
-    log_error("Failed to open file %s: %s", filename, strerror(errno));
-    exit(EXIT_FAILURE);
+    log_panic("Failed to open file %s: %s", filename, strerror(errno));
   }
   lexer_from_fp(lexer, f);
   strcpy(lexer->filename, filename);

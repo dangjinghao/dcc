@@ -22,6 +22,14 @@ static astn __parse_primary_expr_combine_str(parser parser) {
   return node;
 }
 
+astn parse_ident(parser parser) {
+  assert(parser->current_token == TOK_IDENT);
+  astn node = ast_new(ast_ident);
+  node->ident = parser->lexer->lex_token._ident;
+  parser_consume(parser);
+  return node;
+}
+
 astn parse_primary_expr(parser parser) {
   assert(g_is_primary_expression_firstset(parser));
   astn node = NULL;
@@ -38,9 +46,7 @@ astn parse_primary_expr(parser parser) {
     parser_consume(parser);
     break;
   case TOK_IDENT:
-    node = ast_new(ast_ident);
-    node->ident = parser->lexer->lex_token._ident;
-    parser_consume(parser);
+    node = parse_ident(parser);
     break;
   case '(':
     parser_consume(parser);
@@ -367,4 +373,15 @@ astn parse_comma_expr(parser parser) {
     node = n;
   }
   return node;
+}
+
+
+astn parse_constant_expr(parser parser) {
+  struct lexer lexer;
+  lexer_snapshot(&lexer, parser->lexer);
+  astn e = parse_assign_expr( parser);
+  if(!parser_check_constant_expr(e)){
+    compiler_error(&lexer, "Expected constant expression");
+  }
+  return e;
 }

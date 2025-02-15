@@ -122,8 +122,7 @@ char *lexer_token_to_string(int type);
 int lexer_next_token(struct lexer *lexer);
 #define compiler_error(lexer, fmt, ...)                                        \
   do {                                                                         \
-    log_error("Error at %s:%zu: " fmt, (lexer)->filename, (lexer)->ln,         \
+    log_panic("Error at %s:%zu: " fmt, (lexer)->filename, (lexer)->ln,         \
               ##__VA_ARGS__);                                                  \
-    exit(1);                                                                   \
   } while (0)
 #endif

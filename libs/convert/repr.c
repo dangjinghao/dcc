@@ -1,11 +1,12 @@
 #include "ast.h"
+#include "convert.h"
+#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
 #include "sds/sds.h"
 #include <assert.h>
 #include <stddef.h>
-#include "convert.h"
 #include <stdlib.h>
 /**
  * @brief input the decoded char part,
@@ -62,7 +63,46 @@ char convert_decode_char(char *c, char **endptr) {
   return 0;
 }
 
-sds convert_expr_obj_to_repr(astn n, sds buf) {
+void __convert_print_ast_repr(astn n) {
+  sds buf = sdsempty();
+  buf = convert_ast_to_repr(n, buf);
+  printf("%s\n", buf);
+  sdsfree(buf);
+}
+
+sds convert_enum_qualifier_to_string(enum type_qualifier q, sds buf) {
+  if (q == TYPE_QUAL_NONE) {
+    return sdscat(buf, "NONE");
+  }
+  int c = 0;
+  if (q & TYPE_QUAL_CONST) {
+    buf = sdscat(buf, "CONST");
+  }
+  if (q & TYPE_QUAL_VOLATILE) {
+    if (c) {
+      buf = sdscat(buf, " | ");
+    }
+    buf = sdscat(buf, "VOLATILE");
+    c++;
+  }
+  if (q & TYPE_QUAL_RESTRICT) {
+    if (c) {
+      buf = sdscat(buf, " | ");
+    }
+    buf = sdscat(buf, "RESTRICT");
+    c++;
+  }
+  if (q & TYPE_QUAL_INLINE) {
+    if (c) {
+      buf = sdscat(buf, " | ");
+    }
+    buf = sdscat(buf, "INLINE");
+    c++;
+  }
+  return buf;
+}
+
+sds convert_ast_to_repr(astn n, sds buf) {
   if (!n) {
     return buf;
   }
@@ -95,12 +135,12 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
     case TOK_LIT_STRING:
       buf = sdscatrepr(buf, n->primary.v._str, sdslen(n->primary.v._str));
       break;
-    case TOK_IDENT:
-      buf = sdscatlen(buf, n->primary.v._ident, sdslen(n->primary.v._ident));
-      break;
     default:
-      break;
+      assert(0 && "this primary type is not supported");
     }
+    break;
+  case ast_ident:
+    buf = sdscatsds(buf, n->ident);
     break;
   case ast_expr_unary:
     if (!n->unary.postfix) {
@@ -117,29 +157,13 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
       case TOK_KW_SIZEOF:
         buf = sdscatlen(buf, "sizeof ", 7);
         break;
-      case '-':
-        buf = sdscatlen(buf, "-", 1);
-        break;
-      case '+':
-        buf = sdscatlen(buf, "+", 1);
-        break;
-      case '!':
-        buf = sdscatlen(buf, "!", 1);
-        break;
-      case '~':
-        buf = sdscatlen(buf, "~", 1);
-        break;
-      case '*':
-        buf = sdscatlen(buf, "*", 1);
-        break;
-      case '&':
-        buf = sdscatlen(buf, "&", 1);
-        break;
-      default:
-        assert(0 && "this unary postfix op is not supported");
+      default: {
+        char c = n->unary.op;
+        buf = sdscatlen(buf, &c, 1);
+      }
       }
     }
-    buf = convert_expr_obj_to_repr(n->unary.expr, buf);
+    buf = convert_ast_to_repr(n->unary.expr, buf);
     if (n->unary.postfix) {
       switch (n->unary.op) {
       case TOK_SYM_SELF_INC:
@@ -154,22 +178,72 @@ sds convert_expr_obj_to_repr(astn n, sds buf) {
     }
     break;
   case ast_expr_binop:
-    buf = convert_expr_obj_to_repr(n->binop.lhs, buf);
+    buf = convert_ast_to_repr(n->binop.lhs, buf);
     char op = n->binop.op;
     buf = sdscatlen(buf, &op, 1);
-    buf = convert_expr_obj_to_repr(n->binop.rhs, buf);
+    buf = convert_ast_to_repr(n->binop.rhs, buf);
     break;
   case ast_expr_ternary:
-    buf = convert_expr_obj_to_repr(n->ternary.cond, buf);
+    buf = convert_ast_to_repr(n->ternary.cond, buf);
     buf = sdscatlen(buf, "?", 1);
-    buf = convert_expr_obj_to_repr(n->ternary._t, buf);
+    buf = convert_ast_to_repr(n->ternary._t, buf);
     buf = sdscatlen(buf, ":", 1);
-    buf = convert_expr_obj_to_repr(n->ternary._f, buf);
+    buf = convert_ast_to_repr(n->ternary._f, buf);
     break;
-  case ast_declaration:
-    log_error(
-        "unsupported ast type when converting expression object to repr: %d",
-        convert_ast_type_to_string(n->type));
+  case ast_declaration: {
+    buf = sdscatlen(buf, "declaration[", 12);
+    if (n->declaration.ident) {
+      buf = sdscatsds(buf, n->declaration.ident);
+    }
+    buf = sdscatlen(buf, " ", 1);
+    astn *ref;
+    dynarray_foreach(n->declaration.type_chain, ref) {
+      buf = convert_ast_to_repr(*ref, buf);
+      buf = sdscatlen(buf, " ", 1);
+    }
+    buf = sdscatlen(buf, "= ", 2);
+    buf = convert_ast_to_repr(n->declaration.extdata, buf);
+    buf = sdscatlen(buf, "]", 1);
+    break;
+  }
+  case ast_block: {
+    buf = sdscat(buf, "block[ decls[");
+    astn *ref;
+    dynarray_foreach(n->block.decls, ref) {
+      buf = convert_ast_to_repr(*ref, buf);
+      buf = sdscatlen(buf, " ", 1);
+    }
+    buf = sdscatlen(buf, "], stmts[", 1);
+    dynarray_foreach(n->block.stmts, ref) {
+      buf = convert_ast_to_repr(*ref, buf);
+      buf = sdscatlen(buf, " ", 1);
+    }
+    buf = sdscatlen(buf, "]]", 2);
+    break;
+  }
+  case ast_ctype:
+    buf = sdscatlen(buf, "ctype[", 6);
+
+    if (n->ctype.qualifier != TYPE_QUAL_NONE) {
+      buf = convert_enum_qualifier_to_string(n->ctype.qualifier, buf);
+      buf = sdscatlen(buf, " ", 1);
+    }
+    if (n->ctype.storage != TOK_UNKNOWN) {
+      buf = sdscatprintf(buf, "%s ",
+                         convert_token_type_to_string(n->ctype.storage));
+    }
+    if (n->ctype.signint != TOK_UNKNOWN) {
+      buf = sdscatprintf(buf, "%s ",
+                         convert_token_type_to_string(n->ctype.signint));
+    }
+    if (n->ctype.type != TOK_UNKNOWN) {
+      buf =
+          sdscatprintf(buf, "%s ", convert_token_type_to_string(n->ctype.type));
+    }
+    if (n->ctype.user_defined_type) {
+      buf = convert_ast_to_repr(n->ctype.user_defined_type, buf);
+    }
+    buf = sdscatlen(buf, "]", 1);
     break;
   }
   buf = sdscatlen(buf, ")", 1);
@@ -187,13 +261,13 @@ enum type_qualifier convert_token_type_to_qualifier(enum tok_type tok) {
   // case TOK_KW_INLINE:
   //   return TYPE_QUAL_INLINE;
   default:
-    log_error("invalid type qualifier token");
-    exit(EXIT_FAILURE);
+    log_panic("invalid type qualifier token");
     return TYPE_QUAL_NONE;
   }
 }
 
 char *convert_token_type_to_string(enum tok_type tok) {
+  static char b;
   switch (tok) {
     STRCASE(TOK_UNKNOWN);
     STRCASE(TOK_IDENT);
@@ -265,11 +339,11 @@ char *convert_token_type_to_string(enum tok_type tok) {
   case TOK_LIT_CHAR:
   case TOK_LIT_STRING:
   case __TOK_LIT_END:
-    log_error("invalid token type: %d", tok);
-    exit(EXIT_FAILURE);
+    log_panic("invalid token type: %d", tok);
     break;
   }
-  return NULL;
+  b = tok;
+  return &b;
 }
 
 size_t convert_token_type_to_size(enum tok_type t) {
@@ -289,7 +363,7 @@ size_t convert_token_type_to_size(enum tok_type t) {
   case TOK_KW_VOID:
     return sizeof(void);
   default:
-    log_error("unsupported type:`%s`", convert_token_type_to_string(t));
+    log_panic("unsupported type:`%s`", convert_token_type_to_string(t));
   }
   return 0;
 }
@@ -301,6 +375,20 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_expr_primary);
     STRCASE(ast_expr_ternary);
     STRCASE(ast_expr_unary);
+    STRCASE(ast_ident);
+    STRCASE(ast_block);
+    STRCASE(ast_ctype);
+  }
+  return NULL;
+}
+
+char *convert_type_qualifier(enum type_qualifier t) {
+  switch (t) {
+    STRCASE(TYPE_QUAL_NONE);
+    STRCASE(TYPE_QUAL_CONST);
+    STRCASE(TYPE_QUAL_VOLATILE);
+    STRCASE(TYPE_QUAL_RESTRICT);
+    STRCASE(TYPE_QUAL_INLINE);
   }
   return NULL;
 }

@@ -28,18 +28,15 @@ void parser_free(parser parser) {
 
 int parser_consume_with(parser parser, int token) {
   if (parser->current_token == token) {
-    if (token == TOK_LIT_STRING || token == TOK_IDENT) {
-      sdsfree(parser->lexer->lex_token._str);
-    }
     return parser_consume(parser);
   }
-  compiler_error(parser->lexer, "Expected token %s, got %s",
+  compiler_error(parser->lexer, "Expected token `%s`, got `%s`",
                  lexer_token_to_string(token),
                  lexer_token_to_string(parser->current_token));
   return 0;
 }
 /**
- * @brief Free the ast node, if the content is in heap memory, it would be skipped.
+ * @brief Free the ast node and its children, contents
  * 
  * @param node 
  */
@@ -111,4 +108,29 @@ struct declaration *parser_find_in_current_scope_table(sds ident,
 
 void parser_add_to_current_scope_table(struct declaration *decl, dynarray tab) {
   dynarray_add(tab, &decl);
+}
+
+bool parser_check_constant_expr(astn expr) {
+  // TODO: implement the constant expression check
+  return true;
+}
+
+struct ast_node *ast_new(enum ast_type type) {
+  struct ast_node *node = calloc(1, sizeof(struct ast_node));
+  node->type = type;
+  switch (type) {
+  case ast_declaration:
+    node->declaration.type_chain = calloc(1, sizeof(struct dynarray));
+    dynarray_default(node->declaration.type_chain, sizeof(astn));
+    break;
+  case ast_block:
+    node->block.decls = calloc(1, sizeof(struct dynarray));
+    node->block.stmts = calloc(1, sizeof(struct dynarray));
+    dynarray_default(node->block.decls, sizeof(astn));
+    dynarray_default(node->block.stmts, sizeof(astn));
+    break;
+  default:
+    break;
+  }
+  return node;
 }
