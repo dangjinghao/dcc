@@ -50,7 +50,7 @@ astn parse_primary_expr(parser parser) {
     break;
   case '(':
     parser_consume(parser);
-    node = parse_comma_expr(parser);
+    node = parse_expression(parser);
     parser_consume_with(parser, ')');
     break;
   default:
@@ -362,7 +362,7 @@ astn parse_assign_expr(parser parser) { return __parse_assign_expr(parser, 0); }
  * @param parser 
  * @return comma 
  */
-astn parse_comma_expr(parser parser) {
+astn parse_expression(parser parser) {
   astn node = parse_assign_expr(parser);
   while (parser->current_token == ',') {
     astn n = ast_new(ast_expr_binop);

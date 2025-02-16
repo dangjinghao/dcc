@@ -21,7 +21,7 @@ void parser_snapshot(parser _new, parser _old) {
   dynarray_copy(&_new->tagtab, &_old->tagtab);
 }
 
-void parser_free(parser parser) {
+void parser_destory(parser parser) {
   dynarray_free(&parser->idtab);
   dynarray_free(&parser->tagtab);
 }
@@ -36,7 +36,7 @@ int parser_consume_with(parser parser, int token) {
   return 0;
 }
 /**
- * @brief Free the ast node and its children, contents
+ * @brief Free the ast node and its children and contents
  * 
  * @param node 
  */
@@ -56,8 +56,9 @@ void parser_free_ast(astn node) {
     if (node->primary.type == TOK_LIT_STRING) {
       sdsfree(node->primary.v._str);
     }
-  }
-
+  } else if (node->type == ast_ident) {
+    sdsfree(node->ident);
+  }else 
   free(node);
 }
 
@@ -132,4 +133,10 @@ struct ast_node *ast_new(enum ast_type type) {
     break;
   }
   return node;
+}
+
+astn ast_new_empty_statement() {
+  astn stmt = ast_new(ast_expr_primary);
+  stmt->primary.type = TOK_EOF;
+  return stmt;
 }

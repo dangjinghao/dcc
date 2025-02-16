@@ -13,6 +13,7 @@ enum ast_type {
   ast_block,
   ast_ctype,
   ast_ident,
+  ast_labeled_statement,
 };
 
 enum type_qualifier {
@@ -59,9 +60,14 @@ typedef struct ast_node {
       struct ast_node *extdata;
       struct dynarray *type_chain;
     } declaration;
+    struct labeled_statement {
+      enum tok_type type;
+      struct ast_node *value;
+      struct ast_node *stmt;
+    } labeled_statement;
   };
 } *astn;
 
 struct ast_node *ast_new(enum ast_type type);
-
+astn ast_new_empty_statement();
 #endif

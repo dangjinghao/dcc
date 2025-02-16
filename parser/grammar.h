@@ -1,5 +1,6 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
+#include "ast.h"
 #include "lexer.h"
 #include "macro/macro.h"
 #include "parser.h"
@@ -293,9 +294,107 @@ static inline bool g_is_compound_statement_firstset(parser parser) {
   return parser->current_token == '{';
 }
 
+/**
+ * @brief 
+ * @grammar
+ * <labeled-statement> ::= <identifier> : <statement>
+ *                      | case <constant-expression> : <statement>
+ *                      | default : <statement>
+ * 
+ */
+static inline bool g_is_labeled_statement_firstset(parser parser) {
+  return parser->current_token == TOK_IDENT ||
+         parser->current_token == TOK_KW_CASE ||
+         parser->current_token == TOK_KW_DEFAULT;
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <expression> ::= <assignment-expression>
+ *               | <expression> , <assignment-expression>
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_expression_firstset(parser parser) {
+  return g_is_assignment_expression_firstset(parser);
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <expression-statement> ::= {<expression>}? ;
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_expression_statement_firstset(parser parser) {
+  return g_is_expression_firstset(parser) || parser->current_token == ';';
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <selection-statement> ::= if ( <expression> ) <statement>
+ *                        | if ( <expression> ) <statement> else <statement>
+ *                        | switch ( <expression> ) <statement>
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_selection_statement_firstset(parser parser) {
+  return parser->current_token == TOK_KW_IF ||
+         parser->current_token == TOK_KW_SWITCH;
+}
+/**
+ * @brief 
+ * @grammar
+ * <iteration-statement> ::= while ( <expression> ) <statement>
+ *                         | do <statement> while ( <expression> ) ;
+ *                         | for ( {<expression>}? ; {<expression>}? ; {<expression>}? ) <statement>
+ */
+static inline bool g_is_iteration_statement_firstset(parser parser) {
+  return parser->current_token == TOK_KW_WHILE ||
+         parser->current_token == TOK_KW_DO ||
+         parser->current_token == TOK_KW_FOR;
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <jump-statement> ::= goto <identifier> ;
+ *                   | continue ;
+ *                   | break ;
+ *                   | return {<expression>}? ;
+ */
+static inline bool g_is_jump_statement_firstset(parser parser) {
+  return parser->current_token == TOK_KW_GOTO ||
+         parser->current_token == TOK_KW_CONTINUE ||
+         parser->current_token == TOK_KW_BREAK ||
+         parser->current_token == TOK_KW_RETURN;
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <statement> ::= <labeled-statement>
+ *              | <expression-statement>
+ *              | <compound-statement>
+ *              | <selection-statement>
+ *              | <iteration-statement>
+ *              | <jump-statement>
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
 static inline bool g_is_statement_firstset(parser parser) {
-  return false;
-  BUILDING();
+  return g_is_labeled_statement_firstset(parser) ||
+         g_is_expression_statement_firstset(parser) ||
+         g_is_compound_statement_firstset(parser) ||
+         g_is_selection_statement_firstset(parser) ||
+         g_is_iteration_statement_firstset(parser) ||
+         g_is_jump_statement_firstset(parser);
 }
 
 static inline astn g_get_function_params(astn declaration) {
@@ -312,8 +411,13 @@ static inline astn g_get_function_body(astn declaration) {
 }
 
 static inline bool g_is_function_definition(astn declaration) {
-  assert(g_get_function_params(declaration));
-  return g_get_function_body(declaration) != NULL;
+  return g_get_function_params(declaration) &&
+         g_get_function_body(declaration) != NULL;
+}
+
+static inline bool g_is_empty_statement(astn statement) {
+  return statement->type == ast_expr_primary &&
+         statement->primary.type == TOK_EOF;
 }
 
 #endif

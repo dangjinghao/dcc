@@ -8,7 +8,7 @@
 int process_expr(struct lexer *lexer) {
   struct parser parser;
   parser_from_lexer(&parser, lexer);
-  astn n = parse_comma_expr(&parser);
+  astn n = parse_expression(&parser);
   sds buf = sdsempty();
   buf = convert_ast_to_repr(n, buf);
   parser_free_ast(n);
