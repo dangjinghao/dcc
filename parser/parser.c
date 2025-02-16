@@ -3,6 +3,7 @@
 #include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "log/log.h"
+#include "macro/macro.h"
 #include "sds/sds.h"
 int parser_consume(parser parser) {
   return parser->current_token = lexer_next_token(parser->lexer);
@@ -81,9 +82,6 @@ void ast_free(astn node) {
   }
   case ast_block: {
     astn *ref;
-    dynarray_foreach(node->block.decls, ref) { ast_free(*ref); }
-    dynarray_free(node->block.decls);
-    free(node->block.decls);
     dynarray_foreach(node->block.stmts, ref) { ast_free(*ref); }
     dynarray_free(node->block.stmts);
     free(node->block.stmts);
@@ -95,7 +93,8 @@ void ast_free(astn node) {
   }
   case ast_labeled_statement: {
     ast_free(node->labeled_statement.stmt);
-    ast_free(node->labeled_statement.value);
+    if (node->labeled_statement.label_value)
+      ast_free(node->labeled_statement.label_value);
     break;
   }
   default: {
@@ -155,8 +154,8 @@ void parser_add_to_current_scope_table(struct declaration *decl, dynarray tab) {
 }
 
 bool parser_check_constant_expr(astn expr) {
-  // TODO: implement the constant expression check
   return true;
+  BUILDING();
 }
 
 astn ast_new(enum ast_type type) {
@@ -168,9 +167,7 @@ astn ast_new(enum ast_type type) {
     dynarray_default(node->declaration.type_chain, sizeof(astn));
     break;
   case ast_block:
-    node->block.decls = calloc(1, sizeof(struct dynarray));
     node->block.stmts = calloc(1, sizeof(struct dynarray));
-    dynarray_default(node->block.decls, sizeof(astn));
     dynarray_default(node->block.stmts, sizeof(astn));
     break;
   default:
@@ -209,7 +206,7 @@ astn ast_copy(astn n) {
   case ast_expr_primary:
     new->primary.type = n->primary.type;
     new->primary.v = n->primary.v;
-    if(n->primary.type == TOK_LIT_STRING){
+    if (n->primary.type == TOK_LIT_STRING) {
       new->primary.v._str = sdsdup(n->primary.v._str);
     }
     break;
@@ -227,10 +224,6 @@ astn ast_copy(astn n) {
     break;
   case ast_block: {
     astn *ref;
-    dynarray_foreach(n->block.decls, ref) {
-      astn copy = ast_copy(*ref);
-      dynarray_add(new->block.decls, &copy);
-    }
     dynarray_foreach(n->block.stmts, ref) {
       astn copy = ast_copy(*ref);
       dynarray_add(new->block.stmts, &copy);
@@ -246,7 +239,8 @@ astn ast_copy(astn n) {
     break;
   case ast_labeled_statement:
     new->labeled_statement.type = n->labeled_statement.type;
-    new->labeled_statement.value = ast_copy(n->labeled_statement.value);
+    new->labeled_statement.label_value =
+        ast_copy(n->labeled_statement.label_value);
     new->labeled_statement.stmt = ast_copy(n->labeled_statement.stmt);
     break;
   default:

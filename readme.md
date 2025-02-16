@@ -2,7 +2,7 @@
 
 ## TODO
 
-- all prefix and suffix unary op support and their repr
+- use sslist instead of dynarray for performance
 
 ## expression parser
 

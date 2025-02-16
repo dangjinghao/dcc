@@ -46,7 +46,7 @@ typedef struct ast_node {
       union token v;
     } primary;
     struct block {
-      struct dynarray *decls, *stmts;
+      struct dynarray *stmts;
     } block;
     struct ctype {
       enum type_qualifier qualifier;
@@ -62,7 +62,7 @@ typedef struct ast_node {
     } declaration;
     struct labeled_statement {
       enum tok_type type;
-      struct ast_node *value;
+      struct ast_node *label_value;
       struct ast_node *stmt;
     } labeled_statement;
   };

@@ -25,6 +25,7 @@ bool parser_check_constant_expr(astn expr);
 astn parse_constant_expr(parser parser);
 astn parse_external_declaration(parser parser, astn block);
 astn parse_labeled_statement(parser p);
+astn parse_statement(parser p);
 astn parse_translation_unit(parser parser);
-astn parse_compound_statement(parser parser, astn block);
+astn parse_compound_statement(parser parser);
 #endif

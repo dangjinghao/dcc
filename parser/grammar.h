@@ -1,6 +1,7 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
 #include "ast.h"
+#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "macro/macro.h"
 #include "parser.h"
@@ -398,8 +399,12 @@ static inline bool g_is_statement_firstset(parser parser) {
 }
 
 static inline astn g_get_function_params(astn declaration) {
+  assert(declaration->type == ast_declaration);
+  astn *ref = dynarray_get(declaration->declaration.type_chain, 0);
+  if ((*ref)->type == ast_block) {
+    return *ref;
+  }
   return NULL;
-  BUILDING();
 }
 
 static inline astn g_get_function_body(astn declaration) {

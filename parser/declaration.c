@@ -11,6 +11,9 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+dynarray parse_parameter_type_list(parser parser) { BUILDING(); }
+
 /**
  * @brief using the chable to store all declarations
  * @param parser 
@@ -146,16 +149,22 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
   while (parser->current_token == '[' || parser->current_token == '(') {
     if (parser->current_token == '[') {
       parser_consume(parser);
-      BUILDING();
+
+      astn content_type = ast_new(ast_expr_unary);
+      content_type->unary.op = '[';
       if (parser->current_token != ']') {
+        content_type->unary.expr = parse_constant_expr(parser);
       }
       parser_consume_with(parser, ']');
+      dynarray_add(type_chain, &content_type);
     } else {
       parser_consume(parser);
+      astn content_type = ast_new(ast_block);
       if (parser->current_token != ')') {
-        BUILDING();
+        content_type->block.stmts = parse_parameter_type_list(parser);
       }
       parser_consume_with(parser, ')');
+      dynarray_add(type_chain, &content_type);
     }
   }
   return type_chain;
@@ -211,8 +220,7 @@ astn parse_init_declarator(parser parser, astn decl_specs) {
     n->declaration.extdata = parse_initializer(parser);
   } else if (parser->current_token == '{') {
     // function body
-    astn block = ast_new(ast_block);
-    n->declaration.extdata = parse_compound_statement(parser, block);
+    n->declaration.extdata = parse_compound_statement(parser);
   }
   return n;
 }
@@ -226,7 +234,7 @@ astn parse_external_declaration(parser parser, astn current_block) {
   astn init_declarator;
   if (g_is_init_declarator_firstset(parser)) {
     init_declarator = parse_init_declarator(parser, decl_specs);
-    dynarray_add(current_block->block.decls, &init_declarator);
+    dynarray_add(current_block->block.stmts, &init_declarator);
     if (g_is_function_definition(init_declarator)) {
       return current_block;
     }
@@ -234,7 +242,7 @@ astn parse_external_declaration(parser parser, astn current_block) {
   while (parser->current_token == ',') {
     parser_consume(parser);
     init_declarator = parse_init_declarator(parser, ast_copy(decl_specs));
-    dynarray_add(current_block->block.decls, &init_declarator);
+    dynarray_add(current_block->block.stmts, &init_declarator);
   }
   parser_consume_with(parser, ';');
   return current_block;

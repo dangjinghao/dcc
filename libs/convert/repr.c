@@ -207,13 +207,8 @@ sds convert_ast_to_repr(astn n, sds buf) {
     break;
   }
   case ast_block: {
-    buf = sdscat(buf, "block[ decls[");
+    buf = sdscat(buf, "block[stmts[");
     astn *ref;
-    dynarray_foreach(n->block.decls, ref) {
-      buf = convert_ast_to_repr(*ref, buf);
-      buf = sdscatlen(buf, " ", 1);
-    }
-    buf = sdscatlen(buf, "], stmts[", 1);
     dynarray_foreach(n->block.stmts, ref) {
       buf = convert_ast_to_repr(*ref, buf);
       buf = sdscatlen(buf, " ", 1);
@@ -246,7 +241,13 @@ sds convert_ast_to_repr(astn n, sds buf) {
     buf = sdscatlen(buf, "]", 1);
     break;
   case ast_labeled_statement:
-    BUILDING();
+    buf = sdscatprintf(buf, "%s ",
+                       convert_token_type_to_string(n->labeled_statement.type));
+    if (n->labeled_statement.label_value) {
+      buf = convert_ast_to_repr(n->labeled_statement.label_value, buf);
+    }
+    buf = convert_ast_to_repr(n->labeled_statement.stmt, buf);
+
     break;
   }
   buf = sdscatlen(buf, ")", 1);

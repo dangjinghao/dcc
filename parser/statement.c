@@ -1,5 +1,6 @@
 
 #include "ast.h"
+#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "macro/macro.h"
@@ -20,14 +21,15 @@ astn parse_expression_statement(parser p) {
  * @param block 
  * @return astn 
  */
-astn parse_compound_statement(parser parser, astn block) {
+astn parse_compound_statement(parser parser) {
   assert(g_is_compound_statement_firstset(parser));
   parser_consume_with(parser, '{');
+  astn block = ast_new(ast_block);
   while (true) {
     if (g_is_external_declaration_firstset(parser)) {
       parse_external_declaration(parser, block);
     } else if (g_is_statement_firstset(parser)) {
-      BUILDING();
+      dynarray_add(block->block.stmts, parse_statement(parser));
     } else {
       break;
     }
@@ -49,8 +51,7 @@ astn parse_statement(parser p) {
       stmt = parse_expression_statement(p);
     }
   } else if (g_is_compound_statement_firstset(p)) {
-    BUILDING();
-    // stmt = parse_compound_statement(p);
+    stmt = parse_compound_statement(p);
   } else if (g_is_selection_statement_firstset(p)) {
     stmt = parse_selection_statement(p);
   } else if (g_is_iteration_statement_firstset(p)) {
@@ -101,7 +102,7 @@ astn parse_labeled_statement(parser p) {
   astn stmt = parse_statement(p);
   astn ls = ast_new(ast_labeled_statement);
   ls->labeled_statement.type = label_type;
-  ls->labeled_statement.value = label;
+  ls->labeled_statement.label_value = label;
   ls->labeled_statement.stmt = stmt;
 
   return ls;
