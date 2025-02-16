@@ -11,12 +11,6 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
-astn parse_external_declaration(parser parser) {
-  assert(g_is_external_declaration_firstset(parser));
-  BUILDING();
-  // try-resoume algorithm
-}
-
 /**
  * @brief using the chable to store all declarations
  * 
@@ -30,7 +24,7 @@ astn parse_translation_unit(parser parser) {
   }
   astn n = ast_new(ast_block);
   while (g_is_external_declaration_firstset(parser)) {
-    parse_external_declaration(parser);
+    parse_external_declaration(parser, n);
   }
   return n;
 }
@@ -38,6 +32,28 @@ astn parse_translation_unit(parser parser) {
 static void parse_set_type_qualifier(struct ctype *tn,
                                      enum type_qualifier qualifier) {
   tn->qualifier |= qualifier;
+}
+/**
+ * @brief We have to pass the external block because the sub-scope would reuse the function subscope to store the declarations
+ * 
+ * @param parser 
+ * @param block 
+ * @return astn 
+ */
+astn parse_compound_statement(parser parser, astn block) {
+  assert(g_is_compound_statement_firstset(parser));
+  parser_consume_with(parser, '{');
+  while (true) {
+    if (g_is_external_declaration_firstset(parser)) {
+      parse_external_declaration(parser, block);
+    } else if (g_is_statement_firstset(parser)) {
+      BUILDING();
+    } else {
+      break;
+    }
+  }
+  parser_consume_with(parser, '}');
+  return block;
 }
 
 void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
@@ -200,7 +216,8 @@ sds parse_remove_type_chain_ident(dynarray type_chain) {
     return NULL;
   }
   dynarray_pop_head(type_chain, NULL);
-  return first->ident;
+  sds ident = first->ident;
+  return ident;
 }
 
 astn parse_init_declarator(parser parser, astn decl_specs) {
@@ -214,26 +231,33 @@ astn parse_init_declarator(parser parser, astn decl_specs) {
   if (parser->current_token == '=') {
     parser_consume(parser);
     n->declaration.extdata = parse_initializer(parser);
+  } else if (parser->current_token == '{') {
+    // function body
+    astn block = ast_new(ast_block);
+    n->declaration.extdata = parse_compound_statement(parser, block);
   }
   return n;
 }
 
-astn parse_declaration(parser parser) {
-  assert(g_is_declaration_firstset(parser));
+astn parse_external_declaration(parser parser, astn current_block) {
+  assert(g_is_external_declaration_firstset(parser));
+  assert(current_block->type == ast_block);
   astn decl_specs = parse_declaration_specifiers(parser);
   // we would reduce the grammar complexity,
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
-  astn n = ast_new(ast_block);
   if (g_is_init_declarator_firstset(parser)) {
     init_declarator = parse_init_declarator(parser, decl_specs);
-    dynarray_add(n->block.decls, &init_declarator);
+    dynarray_add(current_block->block.decls, &init_declarator);
+    if (g_is_function_definition(init_declarator)) {
+      return current_block;
+    }
   }
   while (parser->current_token == ',') {
     parser_consume(parser);
     init_declarator = parse_init_declarator(parser, decl_specs);
-    dynarray_add(n->block.decls, &init_declarator);
+    dynarray_add(current_block->block.decls, &init_declarator);
   }
   parser_consume_with(parser, ';');
-  return n;
+  return current_block;
 }

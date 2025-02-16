@@ -1,6 +1,9 @@
+#include "ast.h"
 #include "convert/convert.h"
 #include "lexer.h"
+#include "log/log.h"
 #include "parser.h"
+#include <stdbool.h>
 
 int process_expr(struct lexer *lexer) {
   struct parser parser;
@@ -17,7 +20,8 @@ int process_expr(struct lexer *lexer) {
 int process_declaration(struct lexer *lexer) {
   struct parser parser;
   parser_from_lexer(&parser, lexer);
-  astn n = parse_declaration(&parser);
+  astn n = ast_new(ast_block);
+  parse_external_declaration(&parser, n);
   sds buf = sdsempty();
   buf = convert_ast_to_repr(n, buf);
   parser_free_ast(n);
@@ -43,7 +47,7 @@ int str_paren_parse() {
   return 0;
 }
 
-int str_combine(){
+int str_combine() {
   struct lexer lexer;
   lexer_from_string(&lexer, ".1f + \"123\" \"456\" + '\\'' ");
   process_expr(&lexer);
@@ -54,10 +58,13 @@ int str_combine(){
 
 int declaration() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "const int *const ((((* volatile a)))) = 1, b = 2, c = 3;");
+  lexer_from_string(&lexer, "int ");
   process_declaration(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
 
-int main() { return declaration(); }
+int main() {
+  log_color_enable(true);
+  return declaration();
+}

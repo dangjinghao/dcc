@@ -375,12 +375,11 @@ astn parse_comma_expr(parser parser) {
   return node;
 }
 
-
 astn parse_constant_expr(parser parser) {
   struct lexer lexer;
   lexer_snapshot(&lexer, parser->lexer);
-  astn e = parse_assign_expr( parser);
-  if(!parser_check_constant_expr(e)){
+  astn e = parse_assign_expr(parser);
+  if (!parser_check_constant_expr(e)) {
     compiler_error(&lexer, "Expected constant expression");
   }
   return e;

@@ -23,5 +23,6 @@ astn parse_ident(parser parser);
 dynarray parse_declarator(parser parser, dynarray type_chain);
 bool parser_check_constant_expr(astn expr);
 astn parse_constant_expr(parser parser);
-astn parse_declaration(parser parser);
+astn parse_external_declaration(parser parser, astn block);
+
 #endif

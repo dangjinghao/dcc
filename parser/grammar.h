@@ -175,7 +175,7 @@ static inline bool g_is_declarator_firstset(parser parser) {
 /**
  * @brief 
  * @grammar 
- * <function-definition> ::= {<declaration-specifier>}+ <declarator> {<declaration>}* <compound-statement>
+ * <function-definition> ::= {<declaration-specifier>}+ <declarator> <compound-statement>
  * 
  */
 static inline bool g_is_function_definition_firstset(parser parser) {
@@ -200,8 +200,7 @@ static inline bool g_is_declaration_firstset(parser parser) {
  * @param parser 
  */
 static inline bool g_is_external_declaration_firstset(parser parser) {
-  return g_is_function_definition_firstset(parser) ||
-         g_is_declaration_firstset(parser);
+  return g_is_declaration_specifier_firstset(parser);
 }
 
 /**
@@ -279,7 +278,42 @@ static inline bool g_is_assignment_expression_firstset(parser parser) {
 static inline bool g_is_initializer_firstset(parser parser) {
   return g_is_assignment_expression_firstset(parser) ||
          parser->current_token == '{';
+}
+
+/**
+ * @brief because of the implementation features, we have to modify the BNF grammar to 
+ * make it support define function in compound statement.
+ * @grammar
+ * <compound-statement> ::= { {{<external-declaration>} | {<statement>}}* }
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_compound_statement_firstset(parser parser) {
+  return parser->current_token == '{';
+}
+
+static inline bool g_is_statement_firstset(parser parser) {
+  return false;
   BUILDING();
+}
+
+static inline astn g_get_function_params(astn declaration) {
+  return true;
+  BUILDING();
+}
+
+static inline astn g_get_function_body(astn declaration) {
+  if (declaration->declaration.extdata) {
+    assert(declaration->declaration.extdata->type == ast_block);
+    return declaration->declaration.extdata;
+  }
+  return NULL;
+}
+
+static inline bool g_is_function_definition(astn declaration) {
+  assert(g_get_function_params(declaration));
+  return g_get_function_body(declaration) != NULL;
 }
 
 #endif

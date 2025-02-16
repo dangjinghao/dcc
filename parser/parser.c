@@ -53,8 +53,7 @@ void parser_free_ast(astn node) {
     parser_free_ast(node->ternary._t);
     parser_free_ast(node->ternary._f);
   } else if (node->type == ast_expr_primary) {
-    if (node->primary.type == TOK_LIT_STRING ||
-        node->primary.type == TOK_IDENT) {
+    if (node->primary.type == TOK_LIT_STRING) {
       sdsfree(node->primary.v._str);
     }
   }

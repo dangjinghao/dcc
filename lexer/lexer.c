@@ -227,7 +227,9 @@ char *lexer_get_token_str_in_token_table(enum tok_type type,
 
 char *lexer_token_to_string(int type) {
   static char buf[16] = {0};
-  if (type < 256) {
+  if (type == TOK_EOF) {
+    return "EOF";
+  } else if (type < 256) {
     memset(buf, 0, sizeof(buf));
     buf[0] = type;
     return buf;
