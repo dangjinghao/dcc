@@ -45,9 +45,7 @@ astn parse_statement(parser p) {
   assert(g_is_statement_firstset(p));
   astn stmt = NULL;
   if (g_is_labeled_statement_firstset(p)) {
-    if ((stmt = parse_labeled_statement(p))) {
-      return stmt;
-    } else {
+    if (!(stmt = parse_labeled_statement(p))) {
       stmt = parse_expression_statement(p);
     }
   } else if (g_is_compound_statement_firstset(p)) {

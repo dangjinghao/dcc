@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "log/log.h"
+#include "macro/macro.h"
 #include "sds/sds.h"
 #include <assert.h>
 #include <convert/convert.h>
@@ -40,7 +41,7 @@ void lexer_from_file(struct lexer *lexer, char *filename) {
     log_panic("Failed to open file %s: %s", filename, strerror(errno));
   }
   lexer_from_fp(lexer, f);
-  strcpy(lexer->filename, filename);
+  strncpy(lexer->filename, filename, CONST_STRLEN(lexer->filename));
   fclose(f);
 }
 

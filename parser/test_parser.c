@@ -46,6 +46,18 @@ int process_trans_unit(struct lexer *lexer) {
   return 0;
 }
 
+int process_statement(struct lexer *lexer) {
+  struct parser parser;
+  parser_from_lexer(&parser, lexer);
+  astn n = parse_statement(&parser);
+  sds buf = sdsempty();
+  buf = convert_ast_to_repr(n, buf);
+  ast_free(n);
+  printf("%s\n", buf);
+  sdsfree(buf);
+  parser_destory(&parser);
+  return 0;
+}
 
 int str_parse() {
   struct lexer lexer;
@@ -82,7 +94,15 @@ int declaration() {
   return 0;
 }
 
+int statement() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "a = b = 1;");
+  process_statement(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 int main() {
   log_color_enable(true);
-  return declaration();
+  return statement();
 }

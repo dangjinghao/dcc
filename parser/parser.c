@@ -10,22 +10,33 @@ int parser_consume(parser parser) {
 }
 
 void parser_from_lexer(parser parser, struct lexer *lexer) {
-  parser->lexer = lexer;
+  parser->lexer = malloc(sizeof(struct lexer));
+  lexer_snapshot(parser->lexer, lexer);
   parser_consume(parser);
   dynarray_default(&parser->idtab, sizeof(struct declaration *));
   dynarray_default(&parser->tagtab, sizeof(struct declaration *));
 }
 
 void parser_snapshot(parser _new, parser _old) {
+  _new->lexer = malloc(sizeof(struct lexer));
   lexer_snapshot(_new->lexer, _old->lexer);
   _new->current_token = _old->current_token;
+  // bad hack
+  if(_old->current_token == TOK_IDENT || _old->current_token == TOK_LIT_STRING) {
+    _new->lexer->lex_token._ident = sdsdup(_old->lexer->lex_token._ident);
+  }
   dynarray_copy(&_new->idtab, &_old->idtab);
   dynarray_copy(&_new->tagtab, &_old->tagtab);
 }
 
 void parser_destory(parser parser) {
+  // bad hack
+  if(parser->current_token == TOK_IDENT || parser->current_token == TOK_LIT_STRING) {
+    sdsfree(parser->lexer->lex_token._ident);
+  }
   dynarray_free(&parser->idtab);
   dynarray_free(&parser->tagtab);
+  free(parser->lexer);
 }
 
 int parser_consume_with(parser parser, int token) {

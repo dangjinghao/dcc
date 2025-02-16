@@ -85,8 +85,8 @@ enum tok_type {
 
 struct lexer {
   size_t ln;
-  char filename[FILENAME_MAX];
   sds src;
+  size_t pos;
   union token {
     char _char;
     double _double;
@@ -96,7 +96,7 @@ struct lexer {
     sds _str;
     sds _ident;
   } lex_token;
-  size_t pos;
+  char filename[256];
 };
 
 void lexer_from_string(struct lexer *lexer, char *src);
