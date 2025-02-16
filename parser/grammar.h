@@ -398,7 +398,7 @@ static inline bool g_is_statement_firstset(parser parser) {
 }
 
 static inline astn g_get_function_params(astn declaration) {
-  return true;
+  return NULL;
   BUILDING();
 }
 

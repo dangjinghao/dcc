@@ -70,4 +70,5 @@ typedef struct ast_node {
 
 struct ast_node *ast_new(enum ast_type type);
 astn ast_new_empty_statement();
+astn ast_copy(astn n);
 #endif

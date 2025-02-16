@@ -13,7 +13,28 @@ astn parse_expression_statement(parser p) {
   return expr;
 }
 
-astn parse_compound_statement(parser p) { BUILDING(); }
+/**
+ * @brief We have to pass the external block because the sub-scope would reuse the function subscope to store the declarations
+ * 
+ * @param parser 
+ * @param block 
+ * @return astn 
+ */
+astn parse_compound_statement(parser parser, astn block) {
+  assert(g_is_compound_statement_firstset(parser));
+  parser_consume_with(parser, '{');
+  while (true) {
+    if (g_is_external_declaration_firstset(parser)) {
+      parse_external_declaration(parser, block);
+    } else if (g_is_statement_firstset(parser)) {
+      BUILDING();
+    } else {
+      break;
+    }
+  }
+  parser_consume_with(parser, '}');
+  return block;
+}
 astn parse_selection_statement(parser p) { BUILDING(); }
 astn parse_iteration_statement(parser p) { BUILDING(); }
 astn parse_jump_statement(parser p) { BUILDING(); }
@@ -28,7 +49,8 @@ astn parse_statement(parser p) {
       stmt = parse_expression_statement(p);
     }
   } else if (g_is_compound_statement_firstset(p)) {
-    stmt = parse_compound_statement(p);
+    BUILDING();
+    // stmt = parse_compound_statement(p);
   } else if (g_is_selection_statement_firstset(p)) {
     stmt = parse_selection_statement(p);
   } else if (g_is_iteration_statement_firstset(p)) {
@@ -62,7 +84,7 @@ astn parse_labeled_statement(parser p) {
       parser_destory(p);
       parser_snapshot(p, &backup);
       parser_destory(&backup);
-      parser_free_ast(label);
+      ast_free(label);
       return NULL;
     }
     break;

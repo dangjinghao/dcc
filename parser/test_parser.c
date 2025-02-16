@@ -11,9 +11,11 @@ int process_expr(struct lexer *lexer) {
   astn n = parse_expression(&parser);
   sds buf = sdsempty();
   buf = convert_ast_to_repr(n, buf);
-  parser_free_ast(n);
+  ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
+  parser_destory(&parser);
+
   return 0;
 }
 
@@ -24,11 +26,26 @@ int process_declaration(struct lexer *lexer) {
   parse_external_declaration(&parser, n);
   sds buf = sdsempty();
   buf = convert_ast_to_repr(n, buf);
-  parser_free_ast(n);
+  ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
+  parser_destory(&parser);
   return 0;
 }
+
+int process_trans_unit(struct lexer *lexer) {
+  struct parser parser;
+  parser_from_lexer(&parser, lexer);
+  astn n = parse_translation_unit(&parser);
+  sds buf = sdsempty();
+  buf = convert_ast_to_repr(n, buf);
+  ast_free(n);
+  printf("%s\n", buf);
+  sdsfree(buf);
+  parser_destory(&parser);
+  return 0;
+}
+
 
 int str_parse() {
   struct lexer lexer;
@@ -58,8 +75,9 @@ int str_combine() {
 
 int declaration() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "int ");
-  process_declaration(&lexer);
+  lexer_from_string(&lexer,
+                    "int a = 1, b = a, **((*c)) = 1+(((((1))))) + 2*(3+4);");
+  process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }

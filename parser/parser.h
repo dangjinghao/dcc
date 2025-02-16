@@ -6,7 +6,7 @@
 typedef struct parser {
   struct lexer *lexer;
   int current_token;
-  // add NULL if we meet a new scope
+  // add NULL if we meet a new scope. store the *ref* of ast node
   struct dynarray idtab;
   struct dynarray tagtab; //enum, struct, union
 } *parser;
@@ -15,7 +15,7 @@ void parser_snapshot(parser _new, parser _old);
 void parser_destory(parser parser);
 int parser_consume(parser parser);
 int parser_consume_with(parser parser, int token);
-void parser_free_ast(astn node);
+void ast_free(astn node);
 astn parse_assign_expr(parser parser);
 astn __parse_assign_expr(parser parser, int ctx_prec);
 astn parse_expression(parser parser);
@@ -25,4 +25,6 @@ bool parser_check_constant_expr(astn expr);
 astn parse_constant_expr(parser parser);
 astn parse_external_declaration(parser parser, astn block);
 astn parse_labeled_statement(parser p);
+astn parse_translation_unit(parser parser);
+astn parse_compound_statement(parser parser, astn block);
 #endif

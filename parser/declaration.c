@@ -13,7 +13,6 @@
 #include <stdlib.h>
 /**
  * @brief using the chable to store all declarations
- * 
  * @param parser 
  * @return dynnarray
  */
@@ -32,28 +31,6 @@ astn parse_translation_unit(parser parser) {
 static void parse_set_type_qualifier(struct ctype *tn,
                                      enum type_qualifier qualifier) {
   tn->qualifier |= qualifier;
-}
-/**
- * @brief We have to pass the external block because the sub-scope would reuse the function subscope to store the declarations
- * 
- * @param parser 
- * @param block 
- * @return astn 
- */
-astn parse_compound_statement(parser parser, astn block) {
-  assert(g_is_compound_statement_firstset(parser));
-  parser_consume_with(parser, '{');
-  while (true) {
-    if (g_is_external_declaration_firstset(parser)) {
-      parse_external_declaration(parser, block);
-    } else if (g_is_statement_firstset(parser)) {
-      BUILDING();
-    } else {
-      break;
-    }
-  }
-  parser_consume_with(parser, '}');
-  return block;
 }
 
 void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
@@ -194,17 +171,17 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
  */
 dynarray parse_declarator(parser parser, dynarray type_chain) {
   assert(g_is_declarator_firstset(parser));
-  struct dynarray inversed_pointers;
-  dynarray_init(&inversed_pointers, sizeof(astn), 0);
+  struct dynarray reversed_pointers;
+  dynarray_init(&reversed_pointers, sizeof(astn), 0);
   if (g_is_pointer_firstset(parser)) {
-    parse_pointers(parser, &inversed_pointers);
+    parse_pointers(parser, &reversed_pointers);
   }
   parse_direct_declarator(parser, type_chain);
   astn *ref;
-  dynarray_foreach_reverse(&inversed_pointers, ref) {
+  dynarray_foreach_reverse(&reversed_pointers, ref) {
     dynarray_add(type_chain, ref);
   }
-  dynarray_free(&inversed_pointers);
+  dynarray_free(&reversed_pointers);
   return type_chain;
 }
 
@@ -216,7 +193,8 @@ sds parse_remove_type_chain_ident(dynarray type_chain) {
     return NULL;
   }
   dynarray_pop_head(type_chain, NULL);
-  sds ident = first->ident;
+  sds ident = sdsdup(first->ident);
+  ast_free(first);
   return ident;
 }
 
@@ -255,7 +233,7 @@ astn parse_external_declaration(parser parser, astn current_block) {
   }
   while (parser->current_token == ',') {
     parser_consume(parser);
-    init_declarator = parse_init_declarator(parser, decl_specs);
+    init_declarator = parse_init_declarator(parser, ast_copy(decl_specs));
     dynarray_add(current_block->block.decls, &init_declarator);
   }
   parser_consume_with(parser, ';');

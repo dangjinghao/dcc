@@ -245,6 +245,9 @@ sds convert_ast_to_repr(astn n, sds buf) {
     }
     buf = sdscatlen(buf, "]", 1);
     break;
+  case ast_labeled_statement:
+    BUILDING();
+    break;
   }
   buf = sdscatlen(buf, ")", 1);
   return buf;
@@ -378,6 +381,7 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_ident);
     STRCASE(ast_block);
     STRCASE(ast_ctype);
+    STRCASE(ast_labeled_statement);
   }
   return NULL;
 }

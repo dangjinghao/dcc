@@ -42,6 +42,6 @@ test: $(OBJS) makefile $(TEST_ENTRY_OBJ)
 	else \
 		echo "No TEST_ENTRY found"; \
 	fi
-	
+
 
 .PHONY: run gdb clean test
