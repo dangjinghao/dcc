@@ -8,7 +8,6 @@
 #include <assert.h>
 
 /**
- * @brief 
  * @grammar
  * <type-qualifier> ::= const
  *                   | volatile
@@ -20,7 +19,6 @@ static inline bool g_is_type_qualifier_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <storage-class-specifier> ::= auto
  *                            | register
@@ -44,7 +42,6 @@ static inline bool g_is_declaration_typedef(astn d) {
 }
 
 /**
- * @brief 
  * @grammar
  * <typedef-name> ::= identifier
  * @param parser 
@@ -57,7 +54,6 @@ static inline bool g_is_typedef_name_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <enum-specifier> ::= enum <identifier> { <enumerator-list> }
  *                    | enum { <enumerator-list> }
@@ -69,7 +65,6 @@ static inline bool g_is_enum_specifier(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <struct-or-union> ::= struct
  *                    | union
@@ -81,7 +76,6 @@ static inline bool g_is_struct_or_union_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <struct-or-union-specifier> ::= <struct-or-union>
  * @param parser 
@@ -91,7 +85,6 @@ static inline bool g_is_struct_or_union_specifier(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <type-specifier> ::= void
  *                   | char
@@ -125,7 +118,6 @@ static inline bool g_is_type_specifier_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <declaration-specifier> ::= <storage-class-specifier>
  *                          | <type-specifier>
@@ -138,7 +130,6 @@ static inline bool g_is_declaration_specifier_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <pointer> ::= * {<type-qualifier>}* {<pointer>}?
  * 
@@ -156,12 +147,12 @@ static inline bool g_is_pointer_firstset(parser parser) {
  *                      | <direct-declarator> ( {<parameter-type-list>}? )
  *
  * @grammar, right recursive.
- *<direct-declarator> ::= {<identifier>}? <direct-declarator-suffix>
- *                     | ( <declarator> ) <direct-declarator-suffix>
- *
- *<direct-declarator-suffix> ::= [ {<constant-expression>}? ] <direct-declarator-suffix>
- *                            | ( {<parameter-type-list>}? ) <direct-declarator-suffix>
- *                            | ε
+ * <direct-declarator> ::= {<identifier>}? <direct-declarator-suffix>
+ *                      | ( <declarator> ) <direct-declarator-suffix>
+ * 
+ * <direct-declarator-suffix> ::= [ {<constant-expression>}? ] <direct-declarator-suffix>
+ *                             | ( {<parameter-type-list>}? ) <direct-declarator-suffix>
+ *                             | ε
  */
 static inline bool g_is_direct_declarator_firstset(parser parser) {
   int token = parser->current_token;
@@ -169,7 +160,6 @@ static inline bool g_is_direct_declarator_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <declarator> ::= {<pointer>}? <direct-declarator>
  */
@@ -184,7 +174,6 @@ static inline bool g_is_declarator_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar 
  * <function-definition> ::= {<declaration-specifier>}+ <declarator> <compound-statement>
  * 
@@ -194,7 +183,6 @@ static inline bool g_is_function_definition_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <declaration> ::=  {<declaration-specifier>}+ {{<init-declarator>} {, <init-declarator>}*}? ;
  */
@@ -204,7 +192,6 @@ static inline bool g_is_declaration_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <external-declaration> ::= <function-definition>
  *                         | <declaration>
@@ -215,7 +202,6 @@ static inline bool g_is_external_declaration_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar 
  * <translation-unit> ::= {<external-declaration>}*
  */
@@ -241,7 +227,6 @@ static inline bool g_is_int_family_tok(enum tok_type tok) {
 }
 
 /**
- * @brief 
  * @grammar
  * <init-declarator> ::= <declarator>
  *                    | <declarator> = <initializer>
@@ -277,7 +262,6 @@ static inline bool g_is_assignment_expression_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <initializer> ::= <assignment-expression>
  *                | { <initializer-list> }
@@ -305,7 +289,6 @@ static inline bool g_is_compound_statement_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <labeled-statement> ::= <identifier> : <statement>
  *                      | case <constant-expression> : <statement>
@@ -319,7 +302,6 @@ static inline bool g_is_labeled_statement_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <expression> ::= <assignment-expression>
  *               | <expression> , <assignment-expression>
@@ -332,7 +314,6 @@ static inline bool g_is_expression_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <expression-statement> ::= {<expression>}? ;
  * @param parser 
@@ -344,7 +325,6 @@ static inline bool g_is_expression_statement_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <selection-statement> ::= if ( <expression> ) <statement>
  *                        | if ( <expression> ) <statement> else <statement>
@@ -358,7 +338,6 @@ static inline bool g_is_selection_statement_firstset(parser parser) {
          parser->current_token == TOK_KW_SWITCH;
 }
 /**
- * @brief 
  * @grammar
  * <iteration-statement> ::= while ( <expression> ) <statement>
  *                         | do <statement> while ( <expression> ) ;
@@ -371,7 +350,6 @@ static inline bool g_is_iteration_statement_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <jump-statement> ::= goto <identifier> ;
  *                   | continue ;
@@ -386,7 +364,6 @@ static inline bool g_is_jump_statement_firstset(parser parser) {
 }
 
 /**
- * @brief 
  * @grammar
  * <statement> ::= <labeled-statement>
  *              | <expression-statement>
@@ -405,6 +382,43 @@ static inline bool g_is_statement_firstset(parser parser) {
          g_is_selection_statement_firstset(parser) ||
          g_is_iteration_statement_firstset(parser) ||
          g_is_jump_statement_firstset(parser);
+}
+
+/**
+ * @grammar
+ * <parameter-declaration> ::= {<declaration-specifier>}+ <declarator>
+ *                           | {<declaration-specifier>}+ <abstract-declarator>
+ *                           | {<declaration-specifier>}+
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_parameter_declaration_firstset(parser parser) {
+  return g_is_declaration_specifier_firstset(parser);
+}
+
+/**
+ * @grammar
+ * <parameter-list> ::= <parameter-declaration>
+ *                   | <parameter-list> , <parameter-declaration>
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_parameter_list_firstset(parser parser) {
+  return g_is_parameter_declaration_firstset(parser);
+}
+
+/**
+ * @grammar
+ * <parameter-type-list> ::= <parameter-list>
+ *                        | <parameter-list> , ...
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_parameter_type_list_firstset(parser parser) {
+  return g_is_parameter_list_firstset(parser) || true;
 }
 
 static inline astn g_get_function_params(astn declaration) {
@@ -434,4 +448,7 @@ static inline bool g_is_empty_statement(astn statement) {
          statement->primary.type == TOK_EOF;
 }
 
+static inline bool g_is_varargs(astn n) {
+  return n->type == ast_ctype && n->ctype.type == TOK_SYM_VARARGS;
+}
 #endif

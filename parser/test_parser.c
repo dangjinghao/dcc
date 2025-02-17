@@ -108,7 +108,16 @@ int typedef_statement() {
   lexer_destroy(&lexer);
   return 0;
 }
+
+int func_declaration(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "int func(int a, int (*)(int,char) ,...);");
+  process_declaration(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 int main() {
   log_color_enable(true);
-  return typedef_statement();
+  return func_declaration();
 }

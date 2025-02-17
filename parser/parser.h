@@ -19,6 +19,7 @@ astn parse_assign_expr(parser parser);
 astn __parse_assign_expr(parser parser, int ctx_prec);
 astn parse_expression(parser parser);
 astn parse_ident(parser parser);
+astn parse_init_declarator(parser parser, astn decl_specs);
 dynarray parse_declarator(parser parser, dynarray type_chain);
 bool parser_check_constant_expr(astn expr);
 astn parse_constant_expr(parser parser);

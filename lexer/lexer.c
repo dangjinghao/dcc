@@ -159,7 +159,7 @@ struct token_table_entry token_kw_table[] = {
 };
 
 struct token_table_entry token_multi_char_sym_table[] = {
-    {.str = "...", .type = TOK_KW_VARARGS}, // high token level
+    {.str = "...", .type = TOK_SYM_VARARGS}, // high token level
     {.str = "<=", .type = TOK_SYM_LEQ},
     {.str = ">=", .type = TOK_SYM_GEQ},
     {.str = "==", .type = TOK_SYM_EQ},
@@ -453,7 +453,17 @@ int lexer_next_token(struct lexer *lexer) {
     return lexer_next_ident(lexer);
   } else if (isdigit(c)) {
     return lexer_next_number(lexer, false);
-  } else if (c == '.') {
+  }
+  // multi-char symbol
+  struct token_table_entry *table = token_multi_char_sym_table;
+  while (table->str) {
+    if (lexer_try_eat_str(lexer, table->str)) {
+      return table->type;
+    }
+    table++;
+  }
+
+  if (c == '.') {
     lexer_consume(lexer);
     if (isdigit(lexer_peek(lexer))) {
       return lexer_next_number(lexer, true);
@@ -463,14 +473,6 @@ int lexer_next_token(struct lexer *lexer) {
     return lexer_next_char(lexer);
   } else if (c == '"') {
     return lexer_next_string(lexer);
-  }
-  // multi-char symbol
-  struct token_table_entry *table = token_multi_char_sym_table;
-  while (table->str) {
-    if (lexer_try_eat_str(lexer, table->str)) {
-      return table->type;
-    }
-    table++;
   }
   // single char
   lexer_consume(lexer);

@@ -45,7 +45,6 @@ enum tok_type {
   TOK_KW_VOID,
   TOK_KW_VOLATILE,
   TOK_KW_WHILE,
-  TOK_KW_VARARGS,
   __TOK_KW_END,
 
   __TOK_LIT_START,
@@ -59,6 +58,7 @@ enum tok_type {
   TOK_LIT_STRING,
   __TOK_LIT_END,
 
+  TOK_SYM_VARARGS,
   TOK_SYM_LEQ,
   TOK_SYM_GEQ,
   TOK_SYM_EQ,

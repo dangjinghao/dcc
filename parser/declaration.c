@@ -12,8 +12,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-dynarray parse_parameter_type_list(parser parser) { BUILDING(); }
-
 /**
  * @brief using the chable to store all declarations
  * @param parser 
@@ -139,8 +137,46 @@ dynarray parse_pointers(parser parser, dynarray pointers) {
   return pointers;
 }
 
+/**
+ * @brief we will reuse the init-declarator to reduce 
+ * the complexity of implementation
+ * 
+ * @param parser 
+ * @return astn 
+ */
+astn parse_parameter_declaration(parser parser) {
+  assert(g_is_parameter_declaration_firstset(parser));
+  astn decl_specs = parse_declaration_specifiers(parser);
+  return parse_init_declarator(parser, decl_specs);
+}
+
+dynarray parse_parameter_type_list(parser p, astn astp) {
+  assert(astp->type == ast_block);
+  dynarray params = astp->block.stmts;
+  assert(g_is_parameter_list_firstset(p));
+  astn param = parse_parameter_declaration(p);
+  dynarray_add(params, &param);
+  while (p->current_token == ',') {
+    parser_consume(p);
+    if (g_is_parameter_declaration_firstset(p)) {
+      param = parse_parameter_declaration(p);
+      dynarray_add(params, &param);
+    } else if (p->current_token == TOK_SYM_VARARGS) {
+      parser_consume(p);
+      param = ast_new(ast_ctype);
+      param->ctype.type = TOK_SYM_VARARGS;
+      dynarray_add(params, &param);
+      break;
+    } else {
+      compiler_error(p->lexer, "Unexpected token: %s",
+                     convert_token_type_to_string(p->current_token));
+    }
+  }
+  return params;
+}
+
 dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
-  assert(g_is_direct_declarator_firstset(parser));
+  // assert(g_is_direct_declarator_firstset(parser));
   if (parser->current_token == TOK_IDENT) {
     astn id = parse_ident(parser);
     // promise the ident is the 1st element
@@ -166,7 +202,7 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
       parser_consume(parser);
       astn content_type = ast_new(ast_block);
       if (parser->current_token != ')') {
-        content_type->block.stmts = parse_parameter_type_list(parser);
+        parse_parameter_type_list(parser, content_type);
       }
       parser_consume_with(parser, ')');
       dynarray_add(type_chain, &content_type);
@@ -184,7 +220,7 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
  * @return astn 
  */
 dynarray parse_declarator(parser parser, dynarray type_chain) {
-  assert(g_is_declarator_firstset(parser));
+  // assert(g_is_declarator_firstset(parser));
   struct dynarray reversed_pointers;
   dynarray_init(&reversed_pointers, sizeof(astn), 0);
   if (g_is_pointer_firstset(parser)) {
@@ -214,7 +250,7 @@ sds parse_remove_type_chain_ident(dynarray type_chain) {
 }
 
 astn parse_init_declarator(parser parser, astn decl_specs) {
-  assert(g_is_init_declarator_firstset(parser));
+  // assert(g_is_init_declarator_firstset(parser));
   astn n = ast_new(ast_declaration);
   struct dynarray *type_chain = n->declaration.type_chain;
   parse_declarator(parser, type_chain);

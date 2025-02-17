@@ -332,7 +332,7 @@ char *convert_token_type_to_string(enum tok_type tok) {
     STRCASE(TOK_SYM_LOGIC_OR);
     STRCASE(TOK_SYM_LOGIC_AND);
     STRCASE(TOK_KW_BREAK);
-    STRCASE(TOK_KW_VARARGS);
+    STRCASE(TOK_SYM_VARARGS);
 
   case TOK_EOF:
   case __TOK_KW_START:
