@@ -48,18 +48,19 @@ typedef struct ast_node {
     struct block {
       struct dynarray *stmts;
     } block;
-    struct ctype {
-      enum type_qualifier qualifier;
-      // trick: fill token_type with 0 or TOK_UNKNOWN
-      enum tok_type type, signint, storage;
-      struct ast_node *user_defined_type; // used for struct, union, enum
-    } ctype;
     struct declaration {
       sds ident;
       // initializer/function body
       struct ast_node *extdata;
       struct dynarray *type_chain;
     } declaration;
+    struct ctype {
+      enum type_qualifier qualifier;
+      // trick: fill token_type with 0 or TOK_UNKNOWN
+      enum tok_type type, signint, storage;
+      // used for struct, union, enum, holds a reference only, do not free it
+      struct ast_node *user_defined_type;
+    } ctype;
     struct labeled_statement {
       enum tok_type type;
       struct ast_node *label_value;
@@ -70,5 +71,7 @@ typedef struct ast_node {
 
 struct ast_node *ast_new(enum ast_type type);
 astn ast_new_empty_statement();
+void ast_free(astn node);
 astn ast_copy(astn n);
+
 #endif

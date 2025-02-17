@@ -36,6 +36,13 @@ static inline bool g_is_storage_class_specifier_firstset(parser parser) {
   return ARRAY_IN(reserved_kw, token, EQ_EQ);
 }
 
+static inline bool g_is_declaration_typedef(astn d) {
+  assert(d->type == ast_declaration);
+  astn *t = dynarray_get(d->declaration.type_chain, -1);
+  assert((*t)->type == ast_ctype);
+  return (*t)->ctype.storage == TOK_KW_TYPEDEF;
+}
+
 /**
  * @brief 
  * @grammar
@@ -43,8 +50,10 @@ static inline bool g_is_storage_class_specifier_firstset(parser parser) {
  * @param parser 
  */
 static inline bool g_is_typedef_name_firstset(parser parser) {
-  return false;
-  BUILDING();
+  if (parser->current_token != TOK_IDENT) {
+    return false;
+  }
+  return parser_get_typedef(parser, parser->lexer->lex_token._ident) != NULL;
 }
 
 /**

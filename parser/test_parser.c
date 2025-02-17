@@ -96,13 +96,19 @@ int declaration() {
 
 int statement() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "a = b = 1;");
+  lexer_from_string(&lexer, "a = b = 1,2,3,4;");
   process_statement(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
-
+int typedef_statement() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "typedef int i,*ip;i a = 1; ip b = &a;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
 int main() {
   log_color_enable(true);
-  return statement();
+  return typedef_statement();
 }

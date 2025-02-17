@@ -201,8 +201,10 @@ sds convert_ast_to_repr(astn n, sds buf) {
       buf = convert_ast_to_repr(*ref, buf);
       buf = sdscatlen(buf, " ", 1);
     }
-    buf = sdscatlen(buf, "= ", 2);
-    buf = convert_ast_to_repr(n->declaration.extdata, buf);
+    if (n->declaration.extdata) {
+      buf = sdscatlen(buf, "= ", 2);
+      buf = convert_ast_to_repr(n->declaration.extdata, buf);
+    }
     buf = sdscatlen(buf, "]", 1);
     break;
   }
@@ -236,7 +238,9 @@ sds convert_ast_to_repr(astn n, sds buf) {
           sdscatprintf(buf, "%s ", convert_token_type_to_string(n->ctype.type));
     }
     if (n->ctype.user_defined_type) {
+      buf = sdscatlen(buf, "user_defined_type[", 17);
       buf = convert_ast_to_repr(n->ctype.user_defined_type, buf);
+      buf = sdscatlen(buf, "]", 1);
     }
     buf = sdscatlen(buf, "]", 1);
     break;

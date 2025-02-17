@@ -83,7 +83,12 @@ astn parse_declaration_specifiers(parser parser) {
     } else {
       assert(g_is_type_specifier_firstset(parser));
       if (g_is_typedef_name_firstset(parser)) {
-        BUILDING();
+        tn->type = TOK_KW_TYPEDEF;
+        tn->user_defined_type =
+            parser_get_typedef(parser, parser->lexer->lex_token._ident);
+        assert(parser->current_token == TOK_IDENT);
+        sdsfree(parser->lexer->lex_token._ident);
+        parser_consume(parser);
       } else if (g_is_struct_or_union_specifier(parser)) {
         BUILDING();
       } else if (g_is_enum_specifier(parser)) {
@@ -195,7 +200,8 @@ dynarray parse_declarator(parser parser, dynarray type_chain) {
 }
 
 sds parse_remove_type_chain_ident(dynarray type_chain) {
-  astn first = dynarray_get(type_chain, 0);
+  astn *first_ref = dynarray_get(type_chain, 0);
+  astn first = *first_ref;
   if (first->type != ast_ident) {
     // for the abstract declarator, it doesn't have an identifier
     log_debug("abstract declarator");
@@ -225,16 +231,27 @@ astn parse_init_declarator(parser parser, astn decl_specs) {
   return n;
 }
 
+/**
+ * @brief Because we would reduce many delcarators to a single declaration,
+ * e.g. int a,b,c; -> int a; int b; int c;
+ * so we need pass a block to store all the declarations to make it easier
+ * 
+ * @param parser 
+ * @param current_block 
+ * @return astn 
+ */
 astn parse_external_declaration(parser parser, astn current_block) {
   assert(g_is_external_declaration_firstset(parser));
   assert(current_block->type == ast_block);
   astn decl_specs = parse_declaration_specifiers(parser);
-  // we would reduce the grammar complexity,
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
   if (g_is_init_declarator_firstset(parser)) {
     init_declarator = parse_init_declarator(parser, decl_specs);
+    assert(init_declarator->type == ast_declaration);
     dynarray_add(current_block->block.stmts, &init_declarator);
+    parser_add_declaration_to_current_scope_table(init_declarator,
+                                                  &parser->idtab);
     if (g_is_function_definition(init_declarator)) {
       return current_block;
     }
@@ -242,7 +259,10 @@ astn parse_external_declaration(parser parser, astn current_block) {
   while (parser->current_token == ',') {
     parser_consume(parser);
     init_declarator = parse_init_declarator(parser, ast_copy(decl_specs));
+    assert(init_declarator->type == ast_declaration);
     dynarray_add(current_block->block.stmts, &init_declarator);
+    parser_add_declaration_to_current_scope_table(init_declarator,
+                                                  &parser->idtab);
   }
   parser_consume_with(parser, ';');
   return current_block;
