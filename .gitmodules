@@ -1,12 +1,6 @@
 [submodule "libs/sds"]
 	path = libs/sds
 	url = https://github.com/antirez/sds
-[submodule "libs/chable"]
-	path = libs/chable
-	url = mygit:djh/chable
-[submodule "libs/kernel_list"]
-	path = libs/kernel_list
-	url = mygit:djh/kernel_list
 [submodule "libs/log"]
 	path = libs/log
 	url = mygit:djh/clog
