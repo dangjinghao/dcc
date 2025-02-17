@@ -1,9 +1,9 @@
 #ifndef AST_H
 #define AST_H
 
-#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "sds/sds.h"
+#include "slist/slist.h"
 enum ast_type {
   ast_expr_unary = 1,
   ast_expr_binop,
@@ -46,13 +46,13 @@ typedef struct ast_node {
       union token v;
     } primary;
     struct block {
-      struct dynarray *stmts;
+      struct slist stmts;
     } block;
     struct declaration {
       sds ident;
       // initializer/function body
       struct ast_node *extdata;
-      struct dynarray *type_chain;
+      struct slist type_chain;
     } declaration;
     struct ctype {
       enum type_qualifier qualifier;

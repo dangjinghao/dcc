@@ -116,8 +116,3 @@ int func_declaration(){
   lexer_destroy(&lexer);
   return 0;
 }
-
-int main() {
-  log_color_enable(true);
-  return func_declaration();
-}

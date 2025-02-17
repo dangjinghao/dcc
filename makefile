@@ -3,6 +3,7 @@ SRCS := $(shell find . -name "*.c" ! -name "test*")
 OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
 INCS := libs lexer parser
+
 CFLAGS := -ggdb -Og -MMD -std=gnu99 $(addprefix -I,$(INCS)) 
 CFLAGS += -Wall -Wno-stringop-truncation -Wno-format-truncation -Wno-unused-but-set-variable -Wunused-function
 LDFLAGS :=
@@ -34,13 +35,18 @@ compile_commands.json: makefile $(SRCS)
 clean:
 	@$(RM) $(TARGET) $(OBJS) $(DEPS) test.out
 
-TEST_ENTRY_OBJ := $(TEST_ENTRY:.c=.o)
-test: $(OBJS) makefile $(TEST_ENTRY_OBJ)
-	@if [ -f "$(TEST_ENTRY)" ]; then \
-		$(CC) $(TEST_ENTRY_OBJ) $(OBJS) $(LDFLAGS) -o test.out; \
-		$(RUN) ./test.out; \
-	else \
-		echo "No TEST_ENTRY found"; \
-	fi
+TEST_FILE ?= test.c
+TEST_FILE_OBJ := $(TEST_FILE:.c=.o)
+ifndef TEST_ENTRY
+TEST_ENTRY := main
+endif
+ifeq ($(wildcard $(TEST_FILE)),)
+$(error "TEST_FILE:$(TEST_FILE) not found")
+endif
+
+test: $(OBJS) makefile $(TEST_FILE_OBJ)
+
+	$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY)
+	$(RUN) ./test.out 
 
 .PHONY: run gdb clean test

@@ -1,10 +1,10 @@
 
 #include "ast.h"
-#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "macro/macro.h"
 #include "parser.h"
+#include "slist/slist.h"
 
 astn parse_expression_statement(parser p) {
   assert(g_is_expression_statement_firstset(p));
@@ -29,7 +29,7 @@ astn parse_compound_statement(parser parser) {
     if (g_is_external_declaration_firstset(parser)) {
       parse_external_declaration(parser, block);
     } else if (g_is_statement_firstset(parser)) {
-      dynarray_add(block->block.stmts, parse_statement(parser));
+      slist_add_tail(&block->block.stmts, parse_statement(parser));
     } else {
       break;
     }

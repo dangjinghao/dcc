@@ -1,12 +1,12 @@
 #include "ast.h"
 #include "convert/convert.h"
-#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
 #include "parser.h"
 #include "sds/sds.h"
+#include "slist/slist.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
@@ -74,7 +74,6 @@ astn parse_declaration_specifiers(parser parser) {
                        "storage class specifier redefined: %s -> %s",
                        lexer_token_to_string(tn->storage),
                        lexer_token_to_string(parser->current_token));
-        exit(EXIT_FAILURE);
       }
       tn->storage = parser->current_token;
       parser_consume(parser);
@@ -114,13 +113,13 @@ astn parse_initializer(parser parser) {
 }
 
 /**
- * @brief get inversed pointers chain
+ * @brief
  * 
  * @param parser 
  * @param pointers 
- * @return dynarray 
+ * @return slist 
  */
-dynarray parse_pointers(parser parser, dynarray pointers) {
+slist parse_pointers(parser parser, slist pointers) {
   assert(g_is_pointer_firstset(parser));
 
   while (g_is_pointer_firstset(parser)) {
@@ -132,7 +131,7 @@ dynarray parse_pointers(parser parser, dynarray pointers) {
           &p->ctype, convert_token_type_to_qualifier(parser->current_token));
       parser_consume(parser);
     }
-    dynarray_add(pointers, &p);
+    slist_add_head(pointers, p);
   }
   return pointers;
 }
@@ -150,22 +149,22 @@ astn parse_parameter_declaration(parser parser) {
   return parse_init_declarator(parser, decl_specs);
 }
 
-dynarray parse_parameter_type_list(parser p, astn astp) {
+slist parse_parameter_type_list(parser p, astn astp) {
   assert(astp->type == ast_block);
-  dynarray params = astp->block.stmts;
+  slist params = &astp->block.stmts;
   assert(g_is_parameter_list_firstset(p));
   astn param = parse_parameter_declaration(p);
-  dynarray_add(params, &param);
+  slist_add_tail(params, param);
   while (p->current_token == ',') {
     parser_consume(p);
     if (g_is_parameter_declaration_firstset(p)) {
       param = parse_parameter_declaration(p);
-      dynarray_add(params, &param);
+      slist_add_tail(params, param);
     } else if (p->current_token == TOK_SYM_VARARGS) {
       parser_consume(p);
       param = ast_new(ast_ctype);
       param->ctype.type = TOK_SYM_VARARGS;
-      dynarray_add(params, &param);
+      slist_add_tail(params, param);
       break;
     } else {
       compiler_error(p->lexer, "Unexpected token: %s",
@@ -175,13 +174,13 @@ dynarray parse_parameter_type_list(parser p, astn astp) {
   return params;
 }
 
-dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
+slist parse_direct_declarator(parser parser, slist type_chain) {
   // assert(g_is_direct_declarator_firstset(parser));
   if (parser->current_token == TOK_IDENT) {
     astn id = parse_ident(parser);
     // promise the ident is the 1st element
-    assert(dynarray_size(type_chain) == 0);
-    dynarray_add(type_chain, &id);
+    assert(slist_length(type_chain) == 0);
+    slist_add_tail(type_chain, id);
   } else if (parser->current_token == '(') {
     parser_consume(parser);
     parse_declarator(parser, type_chain);
@@ -197,7 +196,7 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
         content_type->unary.expr = parse_constant_expr(parser);
       }
       parser_consume_with(parser, ']');
-      dynarray_add(type_chain, &content_type);
+      slist_add_tail(type_chain, content_type);
     } else {
       parser_consume(parser);
       astn content_type = ast_new(ast_block);
@@ -205,7 +204,7 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
         parse_parameter_type_list(parser, content_type);
       }
       parser_consume_with(parser, ')');
-      dynarray_add(type_chain, &content_type);
+      slist_add_tail(type_chain, content_type);
     }
   }
   return type_chain;
@@ -219,31 +218,27 @@ dynarray parse_direct_declarator(parser parser, dynarray type_chain) {
  * @param declaration 
  * @return astn 
  */
-dynarray parse_declarator(parser parser, dynarray type_chain) {
+slist parse_declarator(parser parser, slist type_chain) {
   // assert(g_is_declarator_firstset(parser));
-  struct dynarray reversed_pointers;
-  dynarray_init(&reversed_pointers, sizeof(astn), 0);
+  struct slist pointers;
+  slist_init(&pointers);
   if (g_is_pointer_firstset(parser)) {
-    parse_pointers(parser, &reversed_pointers);
+    parse_pointers(parser, &pointers);
   }
   parse_direct_declarator(parser, type_chain);
-  astn *ref;
-  dynarray_foreach_reverse(&reversed_pointers, ref) {
-    dynarray_add(type_chain, ref);
-  }
-  dynarray_free(&reversed_pointers);
+  slist_concat(type_chain, &pointers);
+  slist_free(&pointers);
   return type_chain;
 }
 
-sds parse_remove_type_chain_ident(dynarray type_chain) {
-  astn *first_ref = dynarray_get(type_chain, 0);
-  astn first = *first_ref;
+sds parse_remove_type_chain_ident(slist type_chain) {
+  astn first = slist_peek_head(type_chain);
   if (first->type != ast_ident) {
     // for the abstract declarator, it doesn't have an identifier
     log_debug("abstract declarator");
     return NULL;
   }
-  dynarray_pop_head(type_chain, NULL);
+  slist_pop_head(type_chain);
   sds ident = sdsdup(first->ident);
   ast_free(first);
   return ident;
@@ -252,11 +247,11 @@ sds parse_remove_type_chain_ident(dynarray type_chain) {
 astn parse_init_declarator(parser parser, astn decl_specs) {
   // assert(g_is_init_declarator_firstset(parser));
   astn n = ast_new(ast_declaration);
-  struct dynarray *type_chain = n->declaration.type_chain;
+  slist type_chain = &n->declaration.type_chain;
   parse_declarator(parser, type_chain);
-  dynarray_add(type_chain, &decl_specs);
+  slist_add_tail(type_chain, decl_specs);
   n->declaration.ident = parse_remove_type_chain_ident(type_chain);
-  n->declaration.type_chain = type_chain;
+  // n->declaration.type_chain = *type_chain;
   if (parser->current_token == '=') {
     parser_consume(parser);
     n->declaration.extdata = parse_initializer(parser);
@@ -285,7 +280,7 @@ astn parse_external_declaration(parser parser, astn current_block) {
   if (g_is_init_declarator_firstset(parser)) {
     init_declarator = parse_init_declarator(parser, decl_specs);
     assert(init_declarator->type == ast_declaration);
-    dynarray_add(current_block->block.stmts, &init_declarator);
+    slist_add_tail(&current_block->block.stmts, init_declarator);
     parser_add_declaration_to_current_scope_table(init_declarator,
                                                   &parser->idtab);
     if (g_is_function_definition(init_declarator)) {
@@ -296,7 +291,7 @@ astn parse_external_declaration(parser parser, astn current_block) {
     parser_consume(parser);
     init_declarator = parse_init_declarator(parser, ast_copy(decl_specs));
     assert(init_declarator->type == ast_declaration);
-    dynarray_add(current_block->block.stmts, &init_declarator);
+    slist_add_tail(&current_block->block.stmts, init_declarator);
     parser_add_declaration_to_current_scope_table(init_declarator,
                                                   &parser->idtab);
   }

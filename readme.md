@@ -1,8 +1,8 @@
 # DCC
 
-## TODO
+## TODO LIST
 
-- use sslist instead of dynarray for performance
+- [x] use sslist instead of dynarray for performance
 - use llvm c api instead of my llvm scaffold
 ## expression parser
 

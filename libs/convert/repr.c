@@ -1,6 +1,5 @@
 #include "ast.h"
 #include "convert.h"
-#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
@@ -196,9 +195,9 @@ sds convert_ast_to_repr(astn n, sds buf) {
       buf = sdscatsds(buf, n->declaration.ident);
     }
     buf = sdscatlen(buf, " ", 1);
-    astn *ref;
-    dynarray_foreach(n->declaration.type_chain, ref) {
-      buf = convert_ast_to_repr(*ref, buf);
+    astn ref;
+    slist_foreach(&n->declaration.type_chain, ref) {
+      buf = convert_ast_to_repr(ref, buf);
       buf = sdscatlen(buf, " ", 1);
     }
     if (n->declaration.extdata) {
@@ -210,9 +209,9 @@ sds convert_ast_to_repr(astn n, sds buf) {
   }
   case ast_block: {
     buf = sdscat(buf, "block[stmts[");
-    astn *ref;
-    dynarray_foreach(n->block.stmts, ref) {
-      buf = convert_ast_to_repr(*ref, buf);
+    astn ref;
+    slist_foreach(&n->block.stmts, ref) {
+      buf = convert_ast_to_repr(ref, buf);
       buf = sdscatlen(buf, " ", 1);
     }
     buf = sdscatlen(buf, "]]", 2);

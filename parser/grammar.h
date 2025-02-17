@@ -1,10 +1,10 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
 #include "ast.h"
-#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "macro/macro.h"
 #include "parser.h"
+#include "slist/slist.h"
 #include <assert.h>
 
 /**
@@ -36,9 +36,9 @@ static inline bool g_is_storage_class_specifier_firstset(parser parser) {
 
 static inline bool g_is_declaration_typedef(astn d) {
   assert(d->type == ast_declaration);
-  astn *t = dynarray_get(d->declaration.type_chain, -1);
-  assert((*t)->type == ast_ctype);
-  return (*t)->ctype.storage == TOK_KW_TYPEDEF;
+  astn t = slist_peek_tail(&d->declaration.type_chain);
+  assert(t->type == ast_ctype);
+  return t->ctype.storage == TOK_KW_TYPEDEF;
 }
 
 /**
@@ -423,9 +423,9 @@ static inline bool g_is_parameter_type_list_firstset(parser parser) {
 
 static inline astn g_get_function_params(astn declaration) {
   assert(declaration->type == ast_declaration);
-  astn *ref = dynarray_get(declaration->declaration.type_chain, 0);
-  if ((*ref)->type == ast_block) {
-    return *ref;
+  astn ref = slist_peek_head(&declaration->declaration.type_chain);
+  if (ref->type == ast_block) {
+    return ref;
   }
   return NULL;
 }
