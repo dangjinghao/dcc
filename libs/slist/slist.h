@@ -1,5 +1,6 @@
 #ifndef SLIST_H
 #define SLIST_H
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,8 @@ static inline slist slist_get_list_node(slist list, long n) {
 
 /* Return true if the list is empty, otherwise false. */
 static inline bool slist_empty(slist list) {
+  assert(((list->next == NULL) && (list->data == NULL)) ||
+         ((list->next != NULL) && (list->data != NULL)));
   return (list->next == NULL && list->data == NULL);
 }
 
@@ -95,6 +98,7 @@ static inline void *slist_pop_head(slist list) {
       list->data = NULL;
     }
     void *data = head->data;
+    head->data = head->next = NULL; // for safety, remove in the future
     SLIST_FREE(head);
     return data;
   }
@@ -113,6 +117,7 @@ static inline void *slist_pop_tail(slist list) {
     list->next = NULL;
     list->data = NULL;
     void *data = tail->data;
+    tail->data = tail->next = NULL; // for safety, remove in the future
     SLIST_FREE(tail);
     return data;
   }
@@ -126,6 +131,7 @@ static inline void *slist_pop_tail(slist list) {
   list->data = prev;
 
   void *data = tail->data;
+  tail->data = tail->next = NULL; // for safety, remove in the future
   SLIST_FREE(tail);
   return data;
 }
@@ -144,20 +150,38 @@ static inline void slist_free(slist list) {
 
 /* Concatenate src list to dst list, emptying out src. */
 static inline void slist_concat(slist dst, slist src) {
-  if (dst->data) {
-    ((slist)dst->data)->next = src->next;
-  } else {
-    dst->next = src->next;
+  if (slist_empty(src)) {
+    return;
   }
+  if (slist_empty(dst)) {
+    *dst = *src;
+    slist_init(src);
+    return;
+  }
+  ((slist)dst->data)->next = src->next;
   dst->data = src->data;
   slist_init(src);
 }
 
 /* Iteration macro for convenience: 
- *   slist_foreach(mylist, ref) { ... }
- * where 'ref' is a pointer to the node's data.
+ *   slist_foreach(mylist, pos) { ... }
+ * where 'pos' is a pointer to the node's data.
  */
-#define slist_foreach(list, ref)                                               \
-  for (slist l = (list)->next; l && ((ref = l->data), 1); l = l->next)
 
+#define slist_foreach(list, d)                                                 \
+  for (slist pos = (list)->next, tmp;                                          \
+       pos && ((tmp = pos->next), d = pos->data, 1); pos = tmp)
+
+static inline void slist_copy(slist dst, slist src) {
+  void *data;
+  slist_init(dst);
+  slist_foreach(src, data) { slist_add_tail(dst, data); }
+}
+
+static inline size_t slist_length(slist list) {
+  int len = 0;
+  void *_;
+  slist_foreach(list, _) { len++; }
+  return len;
+}
 #endif
