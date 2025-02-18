@@ -12,6 +12,9 @@ astn ast_new(enum ast_type type) {
   case ast_block:
     slist_init(&node->block.stmts);
     break;
+  case ast_expr_typecast:
+    slist_init(&node->typecast.type_chain);
+    break;
   default:
     break;
   }
@@ -34,6 +37,7 @@ astn ast_copy(astn n) {
     new->unary.op = n->unary.op;
     new->unary.postfix = n->unary.postfix;
     new->unary.expr = ast_copy(n->unary.expr);
+    new->unary.extdata = ast_copy(n->unary.extdata);
     break;
   case ast_expr_binop:
     new->binop.op = n->binop.op;
@@ -85,8 +89,18 @@ astn ast_copy(astn n) {
         ast_copy(n->labeled_statement.label_value);
     new->labeled_statement.stmt = ast_copy(n->labeled_statement.stmt);
     break;
+  case ast_expr_typecast: {
+    astn ref;
+    new->typecast.expr = ast_copy(n->typecast.expr);
+    slist_foreach(&n->typecast.type_chain, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->typecast.type_chain, copy);
+    }
+    break;
+  }
   default:
     log_panic("Wrong ast type %d", n->type);
+    break;
   }
   return new;
 }
@@ -102,6 +116,7 @@ void ast_free(astn node) {
   switch (node->type) {
   case ast_expr_unary: {
     ast_free(node->unary.expr);
+    ast_free(node->unary.extdata);
     break;
   }
   case ast_expr_binop: {
@@ -148,9 +163,17 @@ void ast_free(astn node) {
       ast_free(node->labeled_statement.label_value);
     break;
   }
-  default: {
-    log_panic("Wrong ast type %d", node->type);
+
+  case ast_expr_typecast: {
+    astn ref;
+    ast_free(node->typecast.expr);
+    slist_foreach(&node->typecast.type_chain, ref) { ast_free(ref); }
+    slist_free(&node->typecast.type_chain);
+    break;
   }
+  default:
+    log_panic("Wrong ast type %d", node->type);
+    break;
   }
 
   free(node);

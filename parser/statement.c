@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "grammar.h"
 #include "lexer.h"
+#include "log/log.h"
 #include "macro/macro.h"
 #include "parser.h"
 #include "slist/slist.h"
@@ -46,6 +47,8 @@ astn parse_statement(parser p) {
   astn stmt = NULL;
   if (g_is_labeled_statement_firstset(p)) {
     if (!(stmt = parse_labeled_statement(p))) {
+      log_debug("Failed to parse labeled statement,retrying to parse "
+                "expression statement");
       stmt = parse_expression_statement(p);
     }
   } else if (g_is_compound_statement_firstset(p)) {
@@ -77,13 +80,12 @@ astn parse_labeled_statement(parser p) {
     label = parse_ident(p);
     if (p->current_token == ':') {
       parser_consume(p);
+      parser_destory(&backup);
       break;
     } else {
       // failed to parse label, restore parser state
-      parser_destory(p);
-      parser_snapshot(p, &backup);
-      parser_destory(&backup);
       ast_free(label);
+      parser_restore(p, &backup);
       return NULL;
     }
     break;

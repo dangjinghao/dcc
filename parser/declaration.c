@@ -298,3 +298,27 @@ astn parse_external_declaration(parser parser, astn current_block) {
   parser_consume_with(parser, ';');
   return current_block;
 }
+
+astn parse_specifier_qualifier(parser parser) {
+  assert(g_is_specifier_qualifier_firstset(parser));
+  astn spec_qual = parse_declaration_specifiers(parser);
+  return spec_qual;
+}
+
+/**
+ * @brief reuse the parse_declaration_specifiers and parse_declarator
+ * 
+ * @param parser 
+ * @return astn 
+ */
+slist parse_type_name(parser parser, slist type_chain) {
+  assert(g_is_type_name_firstset(parser));
+  astn spec_qual = parse_specifier_qualifier(parser);
+
+  parse_declarator(parser, type_chain);
+  slist_add_tail(type_chain, spec_qual);
+  if (parse_remove_type_chain_ident(type_chain)) {
+    compiler_error(parser->lexer, "<type-name> should not have an identifier.");
+  }
+  return type_chain;
+}

@@ -30,6 +30,18 @@ void parser_snapshot(parser _new, parser _old) {
   slist_copy(&_new->tagtab, &_old->tagtab);
 }
 
+/**
+ * @brief destory the target parser and move the snapshot to the target,
+ * so do not free the snapshot after this function
+ * 
+ * @param target 
+ * @param snapshot 
+ */
+void parser_restore(parser target, parser snapshot) {
+  parser_destory(target);
+  *target = *snapshot;
+}
+
 void parser_destory(parser parser) {
   // bad hack
   if (parser->current_token == TOK_IDENT ||

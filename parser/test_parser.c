@@ -59,7 +59,7 @@ int process_statement(struct lexer *lexer) {
   return 0;
 }
 
-int str_parse() {
+int ptc_ternary() {
   struct lexer lexer;
   lexer_from_string(&lexer, "a1,a2,V1 = V2 = C1?C2?T1:F1:C3?T2:F2");
   process_expr(&lexer);
@@ -67,7 +67,7 @@ int str_parse() {
   return 0;
 }
 
-int str_paren_parse() {
+int tesecase_paren_expr() {
   struct lexer lexer;
   lexer_from_string(&lexer, "1+(((((1))))) + 2*(3+4)");
   process_expr(&lexer);
@@ -76,7 +76,7 @@ int str_paren_parse() {
   return 0;
 }
 
-int str_combine() {
+int ptc_str_combine() {
   struct lexer lexer;
   lexer_from_string(&lexer, ".1f + \"123\" \"456\" + '\\'' ");
   process_expr(&lexer);
@@ -85,7 +85,7 @@ int str_combine() {
   return 0;
 }
 
-int declaration() {
+int ptc_declaration() {
   struct lexer lexer;
   lexer_from_string(&lexer,
                     "int a = 1, b = a, **((*c)) = 1+(((((1))))) + 2*(3+4);");
@@ -94,14 +94,22 @@ int declaration() {
   return 0;
 }
 
-int statement() {
+int ptc_statement() {
   struct lexer lexer;
   lexer_from_string(&lexer, "a = b = 1,2,3,4;");
   process_statement(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
-int typedef_statement() {
+
+int ptc_label(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "label: a = 1;");
+  process_statement(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+int ptc_typedef_statement() {
   struct lexer lexer;
   lexer_from_string(&lexer, "typedef int i,*ip;i a = 1; ip b = &a;");
   process_trans_unit(&lexer);
@@ -109,10 +117,32 @@ int typedef_statement() {
   return 0;
 }
 
-int func_declaration(){
+int ptc_func_declaration() {
   struct lexer lexer;
   lexer_from_string(&lexer, "int func(int a, int (*)(int,char) ,...);");
   process_declaration(&lexer);
   lexer_destroy(&lexer);
   return 0;
+}
+
+int ptc_typecast(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "(const int)1 + (void*)2 + (int(*)(int,char))0");
+  process_expr(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_unary_expr(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "(void*)0 + 1+(((((1))))) + ++!-+~*&a++--++-- * (1 + 2)");
+  process_expr(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+[[gnu::constructor]] void init() {
+  log_color_enable(true);
+  log_set_level(LOG_LEVEL_DEBUG);
+  log_debug("test_parser init");
 }

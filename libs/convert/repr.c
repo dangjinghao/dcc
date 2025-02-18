@@ -175,6 +175,11 @@ sds convert_ast_to_repr(astn n, sds buf) {
         assert(0 && "this unary postfix op is not supported yet");
       }
     }
+    if (n->unary.extdata) {
+      buf = sdscatlen(buf, " extdata[", 9);
+      buf = convert_ast_to_repr(n->unary.extdata, buf);
+      buf = sdscatlen(buf, "]", 1);
+    }
     break;
   case ast_expr_binop:
     buf = convert_ast_to_repr(n->binop.lhs, buf);
@@ -251,6 +256,16 @@ sds convert_ast_to_repr(astn n, sds buf) {
     }
     buf = convert_ast_to_repr(n->labeled_statement.stmt, buf);
 
+    break;
+  case ast_expr_typecast:
+    buf = sdscatlen(buf, "(typecast[", 10);
+    astn ref;
+    slist_foreach(&n->typecast.type_chain, ref) {
+      buf = convert_ast_to_repr(ref, buf);
+      buf = sdscatlen(buf, " ", 1);
+    }
+    buf = sdscatlen(buf, "])", 2);
+    buf = convert_ast_to_repr(n->typecast.expr, buf);
     break;
   }
   buf = sdscatlen(buf, ")", 1);
@@ -386,6 +401,7 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_block);
     STRCASE(ast_ctype);
     STRCASE(ast_labeled_statement);
+    STRCASE(ast_expr_typecast);
   }
   return NULL;
 }

@@ -9,6 +9,7 @@ enum ast_type {
   ast_expr_binop,
   ast_expr_ternary,
   ast_expr_primary,
+  ast_expr_typecast,
   ast_declaration,
   ast_block,
   ast_ctype,
@@ -31,8 +32,14 @@ typedef struct ast_node {
     struct unary {
       int op;
       char postfix;
+      // used for array subscript, function call, get member(by arrow or dot)
+      struct ast_node *extdata;
       struct ast_node *expr;
     } unary;
+    struct typecast {
+      struct slist type_chain;
+      struct ast_node *expr;
+    } typecast;
     struct binop {
       int op;
       struct ast_node *lhs, *rhs;
@@ -52,6 +59,9 @@ typedef struct ast_node {
       sds ident;
       // initializer/function body
       struct ast_node *extdata;
+      // ast_expr_unary is used for array declaration [<expr>],
+      // ast_block is used for function parameters(<parameter-type-list>),
+      // ast_ctype
       struct slist type_chain;
     } declaration;
     struct ctype {

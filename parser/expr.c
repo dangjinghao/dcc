@@ -68,23 +68,43 @@ astn parse_unary_postfix(parser parser) {
   static int postfix_ops[] = {
       TOK_SYM_SELF_INC, TOK_SYM_SELF_DEC, TOK_SYM_ARROW, '[', '(', '.'};
   astn v = parse_primary_expr(parser);
-  while (true) {
-    if (ARRAY_IN(postfix_ops, parser->current_token, EQ_EQ)) {
-      astn node = ast_new(ast_expr_unary);
-      // TODO: support advanced postfix
-      node->unary.op = parser->current_token;
-      node->unary.postfix = true;
-      parser_consume(parser);
-      node->unary.expr = v;
-      v = node;
-    } else {
-      break;
-    }
+  while (ARRAY_IN(postfix_ops, parser->current_token, EQ_EQ)) {
+    astn node = ast_new(ast_expr_unary);
+    // TODO: support advanced postfix
+    node->unary.op = parser->current_token;
+    node->unary.postfix = true;
+    parser_consume(parser);
+    node->unary.expr = v;
+    v = node;
   }
   return v;
 }
 
+astn parse_cast_expr(parser parser) {
+  assert(g_is_cast_expression_firstset(parser));
+  if (parser->current_token != '(') {
+    return parse_unary(parser);
+  }
+
+  // typecast process
+  struct parser snapshot;
+  parser_snapshot(&snapshot, parser);
+  parser_consume(parser);
+  if (!g_is_type_name_firstset(parser)) {
+    // sub-expression in parentheses
+    parser_restore(parser, &snapshot);
+    return parse_unary(parser);
+  }
+  parser_destory(&snapshot);
+  astn node = ast_new(ast_expr_typecast);
+  parse_type_name(parser, &node->typecast.type_chain);
+  parser_consume_with(parser, ')');
+  node->typecast.expr = parse_cast_expr(parser);
+  return node;
+}
+
 astn parse_unary_prefix(parser parser) {
+  assert(g_is_unary_expression_firstset(parser));
   static int prefix_uops[] = {
       TOK_SYM_SELF_INC,
       TOK_SYM_SELF_DEC,
@@ -96,17 +116,35 @@ astn parse_unary_prefix(parser parser) {
       '*',
       '&',
   };
-
-  if (ARRAY_IN(prefix_uops, parser->current_token, EQ_EQ)) {
-    astn node = ast_new(ast_expr_unary);
-    node->unary.op = parser->current_token;
-    node->unary.postfix = false;
-    parser_consume(parser);
-    node->unary.expr = parse_unary_postfix(parser);
-    return node;
+  if (!ARRAY_IN(prefix_uops, parser->current_token, EQ_EQ)) {
+    return parse_unary_postfix(parser);
   }
-
-  return parse_unary_postfix(parser);
+  astn node = ast_new(ast_expr_unary);
+  node->unary.op = parser->current_token;
+  node->unary.postfix = false;
+  parser_consume(parser);
+  switch (node->unary.op) {
+  case TOK_SYM_SELF_INC:
+  case TOK_SYM_SELF_DEC: {
+    node->unary.expr = parse_unary(parser);
+    break;
+  }
+  case TOK_KW_SIZEOF: {
+    if (g_is_type_name_firstset(parser)) {
+      astn declaration = ast_new(ast_declaration);
+      parse_type_name(parser, &declaration->declaration.type_chain);
+      node->unary.expr = declaration;
+    } else {
+      node->unary.expr = parse_unary(parser);
+    }
+    break;
+  }
+  default: {
+    node->unary.expr = parse_cast_expr(parser);
+    break;
+  }
+  }
+  return node;
 }
 
 astn parse_unary(parser parser) {
@@ -327,7 +365,7 @@ struct infix_parselet infix_parselets[] = {
 
 /* Pratt algorithm parser */
 astn __parse_assign_expr(parser parser, int ctx_prec) {
-  astn left = parse_unary(parser);
+  astn left = parse_cast_expr(parser);
 
   while (true) {
     int infix_token = parser->current_token;

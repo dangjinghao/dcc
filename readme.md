@@ -2,7 +2,7 @@
 
 ## TODO LIST
 
-- [x] use sslist instead of dynarray for performance
+- [x] use slist instead of dynarray for performance
 - use llvm c api instead of my llvm scaffold
 ## expression parser
 

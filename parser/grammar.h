@@ -241,6 +241,26 @@ static inline bool g_is_primary_expression_firstset(parser parser) {
           parser->current_token < TOK_SYM_LEQ);
 }
 
+/**
+ * @grammar
+ * <unary-expression> ::= <postfix-expression>
+ *                     | ++ <unary-expression>
+ *                     | -- <unary-expression>
+ *                     | <unary-operator> <cast-expression>
+ *                     | sizeof <unary-expression>
+ *                     | sizeof <type-name>
+ *
+ * <unary-operator> ::= &
+ *                   | *
+ *                   | +
+ *                   | -
+ *                   | ~
+ *                   | !
+
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
 static inline bool g_is_unary_expression_firstset(parser parser) {
   int prefix_uops[] = {
       TOK_SYM_SELF_INC,
@@ -256,6 +276,20 @@ static inline bool g_is_unary_expression_firstset(parser parser) {
   return ARRAY_IN(prefix_uops, parser->current_token, EQ_EQ) ||
          g_is_primary_expression_firstset(parser);
 }
+
+/**
+ * @brief 
+ * <cast-expression> ::= <unary-expression>
+ *                    | ( <type-name> ) <cast-expression>
+ * 
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_cast_expression_firstset(parser parser){
+  return parser->current_token == '(' || g_is_unary_expression_firstset(parser);
+}
+
 
 static inline bool g_is_assignment_expression_firstset(parser parser) {
   return g_is_unary_expression_firstset(parser);
@@ -430,6 +464,30 @@ static inline astn g_get_function_params(astn declaration) {
   return NULL;
 }
 
+/**
+ * @brief 
+ * @grammar
+ * <specifier-qualifier> ::= <type-specifier>
+ *                        | <type-qualifier>
+ */
+static inline bool g_is_specifier_qualifier_firstset(parser parser) {
+  return g_is_type_specifier_firstset(parser) ||
+         g_is_type_qualifier_firstset(parser);
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <type-name> ::= {<specifier-qualifier>}+ {<abstract-declarator>}?
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_type_name_firstset(parser parser){
+  return g_is_specifier_qualifier_firstset(parser);
+}
+
+
 static inline astn g_get_function_body(astn declaration) {
   if (declaration->declaration.extdata) {
     assert(declaration->declaration.extdata->type == ast_block);
@@ -451,4 +509,5 @@ static inline bool g_is_empty_statement(astn statement) {
 static inline bool g_is_varargs(astn n) {
   return n->type == ast_ctype && n->ctype.type == TOK_SYM_VARARGS;
 }
+
 #endif
