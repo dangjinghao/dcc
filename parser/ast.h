@@ -32,7 +32,7 @@ typedef struct ast_node {
     struct unary {
       int op;
       char postfix;
-      // used for array subscript, function call, get member(by arrow or dot)
+      // used for array subscript(expr type), function call(block), get member(by arrow or dot)(ident type)
       struct ast_node *extdata;
       struct ast_node *expr;
     } unary;

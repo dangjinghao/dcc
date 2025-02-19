@@ -171,14 +171,27 @@ sds convert_ast_to_repr(astn n, sds buf) {
       case TOK_SYM_SELF_DEC:
         buf = sdscatlen(buf, "--", 2);
         break;
+      case TOK_SYM_ARROW:
+        buf = sdscatlen(buf, "->", 2);
+        buf = convert_ast_to_repr(n->unary.extdata, buf);
+        break;
+      case '[':
+        buf = sdscatlen(buf, "[", 1);
+        buf = convert_ast_to_repr(n->unary.extdata, buf);
+        buf = sdscatlen(buf, "]", 1);
+        break;
+      case '(':
+        buf = sdscatlen(buf, "(", 1);
+        buf = convert_ast_to_repr(n->unary.extdata, buf);
+        buf = sdscatlen(buf, ")", 1);
+        break;
+      case '.':
+        buf = sdscatlen(buf, ".", 1);
+        buf = convert_ast_to_repr(n->unary.extdata, buf);
+        break;
       default:
-        assert(0 && "this unary postfix op is not supported yet");
+        log_panic("unsupported unary postfix operator: %d", n->unary.op);
       }
-    }
-    if (n->unary.extdata) {
-      buf = sdscatlen(buf, " extdata[", 9);
-      buf = convert_ast_to_repr(n->unary.extdata, buf);
-      buf = sdscatlen(buf, "]", 1);
     }
     break;
   case ast_expr_binop:

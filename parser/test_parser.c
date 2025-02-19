@@ -141,6 +141,14 @@ int ptc_unary_expr(){
   return 0;
 }
 
+int ptc_unary_advance_post_expr(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "a[1].x+++&b[2]->member.m(1,2.f,\"hello\",0x1234)");
+  process_expr(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 [[gnu::constructor]] void init() {
   log_color_enable(true);
   log_set_level(LOG_LEVEL_DEBUG);

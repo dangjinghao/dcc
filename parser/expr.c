@@ -5,6 +5,7 @@
 #include "macro/macro.h"
 #include "parser.h"
 #include "sds/sds.h"
+#include "slist/slist.h"
 #include <assert.h>
 #include <stdbool.h>
 static astn __parse_primary_expr_combine_str(parser parser) {
@@ -61,8 +62,45 @@ astn parse_primary_expr(parser parser) {
   return node;
 }
 
-// static ast_node_ptr parse_unary_advanced_postfix(parser parser) {
-// }
+static astn parse_unary_advanced_postfix_if_need(parser parser, astn unary) {
+  switch (unary->unary.op) {
+  case '[': {
+    if (parser->current_token == ']') {
+      parser_consume(parser);
+      return unary;
+    }
+    unary->unary.extdata = parse_expression(parser);
+    parser_consume_with(parser, ']');
+    break;
+  }
+  case '.':
+  case TOK_SYM_ARROW: {
+    if (parser->current_token != TOK_IDENT) {
+      compiler_error(parser->lexer, "Expected identifier");
+    }
+    unary->unary.extdata = parse_ident(parser);
+    break;
+  }
+  case '(': {
+    if (parser->current_token == ')') {
+      parser_consume(parser);
+      return unary;
+    }
+    astn args = ast_new(ast_block);
+    slist_add_tail(&args->block.stmts, parse_assign_expr(parser));
+    while (parser->current_token == ',') {
+      parser_consume(parser);
+      slist_add_tail(&args->block.stmts, parse_assign_expr(parser));
+    }
+    unary->unary.extdata = args;
+    parser_consume_with(parser, ')');
+    break;
+  }
+  default:
+    break;
+  }
+  return unary;
+}
 
 astn parse_unary_postfix(parser parser) {
   static int postfix_ops[] = {
@@ -70,10 +108,10 @@ astn parse_unary_postfix(parser parser) {
   astn v = parse_primary_expr(parser);
   while (ARRAY_IN(postfix_ops, parser->current_token, EQ_EQ)) {
     astn node = ast_new(ast_expr_unary);
-    // TODO: support advanced postfix
     node->unary.op = parser->current_token;
     node->unary.postfix = true;
     parser_consume(parser);
+    parse_unary_advanced_postfix_if_need(parser, node);
     node->unary.expr = v;
     v = node;
   }
