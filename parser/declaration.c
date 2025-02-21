@@ -22,7 +22,7 @@
 astn parse_translation_unit(parser parser) {
   assert(g_is_translation_unit_firstset(parser));
 
-  astn n = ast_new(ast_block);
+  astn n = ast_new(ast_list);
   parser->global_block = n;
   parser->global_uid = parser->local_uid = 1;
   while (g_is_external_declaration_firstset(parser)) {
@@ -157,8 +157,8 @@ astn parse_parameter_declaration(parser parser) {
 }
 
 slist parse_parameter_type_list(parser p, astn astp) {
-  assert(astp->type == ast_block);
-  slist params = &astp->block.stmts;
+  assert(astp->type == ast_list);
+  slist params = &astp->list;
   assert(g_is_parameter_list_firstset(p));
   astn param = parse_parameter_declaration(p);
   slist_add_tail(params, param);
@@ -206,7 +206,7 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
       slist_add_tail(type_chain, content_type);
     } else {
       parser_consume(parser);
-      astn content_type = ast_new(ast_block);
+      astn content_type = ast_new(ast_list);
       if (parser->current_token != ')') {
         parse_parameter_type_list(parser, content_type);
       }
@@ -298,7 +298,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
                      "function definition without parameters declaration");
     }
     astn p;
-    slist_foreach(&ps->block.stmts, p) {
+    slist_foreach(&ps->list, p) {
       sds id = p->declaration.ident;
       if (!id) {
         compiler_error(parser->lexer,
@@ -326,14 +326,14 @@ astn parse_init_declarator(parser parser, astn decl_specs,
  */
 astn parse_external_declaration(parser parser, astn current_block) {
   assert(g_is_external_declaration_firstset(parser));
-  assert(current_block->type == ast_block);
+  assert(current_block->type == ast_list);
   astn decl_specs = parse_declaration_specifiers(parser);
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
   if (g_is_init_declarator_firstset(parser)) {
     init_declarator = parse_init_declarator(parser, decl_specs, false);
     assert(init_declarator->type == ast_declaration);
-    slist_add_tail(&current_block->block.stmts, init_declarator);
+    slist_add_tail(&current_block->list, init_declarator);
     if (g_is_function_definition(init_declarator)) {
       return current_block;
     }
@@ -343,7 +343,7 @@ astn parse_external_declaration(parser parser, astn current_block) {
     init_declarator =
         parse_init_declarator(parser, ast_copy(decl_specs), false);
     assert(init_declarator->type == ast_declaration);
-    slist_add_tail(&current_block->block.stmts, init_declarator);
+    slist_add_tail(&current_block->list, init_declarator);
   }
   parser_consume_with(parser, ';');
   return current_block;

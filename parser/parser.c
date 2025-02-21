@@ -17,6 +17,8 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
   parser_consume(parser);
   slist_init(&parser->idtab);
   slist_init(&parser->tagtab);
+  parser->global_block = parser->interruptable_block =
+      parser->current_function_block = NULL;
 }
 
 void parser_snapshot(parser _new, parser _old) {

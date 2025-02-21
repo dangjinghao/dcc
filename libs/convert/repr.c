@@ -226,14 +226,14 @@ sds convert_ast_to_repr(astn n, sds buf) {
     buf = sdscatlen(buf, "]", 1);
     break;
   }
-  case ast_block: {
-    buf = sdscat(buf, "block[stmts[");
+  case ast_list: {
+    buf = sdscat(buf, "list[");
     astn ref;
-    slist_foreach(&n->block.stmts, ref) {
+    slist_foreach(&n->list, ref) {
       buf = convert_ast_to_repr(ref, buf);
       buf = sdscatlen(buf, " ", 1);
     }
-    buf = sdscatlen(buf, "]]", 2);
+    buf = sdscatlen(buf, "]", 2);
     break;
   }
   case ast_ctype:
@@ -418,7 +418,7 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_expr_ternary);
     STRCASE(ast_expr_unary);
     STRCASE(ast_ident);
-    STRCASE(ast_block);
+    STRCASE(ast_list);
     STRCASE(ast_ctype);
     STRCASE(ast_labeled_statement);
     STRCASE(ast_expr_typecast);

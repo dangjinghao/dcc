@@ -458,7 +458,7 @@ static inline bool g_is_parameter_type_list_firstset(parser parser) {
 static inline astn g_get_function_params(astn declaration) {
   assert(declaration->type == ast_declaration);
   astn ref = slist_peek_head(&declaration->declaration.type_chain);
-  if (ref->type == ast_block) {
+  if (ref->type == ast_list) {
     return ref;
   }
   return NULL;
@@ -490,7 +490,7 @@ static inline bool g_is_type_name_firstset(parser parser){
 
 static inline astn g_get_function_body(astn declaration) {
   if (declaration->declaration.extdata) {
-    assert(declaration->declaration.extdata->type == ast_block);
+    assert(declaration->declaration.extdata->type == ast_list);
     return declaration->declaration.extdata;
   }
   return NULL;

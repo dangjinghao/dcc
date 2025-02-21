@@ -23,12 +23,12 @@ astn parse_expression_statement(parser p) {
 astn parse_compound_statement(parser parser) {
   assert(g_is_compound_statement_firstset(parser));
   parser_consume_with(parser, '{');
-  astn block = ast_new(ast_block);
+  astn block = ast_new(ast_list);
   while (true) {
     if (g_is_external_declaration_firstset(parser)) {
       parse_external_declaration(parser, block);
     } else if (g_is_statement_firstset(parser)) {
-      slist_add_tail(&block->block.stmts, parse_statement(parser));
+      slist_add_tail(&block->list, parse_statement(parser));
     } else {
       break;
     }

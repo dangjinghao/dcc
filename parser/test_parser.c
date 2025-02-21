@@ -22,7 +22,7 @@ int process_expr(struct lexer *lexer) {
 int process_declaration(struct lexer *lexer) {
   struct parser parser;
   parser_from_lexer(&parser, lexer);
-  astn n = ast_new(ast_block);
+  astn n = ast_new(ast_list);
   parse_external_declaration(&parser, n);
   sds buf = sdsempty();
   buf = convert_ast_to_repr(n, buf);

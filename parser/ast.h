@@ -11,7 +11,7 @@ enum ast_type {
   ast_expr_primary,
   ast_expr_typecast,
   ast_declaration,
-  ast_block,
+  ast_list,
   ast_ctype,
   ast_ident,
   ast_labeled_statement,
@@ -54,9 +54,7 @@ typedef struct ast_node {
       enum tok_type type;
       union token v;
     } primary;
-    struct block {
-      struct slist stmts;
-    } block;
+    struct slist list;
     struct declaration {
       sds ident;
       // initializer/function body

@@ -9,8 +9,8 @@ astn ast_new(enum ast_type type) {
   case ast_declaration:
     slist_init(&node->declaration.type_chain);
     break;
-  case ast_block:
-    slist_init(&node->block.stmts);
+  case ast_list:
+    slist_init(&node->list);
     break;
   case ast_expr_typecast:
     slist_init(&node->typecast.type_chain);
@@ -68,11 +68,11 @@ astn ast_copy(astn n) {
       slist_add_tail(&new->declaration.type_chain, copy);
     }
     break;
-  case ast_block: {
+  case ast_list: {
     astn ref;
-    slist_foreach(&n->block.stmts, ref) {
+    slist_foreach(&n->list, ref) {
       astn copy = ast_copy(ref);
-      slist_add_tail(&new->block.stmts, copy);
+      slist_add_tail(&new->list, copy);
     }
     break;
   }
@@ -148,10 +148,10 @@ void ast_free(astn node) {
     sdsfree(node->declaration.ident);
     break;
   }
-  case ast_block: {
+  case ast_list: {
     astn ref;
-    slist_foreach(&node->block.stmts, ref) { ast_free(ref); }
-    slist_free(&node->block.stmts);
+    slist_foreach(&node->list, ref) { ast_free(ref); }
+    slist_free(&node->list);
     break;
   }
   case ast_ctype: {
