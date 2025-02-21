@@ -9,8 +9,10 @@
 #include "slist/slist.h"
 #include <assert.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 /**
  * @brief using the chable to store all declarations
@@ -19,13 +21,16 @@
  */
 astn parse_translation_unit(parser parser) {
   assert(g_is_translation_unit_firstset(parser));
-  if (parser->current_token == TOK_EOF) {
-    return NULL;
-  }
+
   astn n = ast_new(ast_block);
+  parser->global_block = n;
+  parser->global_uid = parser->local_uid = 1;
   while (g_is_external_declaration_firstset(parser)) {
     parse_external_declaration(parser, n);
+    parser->local_uid = 1;
   }
+  parser_consume_with(parser, TOK_EOF);
+  parser->global_block = NULL;
   return n;
 }
 
@@ -81,8 +86,10 @@ astn parse_declaration_specifiers(parser parser) {
       assert(g_is_type_specifier_firstset(parser));
       if (g_is_typedef_name_firstset(parser)) {
         tn->type = TOK_KW_TYPEDEF;
-        tn->user_defined_type =
-            parser_get_typedef(parser, parser->lexer->lex_token._ident);
+        astn ref = ast_new(ast_ref);
+        ref->ref = parser_get_typedef_by_type_name(
+            parser, parser->lexer->lex_token._ident);
+        tn->user_defined_type = ref;
         assert(parser->current_token == TOK_IDENT);
         sdsfree(parser->lexer->lex_token._ident);
         parser_consume(parser);
@@ -146,7 +153,7 @@ slist parse_pointers(parser parser, slist pointers) {
 astn parse_parameter_declaration(parser parser) {
   assert(g_is_parameter_declaration_firstset(parser));
   astn decl_specs = parse_declaration_specifiers(parser);
-  return parse_init_declarator(parser, decl_specs);
+  return parse_init_declarator(parser, decl_specs, true);
 }
 
 slist parse_parameter_type_list(parser p, astn astp) {
@@ -243,21 +250,67 @@ sds parse_remove_type_chain_ident(slist type_chain) {
   ast_free(first);
   return ident;
 }
-
-astn parse_init_declarator(parser parser, astn decl_specs) {
+/* delay_alloc_uid is used in parsing function parameters, to avoid allocating wrong block uid */
+astn parse_init_declarator(parser parser, astn decl_specs,
+                           bool delay_alloc_id) {
   // assert(g_is_init_declarator_firstset(parser));
   astn n = ast_new(ast_declaration);
   slist type_chain = &n->declaration.type_chain;
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, decl_specs);
   n->declaration.ident = parse_remove_type_chain_ident(type_chain);
-  // n->declaration.type_chain = *type_chain;
+  if (g_get_function_params(n) && parser->current_token != '{') {
+    // we should not use g_is_function_declaration(n) because the function is waiting for parsing.
+    // if it is a function declaration, we should add an `extern` storage to
+    // distinguish it from a function definition simply.
+    // we put this process in there because the later parser_declare_new_symbol needs the 
+    // extern to determine whether it is a function declaration or not.
+    log_debug("add extern storage specifier to function declaration: %s",
+              n->declaration.ident);
+    
+    decl_specs->ctype.storage = TOK_KW_EXTERN;
+  }
+
+  if (!delay_alloc_id) {
+    // this symbol declaration would be delayed to the function definition process
+    // and it should only be used in the function parameter parse process
+    parser_declare_new_symbol(parser, n);
+  }
   if (parser->current_token == '=') {
+    if (g_get_function_params(n)) {
+      compiler_error(parser->lexer,
+                     "function declaration should not have an initializer");
+    }
     parser_consume(parser);
     n->declaration.extdata = parse_initializer(parser);
   } else if (parser->current_token == '{') {
+    // function definition
+    if (!parser_is_current_block_global(parser)) {
+      compiler_error(parser->lexer,
+                     "function definition is not allowed in non-global scope");
+    }
+    parser_push_scope(parser);
+    parser->current_function_block = n;
+    // add params to the scope
+    astn ps = g_get_function_params(n);
+    if (!ps) {
+      compiler_error(parser->lexer,
+                     "function definition without parameters declaration");
+    }
+    astn p;
+    slist_foreach(&ps->block.stmts, p) {
+      sds id = p->declaration.ident;
+      if (!id) {
+        compiler_error(parser->lexer,
+                       "there is a function parameter without an identifier");
+      }
+      parser_declare_new_symbol(parser, p);
+    }
+
     // function body
     n->declaration.extdata = parse_compound_statement(parser);
+    parser->current_function_block = NULL;
+    parser_pop_scope(parser);
   }
   return n;
 }
@@ -278,22 +331,19 @@ astn parse_external_declaration(parser parser, astn current_block) {
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
   if (g_is_init_declarator_firstset(parser)) {
-    init_declarator = parse_init_declarator(parser, decl_specs);
+    init_declarator = parse_init_declarator(parser, decl_specs, false);
     assert(init_declarator->type == ast_declaration);
     slist_add_tail(&current_block->block.stmts, init_declarator);
-    parser_add_declaration_to_current_scope_table(init_declarator,
-                                                  &parser->idtab);
     if (g_is_function_definition(init_declarator)) {
       return current_block;
     }
   }
   while (parser->current_token == ',') {
     parser_consume(parser);
-    init_declarator = parse_init_declarator(parser, ast_copy(decl_specs));
+    init_declarator =
+        parse_init_declarator(parser, ast_copy(decl_specs), false);
     assert(init_declarator->type == ast_declaration);
     slist_add_tail(&current_block->block.stmts, init_declarator);
-    parser_add_declaration_to_current_scope_table(init_declarator,
-                                                  &parser->idtab);
   }
   parser_consume_with(parser, ';');
   return current_block;

@@ -211,8 +211,9 @@ sds convert_ast_to_repr(astn n, sds buf) {
     buf = sdscatlen(buf, "declaration[", 12);
     if (n->declaration.ident) {
       buf = sdscatsds(buf, n->declaration.ident);
+      buf = sdscatprintf(buf, ".%ld", n->declaration.uid);
+      buf = sdscatlen(buf, " ", 1);
     }
-    buf = sdscatlen(buf, " ", 1);
     astn ref;
     slist_foreach(&n->declaration.type_chain, ref) {
       buf = convert_ast_to_repr(ref, buf);
@@ -279,6 +280,12 @@ sds convert_ast_to_repr(astn n, sds buf) {
     }
     buf = sdscatlen(buf, "])", 2);
     buf = convert_ast_to_repr(n->typecast.expr, buf);
+    break;
+  case ast_ref:
+    buf = sdscatlen(buf, "ref[", 4);
+    buf = convert_ast_to_repr(n->ref, buf);
+    buf = sdscatlen(buf, "]", 1);
+
     break;
   }
   buf = sdscatlen(buf, ")", 1);
@@ -415,6 +422,7 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_ctype);
     STRCASE(ast_labeled_statement);
     STRCASE(ast_expr_typecast);
+    STRCASE(ast_ref);
   }
   return NULL;
 }

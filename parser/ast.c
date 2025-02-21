@@ -171,6 +171,9 @@ void ast_free(astn node) {
     slist_free(&node->typecast.type_chain);
     break;
   }
+  case ast_ref: {
+    break;
+  }
   default:
     log_panic("Wrong ast type %d", node->type);
     break;

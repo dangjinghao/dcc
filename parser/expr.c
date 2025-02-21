@@ -46,9 +46,18 @@ astn parse_primary_expr(parser parser) {
     node->primary.v = parser->lexer->lex_token;
     parser_consume(parser);
     break;
-  case TOK_IDENT:
+  case TOK_IDENT: {
     node = parse_ident(parser);
+    astn ref_id =
+        parser_find_declaration_in_all_scope_table(node->ident, &parser->idtab);
+    if (!ref_id) {
+      compiler_error(parser->lexer, "Undefined identifier %s", node->ident);
+    }
+    ast_free(node);
+    node = ast_new(ast_ref);
+    node->ref = ref_id;
     break;
+  }
   case '(':
     parser_consume(parser);
     node = parse_expression(parser);

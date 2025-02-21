@@ -2,9 +2,11 @@
 #include "ast.h"
 #include "grammar.h"
 #include "lexer.h"
+#include "log/log.h"
 #include "macro/macro.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include <stdbool.h>
 int parser_consume(parser parser) {
   return parser->current_token = lexer_next_token(parser->lexer);
 }
@@ -63,28 +65,29 @@ int parser_consume_with(parser parser, int token) {
   return 0;
 }
 
+static struct ast_node __parser_scope_fence,
+    *__parser_scope_fence_ptr = &__parser_scope_fence;
 void parser_push_scope(parser parser) {
-  slist_add_head(&parser->idtab, NULL);
-  slist_add_head(&parser->tagtab, NULL);
+  log_debug("push scope at line %ld", parser->lexer->ln);
+  slist_add_head(&parser->idtab, __parser_scope_fence_ptr);
+  slist_add_head(&parser->tagtab, __parser_scope_fence_ptr);
 }
 
 void parser_pop_scope(parser parser) {
-  struct declaration *data;
-  slist_foreach(&parser->idtab, data) {
-    slist_pop_head(&parser->idtab);
-    if (data == NULL) {
-      break;
-    }
+  log_debug("pop scope at line %ld", parser->lexer->ln);
+  astn r;
+  while ((r = slist_pop_head(&parser->idtab)) != __parser_scope_fence_ptr) {
+    log_debug("pop declaration `%s`", r->declaration.ident);
   }
 }
 
 astn parser_find_declaration_in_all_scope_table(sds ident, slist tab) {
   astn data;
   slist_foreach(tab, data) {
-    if (data == NULL) {
+    if (data == __parser_scope_fence_ptr) {
       continue;
     }
-    if (sdscmp(data->ident, ident) == 0) {
+    if (sdscmp(data->declaration.ident, ident) == 0) {
       return data;
     }
   }
@@ -94,10 +97,10 @@ astn parser_find_declaration_in_all_scope_table(sds ident, slist tab) {
 astn parser_find_declaration_in_current_scope_table(sds ident, slist tab) {
   astn data;
   slist_foreach(tab, data) {
-    if (data == NULL) {
+    if (data == __parser_scope_fence_ptr) {
       break;
     }
-    if (sdscmp(data->ident, ident) == 0) {
+    if (sdscmp(data->declaration.ident, ident) == 0) {
       return data;
     }
   }
@@ -105,6 +108,7 @@ astn parser_find_declaration_in_current_scope_table(sds ident, slist tab) {
 }
 
 void parser_add_declaration_to_current_scope_table(astn decl, slist tab) {
+  log_debug("add declaration `%s` to current scope", decl->declaration.ident);
   slist_add_head(tab, decl);
 }
 
@@ -113,10 +117,60 @@ bool parser_check_constant_expr(astn expr) {
   BUILDING();
 }
 
-astn parser_get_typedef(parser parser, sds ident) {
+astn parser_get_typedef_by_type_name(parser parser, sds ident) {
   astn d = parser_find_declaration_in_all_scope_table(ident, &parser->idtab);
   if (d && g_is_declaration_typedef(d)) {
     return d;
   }
   return NULL;
+}
+
+bool parser_is_current_block_global(parser parser) {
+  // find NULL in the idtab
+  return parser->current_function_block == NULL;
+}
+
+/**
+ * @brief add declaration to the current scope table,
+ * set the uid for the declaration
+ * 
+ * @param parser 
+ * @param n 
+ */
+void parser_declare_new_symbol(parser parser, astn n) {
+  astn decl_specs = g_get_declaration_specifier(n);
+  if (n->declaration.ident == NULL) {
+    log_debug("this is an abstract declarator, skipping declaration");
+    return;
+  }
+  astn exists_declaration = parser_find_declaration_in_current_scope_table(
+      n->declaration.ident, &parser->idtab);
+  if (exists_declaration && decl_specs->ctype.storage == TOK_KW_EXTERN) {
+
+    log_debug(
+        "multiple declaration with a new extern declaration, do nothing: %s",
+        n->declaration.ident);
+    return;
+  } else if (exists_declaration && decl_specs->ctype.storage != TOK_KW_EXTERN &&
+             g_get_declaration_specifier(exists_declaration)->ctype.storage !=
+                 TOK_KW_EXTERN) {
+    compiler_error(parser->lexer, "redefined symbol %s", n->declaration.ident);
+  }
+  parser_set_declaration_uid(n, parser);
+  parser_add_declaration_to_current_scope_table(n, &parser->idtab);
+}
+
+size_t parser_get_local_uid(parser parser) { return parser->local_uid++; }
+size_t parser_get_global_uid(parser parser) { return parser->global_uid++; }
+
+void parser_set_declaration_uid(astn n, parser parser) {
+  if (n->declaration.ident) {
+    if (parser_is_current_block_global(parser)) {
+      n->declaration.uid = parser_get_global_uid(parser);
+    } else {
+      n->declaration.uid = parser_get_local_uid(parser);
+    }
+  } else {
+    log_debug("this is an abstract declarator, skipping allocate uid");
+  }
 }

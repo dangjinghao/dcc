@@ -50,7 +50,7 @@ static inline bool g_is_typedef_name_firstset(parser parser) {
   if (parser->current_token != TOK_IDENT) {
     return false;
   }
-  return parser_get_typedef(parser, parser->lexer->lex_token._ident) != NULL;
+  return parser_get_typedef_by_type_name(parser, parser->lexer->lex_token._ident) != NULL;
 }
 
 /**
@@ -506,8 +506,17 @@ static inline bool g_is_empty_statement(astn statement) {
          statement->primary.type == TOK_EOF;
 }
 
+static inline bool g_is_function_declaration(astn declaration) {
+  return g_get_function_params(declaration) && !g_get_function_body(declaration);
+}
+
 static inline bool g_is_varargs(astn n) {
   return n->type == ast_ctype && n->ctype.type == TOK_SYM_VARARGS;
 }
 
+
+static inline astn g_get_declaration_specifier(astn declaration) {
+  assert(declaration->type == ast_declaration);
+  return slist_peek_tail(&declaration->declaration.type_chain);
+}
 #endif

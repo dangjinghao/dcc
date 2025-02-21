@@ -103,7 +103,6 @@ void lexer_from_string(struct lexer *lexer, char *src);
 void lexer_from_file(struct lexer *lexer, char *filename);
 void lexer_from_fp(struct lexer *lexer, FILE *fp);
 void lexer_destroy(struct lexer *lexer);
-void lexer_copy(struct lexer *dst, struct lexer *src);
 void lexer_snapshot(struct lexer *dst, struct lexer *src);
 bool lexer_eof(struct lexer *lexer);
 int lexer_peek(struct lexer *lexer);

@@ -102,7 +102,7 @@ int ptc_statement() {
   return 0;
 }
 
-int ptc_label(){
+int ptc_label() {
   struct lexer lexer;
   lexer_from_string(&lexer, "label: a = 1;");
   process_statement(&lexer);
@@ -125,7 +125,7 @@ int ptc_func_declaration() {
   return 0;
 }
 
-int ptc_typecast(){
+int ptc_typecast() {
   struct lexer lexer;
   lexer_from_string(&lexer, "(const int)1 + (void*)2 + (int(*)(int,char))0");
   process_expr(&lexer);
@@ -133,18 +133,77 @@ int ptc_typecast(){
   return 0;
 }
 
-int ptc_unary_expr(){
+int ptc_unary_expr() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "(void*)0 + 1+(((((1))))) + ++!-+~*&a++--++-- * (1 + 2)");
+  lexer_from_string(&lexer,
+                    "(void*)0 + 1+(((((1))))) + ++!-+~*&a++--++-- * (1 + 2)");
   process_expr(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
 
-int ptc_unary_advance_post_expr(){
+int ptc_unary_advance_post_expr() {
   struct lexer lexer;
   lexer_from_string(&lexer, "a[1].x+++&b[2]->member.m(1,2.f,\"hello\",0x1234)");
   process_expr(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_var_no_exists() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "int a=1,b=a,b=c;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_var_redef() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "int a = 1,a = 2;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_function_def() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "typedef int I;int func(int a, int b){int c = 1; "
+                            "c= a+b + c;}\nI func2(I a,char c){ func;}");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_extern() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "extern int A;\n int A; extern int A;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+int ptc_extern_redef() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "extern int A;\n int A; extern int A; int A;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_decl_def_decl() {
+  struct lexer lexer;
+  lexer_from_string(&lexer,
+                    "int A();extern int A(); int A(); int A(){} int A();");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_decl_def_decl_redef() {
+  struct lexer lexer;
+  lexer_from_string(&lexer,
+                    "int A();extern int A(); int A(); int A(){} int A();int A(){}");
+  process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }

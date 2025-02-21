@@ -15,6 +15,7 @@ enum ast_type {
   ast_ctype,
   ast_ident,
   ast_labeled_statement,
+  ast_ref,
 };
 
 enum type_qualifier {
@@ -28,6 +29,7 @@ enum type_qualifier {
 typedef struct ast_node {
   enum ast_type type;
   union {
+    struct ast_node *ref;
     sds ident;
     struct unary {
       int op;
@@ -59,6 +61,7 @@ typedef struct ast_node {
       sds ident;
       // initializer/function body
       struct ast_node *extdata;
+      size_t uid;
       // ast_expr_unary is used for array declaration [<expr>],
       // ast_block is used for function parameters(<parameter-type-list>),
       // ast_ctype

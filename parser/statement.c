@@ -16,10 +16,8 @@ astn parse_expression_statement(parser p) {
 }
 
 /**
- * @brief We have to pass the external block because the sub-scope would reuse the function subscope to store the declarations
  * 
  * @param parser 
- * @param block 
  * @return astn 
  */
 astn parse_compound_statement(parser parser) {
@@ -52,7 +50,9 @@ astn parse_statement(parser p) {
       stmt = parse_expression_statement(p);
     }
   } else if (g_is_compound_statement_firstset(p)) {
+    parser_push_scope(p);
     stmt = parse_compound_statement(p);
+    parser_pop_scope(p);
   } else if (g_is_selection_statement_firstset(p)) {
     stmt = parse_selection_statement(p);
   } else if (g_is_iteration_statement_firstset(p)) {

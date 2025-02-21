@@ -50,13 +50,6 @@ void lexer_destroy(struct lexer *lexer) {
   memset(lexer, 0, sizeof(*lexer));
 }
 
-void lexer_copy(struct lexer *dst, struct lexer *src) {
-  dst->ln = src->ln;
-  strcpy(dst->filename, src->filename);
-  dst->src = sdsdup(src->src);
-  dst->pos = src->pos;
-}
-
 void lexer_snapshot(struct lexer *dst, struct lexer *src) { *dst = *src; }
 
 bool lexer_eof(struct lexer *lexer) { return lexer->pos >= sdslen(lexer->src); }
