@@ -169,9 +169,8 @@ slist parse_parameter_type_list(parser p, astn astp) {
       slist_add_tail(params, param);
     } else if (p->current_token == TOK_SYM_VARARGS) {
       parser_consume(p);
-      param = ast_new(ast_ctype);
-      param->ctype.type = TOK_SYM_VARARGS;
-      slist_add_tail(params, param);
+
+      slist_add_tail(params, g_create_varargs());
       break;
     } else {
       compiler_error(p->lexer, "Unexpected token: %s",
@@ -190,6 +189,7 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
     slist_add_tail(type_chain, id);
   } else if (parser->current_token == '(') {
     parser_consume(parser);
+
     parse_declarator(parser, type_chain);
     parser_consume_with(parser, ')');
   }
@@ -207,7 +207,12 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
     } else {
       parser_consume(parser);
       astn content_type = ast_new(ast_list);
-      if (parser->current_token != ')') {
+      if (parser->current_token == ')') {
+        // int F(); in C language, it means F with any parameters
+        // but this way had been deprecated in C23
+        // we should use int F(void) instead
+        slist_add_tail(&content_type->list, g_create_void_param());
+      } else {
         parse_parameter_type_list(parser, content_type);
       }
       parser_consume_with(parser, ')');
@@ -263,11 +268,11 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     // we should not use g_is_function_declaration(n) because the function is waiting for parsing.
     // if it is a function declaration, we should add an `extern` storage to
     // distinguish it from a function definition simply.
-    // we put this process in there because the later parser_declare_new_symbol needs the 
+    // we put this process in there because the later parser_declare_new_symbol needs the
     // extern to determine whether it is a function declaration or not.
     log_debug("add extern storage specifier to function declaration: %s",
               n->declaration.ident);
-    
+
     decl_specs->ctype.storage = TOK_KW_EXTERN;
   }
 
@@ -300,6 +305,9 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     astn p;
     slist_foreach(&ps->list, p) {
       sds id = p->declaration.ident;
+      if (g_is_void_param(p)) {
+        continue;
+      }
       if (!id) {
         compiler_error(parser->lexer,
                        "there is a function parameter without an identifier");

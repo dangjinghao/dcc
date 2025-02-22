@@ -50,7 +50,8 @@ static inline bool g_is_typedef_name_firstset(parser parser) {
   if (parser->current_token != TOK_IDENT) {
     return false;
   }
-  return parser_get_typedef_by_type_name(parser, parser->lexer->lex_token._ident) != NULL;
+  return parser_get_typedef_by_type_name(
+             parser, parser->lexer->lex_token._ident) != NULL;
 }
 
 /**
@@ -286,10 +287,9 @@ static inline bool g_is_unary_expression_firstset(parser parser) {
  * @return true 
  * @return false 
  */
-static inline bool g_is_cast_expression_firstset(parser parser){
+static inline bool g_is_cast_expression_firstset(parser parser) {
   return parser->current_token == '(' || g_is_unary_expression_firstset(parser);
 }
-
 
 static inline bool g_is_assignment_expression_firstset(parser parser) {
   return g_is_unary_expression_firstset(parser);
@@ -483,10 +483,9 @@ static inline bool g_is_specifier_qualifier_firstset(parser parser) {
  * @return true 
  * @return false 
  */
-static inline bool g_is_type_name_firstset(parser parser){
+static inline bool g_is_type_name_firstset(parser parser) {
   return g_is_specifier_qualifier_firstset(parser);
 }
-
 
 static inline astn g_get_function_body(astn declaration) {
   if (declaration->declaration.extdata) {
@@ -507,13 +506,33 @@ static inline bool g_is_empty_statement(astn statement) {
 }
 
 static inline bool g_is_function_declaration(astn declaration) {
-  return g_get_function_params(declaration) && !g_get_function_body(declaration);
+  return g_get_function_params(declaration) &&
+         !g_get_function_body(declaration);
 }
 
 static inline bool g_is_varargs(astn n) {
   return n->type == ast_ctype && n->ctype.type == TOK_SYM_VARARGS;
 }
 
+static inline astn g_create_varargs() {
+  astn n = ast_new(ast_ctype);
+  n->ctype.type = TOK_SYM_VARARGS;
+  return n;
+}
+
+static inline astn g_create_void_param() {
+  astn n = ast_new(ast_declaration);
+  astn ctype = ast_new(ast_ctype);
+  ctype->ctype.type = TOK_KW_VOID;
+  slist_add_head(&n->declaration.type_chain, ctype);
+  return n;
+}
+
+static inline bool g_is_void_param(astn n) {
+  assert(n->type == ast_declaration);
+  astn ctype = slist_peek_head(&n->declaration.type_chain);
+  return ctype->ctype.type == TOK_KW_VOID;
+}
 
 static inline astn g_get_declaration_specifier(astn declaration) {
   assert(declaration->type == ast_declaration);
