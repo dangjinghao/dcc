@@ -10,7 +10,12 @@
 astn parse_expression_statement(parser p) {
   assert(g_is_expression_statement_firstset(p));
   // move the empty statement check to the parse_statement
-  astn expr = parse_expression(p);
+  astn expr;
+  if (p->current_token == ';') {
+    expr = g_create_empty_statement();
+  } else {
+    expr = parse_expression(p);
+  }
   parser_consume_with(p, ';');
   return expr;
 }
@@ -44,6 +49,7 @@ astn parse_statement(parser p) {
   assert(g_is_statement_firstset(p));
   astn stmt = NULL;
   if (g_is_labeled_statement_firstset(p)) {
+    // special case for the expression stats with ident
     if (!(stmt = parse_labeled_statement(p))) {
       log_debug("Failed to parse labeled statement,retrying to parse "
                 "expression statement");
@@ -59,10 +65,8 @@ astn parse_statement(parser p) {
     stmt = parse_iteration_statement(p);
   } else if (g_is_jump_statement_firstset(p)) {
     stmt = parse_jump_statement(p);
-  } else if (p->current_token == ';') {
-    stmt = ast_new(ast_expr_primary);
-    stmt->primary.type = TOK_EOF;
-    parser_consume(p);
+  } else {
+    stmt = parse_expression_statement(p);
   }
   return stmt;
 }

@@ -505,6 +505,12 @@ static inline bool g_is_empty_statement(astn statement) {
          statement->primary.type == TOK_EOF;
 }
 
+static inline astn g_create_empty_statement() {
+  astn n = ast_new(ast_expr_primary);
+  n->primary.type = TOK_EOF;
+  return n;
+}
+
 static inline bool g_is_function_declaration(astn declaration) {
   return g_get_function_params(declaration) &&
          !g_get_function_body(declaration);
