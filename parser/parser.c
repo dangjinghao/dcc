@@ -103,16 +103,26 @@ astn parser_find_declaration_in_current_scope_table(sds ident, slist tab) {
     if (data == __parser_scope_fence_ptr) {
       break;
     }
-    if (sdscmp(data->declaration.ident, ident) == 0) {
+    if (data->type == ast_declaration &&
+        sdscmp(data->declaration.ident, ident) == 0) {
+      return data;
+    } else if (data->type == ast_struct_union_declaration &&
+               sdscmp(data->struct_union_declaration.ident, ident) == 0) {
       return data;
     }
   }
   return NULL;
 }
 
-void parser_add_declaration_to_current_scope_table(astn decl, slist tab) {
-  log_debug("add declaration `%s` to current scope", decl->declaration.ident);
-  slist_add_head(tab, decl);
+void parser_add_declaration_to_current_scope_table(astn n, slist tab) {
+  if (n->type == ast_declaration) {
+    log_debug("add declaration `%s` to current scope", n->declaration.ident);
+
+  } else if (n->type == ast_struct_union_declaration) {
+    log_debug("add struct declaration `%s` to current scope",
+              n->struct_union_declaration.ident);
+  }
+  slist_add_head(tab, n);
 }
 
 bool parser_check_constant_expr(astn expr) {
@@ -161,6 +171,20 @@ void parser_declare_new_symbol(parser parser, astn n) {
   }
   parser_set_declaration_uid(n, parser);
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
+}
+
+void parser_declare_new_struct_union(parser parser, astn n) {
+  if (n->struct_union_declaration.ident == NULL) {
+    log_debug("this is an abstract struct declarator, skipping declaration");
+    return;
+  }
+  astn exists_declaration = parser_find_declaration_in_current_scope_table(
+      n->struct_union_declaration.ident, &parser->tagtab);
+  if (exists_declaration) {
+    compiler_error(parser->lexer, "redefined struct/union %s",
+                   n->struct_union_declaration.ident);
+  }
+  parser_add_declaration_to_current_scope_table(n, &parser->tagtab);
 }
 
 size_t parser_get_local_uid(parser parser) {

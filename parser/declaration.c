@@ -62,6 +62,58 @@ void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
   }
 }
 
+astn parse_struct_declarator(parser parser, astn decl_specs) {
+  assert(g_is_struct_declarator_firstset(parser));
+  astn n = ast_new(ast_declaration);
+  slist type_chain = &n->declaration.type_chain;
+  if (g_is_declarator_firstset(parser)) {
+    parse_declarator(parser, type_chain);
+    slist_add_tail(type_chain, decl_specs);
+    n->declaration.ident = parse_remove_type_chain_ident(type_chain);
+  }
+  if (parser->current_token == ':') {
+    parser_consume_with(parser, ':');
+    n->declaration.extdata = parse_constant_expr(parser);
+  }
+  return n;
+}
+
+slist parse_struct_declaration(parser parser, slist member_declarations) {
+  assert(g_is_struct_declaration_firstset(parser));
+  astn decl_specs = parse_specifier_qualifiers(parser);
+  astn struct_declarator = parse_struct_declarator(parser, decl_specs);
+  slist_add_tail(member_declarations, struct_declarator);
+  while (parser->current_token == ',') {
+    parser_consume(parser);
+    struct_declarator = parse_struct_declarator(parser, ast_copy(decl_specs));
+    slist_add_tail(member_declarations, struct_declarator);
+  }
+  parser_consume_with(parser, ';');
+  return member_declarations;
+}
+
+astn parse_struct_or_union_specifier(parser parser) {
+  assert(g_is_struct_or_union_specifier(parser));
+  astn n = ast_new(ast_struct_union_declaration);
+  parser_consume(parser);
+  if (parser->current_token == TOK_IDENT) {
+    n->struct_union_declaration.ident = parser->lexer->lex_token._ident;
+    parser_declare_new_struct_union(parser, n);
+    parser_consume(parser);
+  }
+  if (parser->current_token == '{') {
+    parser_consume(parser);
+    while (g_is_struct_declaration_firstset(parser)) {
+      parse_struct_declaration(
+          parser, &n->struct_union_declaration.member_declarations);
+    }
+    parser_consume_with(parser, '}');
+  } else {
+    // struct declaration, check if it exists
+  }
+  return n;
+}
+
 /* {<declaration-specifier>}+ */
 astn parse_declaration_specifiers(parser parser) {
   assert(g_is_declaration_specifier_firstset(parser));
@@ -94,7 +146,9 @@ astn parse_declaration_specifiers(parser parser) {
         sdsfree(parser->lexer->lex_token._ident);
         parser_consume(parser);
       } else if (g_is_struct_or_union_specifier(parser)) {
-        BUILDING();
+        tn->type = parser->current_token;
+        astn n = parse_struct_or_union_specifier(parser);
+        tn->user_defined_type = n;
       } else if (g_is_enum_specifier(parser)) {
         // we should convert enum to int when we meet it
         BUILDING();
@@ -345,19 +399,26 @@ astn parse_external_declaration(parser parser, astn current_block) {
     if (g_is_function_definition(init_declarator)) {
       return current_block;
     }
-  }
-  while (parser->current_token == ',') {
-    parser_consume(parser);
-    init_declarator =
-        parse_init_declarator(parser, ast_copy(decl_specs), false);
-    assert(init_declarator->type == ast_declaration);
-    slist_add_tail(&current_block->list, init_declarator);
+    while (parser->current_token == ',') {
+      parser_consume(parser);
+      init_declarator =
+          parse_init_declarator(parser, ast_copy(decl_specs), false);
+      assert(init_declarator->type == ast_declaration);
+      slist_add_tail(&current_block->list, init_declarator);
+    }
+  } else {
+    // struct or union declaration without identifier
+    astn n = ast_new(ast_declaration);
+    slist type_chain = &n->declaration.type_chain;
+    slist_add_tail(type_chain, decl_specs);
+    slist_add_tail(&current_block->list, n);
   }
   parser_consume_with(parser, ';');
+
   return current_block;
 }
 
-astn parse_specifier_qualifier(parser parser) {
+astn parse_specifier_qualifiers(parser parser) {
   assert(g_is_specifier_qualifier_firstset(parser));
   astn spec_qual = parse_declaration_specifiers(parser);
   return spec_qual;
@@ -371,7 +432,7 @@ astn parse_specifier_qualifier(parser parser) {
  */
 slist parse_type_name(parser parser, slist type_chain) {
   assert(g_is_type_name_firstset(parser));
-  astn spec_qual = parse_specifier_qualifier(parser);
+  astn spec_qual = parse_specifier_qualifiers(parser);
 
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, spec_qual);

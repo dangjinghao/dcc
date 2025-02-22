@@ -78,8 +78,9 @@ static inline bool g_is_struct_or_union_firstset(parser parser) {
 
 /**
  * @grammar
- * <struct-or-union-specifier> ::= <struct-or-union>
- * @param parser 
+ * <struct-or-union-specifier> ::= <struct-or-union> <identifier> { {<struct-declaration>}+ }
+ *                               | <struct-or-union> { {<struct-declaration>}+ }
+ *                               | <struct-or-union> <identifier>
  */
 static inline bool g_is_struct_or_union_specifier(parser parser) {
   return g_is_struct_or_union_firstset(parser);
@@ -487,6 +488,42 @@ static inline bool g_is_type_name_firstset(parser parser) {
   return g_is_specifier_qualifier_firstset(parser);
 }
 
+/**
+ * @grammar
+ * <struct-declarator> ::= <declarator>
+ *                      | <declarator> : <constant-expression>
+ *                      | : <constant-expression>
+ * 
+ */
+static inline bool g_is_struct_declarator_firstset(parser parser) {
+  return g_is_declarator_firstset(parser) || parser->current_token == ':';
+}
+
+/**
+ * @grammar
+ * <struct-declaration> ::= {<specifier-qualifier>}+ <struct-declarator-list> ;
+ * 
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_struct_declaration_firstset(parser parser) {
+  return g_is_specifier_qualifier_firstset(parser);
+}
+
+/**
+ * @brief 
+ * @grammar
+ * <struct-declarator-list> ::= <struct-declarator>
+ *                            | <struct-declarator-list> , <struct-declarator>
+ * @param parser 
+ * @return true 
+ * @return false 
+ */
+static inline bool g_is_struct_declarator_list_firstset(parser parser) {
+  return g_is_struct_declarator_firstset(parser);
+}
+
 static inline astn g_get_function_body(astn declaration) {
   if (declaration->declaration.extdata) {
     assert(declaration->declaration.extdata->type == ast_list);
@@ -544,4 +581,5 @@ static inline astn g_get_declaration_specifier(astn declaration) {
   assert(declaration->type == ast_declaration);
   return slist_peek_tail(&declaration->declaration.type_chain);
 }
+
 #endif

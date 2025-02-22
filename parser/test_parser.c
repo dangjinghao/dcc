@@ -175,6 +175,14 @@ int ptc_function_def() {
   return 0;
 }
 
+int ptc_struct(){
+  struct lexer lexer;
+  lexer_from_string(&lexer,"typedef struct stu{int id: 4;union {int i;char c;}_t;} STU;STU stu;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 int ptc_extern() {
   struct lexer lexer;
   lexer_from_string(&lexer, "extern int A;\n int A; extern int A;");

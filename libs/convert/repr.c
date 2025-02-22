@@ -166,7 +166,7 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     buf = sdscatprintf(buf, "{\"name\":\"id-%s\"}", n->ident);
     break;
   case ast_expr_unary: {
-    buf = sdscatprintf("{\"name\":\"<%s-%s> %s\",\"children\":[",
+    buf = sdscatprintf(buf, "{\"name\":\"<%s-%s> %s\",\"children\":[",
                        convert_ast_type_to_string(n->type),
                        n->unary.postfix ? "post" : "front",
                        convert_token_type_to_string(n->unary.op));
@@ -272,7 +272,7 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
       buf = sdscat(buf, ",");
     }
     if (n->ctype.type != TOK_UNKNOWN) {
-      buf = sdscatprintf(buf, "{\"name\":\"<type> %s\"}",
+      buf = sdscatprintf(buf, "{\"name\":\"%s\"}",
                          convert_token_type_to_string(n->ctype.type));
       buf = sdscat(buf, ",");
     }
@@ -314,6 +314,28 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
   case ast_ref:
     buf = sdscatprintf(buf, "{\"name\":\"ref\",\"children\":[");
     buf = convert_ast_to_json(n->ref, buf, true);
+    buf = sdscat(buf, "]}");
+    break;
+  case ast_struct_union_declaration:
+    buf = sdscatprintf(buf, "{\"name\":\"struct/union\",\"children\":[");
+    if (n->struct_union_declaration.ident) {
+      buf = sdscatprintf(buf, "{\"name\":\"<id> %s\"},",
+                         n->struct_union_declaration.ident);
+    } else {
+      buf = sdscatprintf(buf, "{\"name\":\"<empty-id>\"},");
+    }
+    if (!shallow) {
+      astn ref;
+      slist_foreach(&n->struct_union_declaration.member_declarations, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"}");
+    }
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
     buf = sdscat(buf, "]}");
     break;
   }
@@ -450,6 +472,7 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_ctype);
     STRCASE(ast_labeled_statement);
     STRCASE(ast_expr_typecast);
+    STRCASE(ast_struct_union_declaration);
     STRCASE(ast_ref);
   }
   return NULL;

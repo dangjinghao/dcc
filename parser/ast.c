@@ -15,6 +15,9 @@ astn ast_new(enum ast_type type) {
   case ast_expr_typecast:
     slist_init(&node->typecast.type_chain);
     break;
+  case ast_struct_union_declaration:
+    slist_init(&node->struct_union_declaration.member_declarations);
+    break;
   default:
     break;
   }
@@ -81,7 +84,7 @@ astn ast_copy(astn n) {
     new->ctype.type = n->ctype.type;
     new->ctype.signint = n->ctype.signint;
     new->ctype.storage = n->ctype.storage;
-    new->ctype.user_defined_type = n->ctype.user_defined_type;
+    new->ctype.user_defined_type = ast_copy(n->ctype.user_defined_type);
     break;
   case ast_labeled_statement:
     new->labeled_statement.type = n->labeled_statement.type;
@@ -95,6 +98,16 @@ astn ast_copy(astn n) {
     slist_foreach(&n->typecast.type_chain, ref) {
       astn copy = ast_copy(ref);
       slist_add_tail(&new->typecast.type_chain, copy);
+    }
+    break;
+  }
+  case ast_struct_union_declaration: {
+    new->struct_union_declaration.ident =
+        sdsdup(n->struct_union_declaration.ident);
+    astn ref;
+    slist_foreach(&n->struct_union_declaration.member_declarations, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->struct_union_declaration.member_declarations, copy);
     }
     break;
   }
@@ -155,6 +168,7 @@ void ast_free(astn node) {
     break;
   }
   case ast_ctype: {
+    ast_free(node->ctype.user_defined_type);
     break;
   }
   case ast_labeled_statement: {
@@ -172,6 +186,15 @@ void ast_free(astn node) {
     break;
   }
   case ast_ref: {
+    break;
+  }
+  case ast_struct_union_declaration: {
+    astn ref;
+    slist_foreach(&node->struct_union_declaration.member_declarations, ref) {
+      ast_free(ref);
+    }
+    sdsfree(node->struct_union_declaration.ident);
+    slist_free(&node->struct_union_declaration.member_declarations);
     break;
   }
   default:

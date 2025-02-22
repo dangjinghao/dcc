@@ -16,6 +16,7 @@ enum ast_type {
   ast_ident,
   ast_labeled_statement,
   ast_ref,
+  ast_struct_union_declaration,
 };
 
 enum type_qualifier {
@@ -57,7 +58,7 @@ typedef struct ast_node {
     struct slist list;
     struct declaration {
       sds ident;
-      // initializer/function body
+      // initializer/function body/struct declaration bitfield
       struct ast_node *extdata;
       size_t uid;
       // ast_expr_unary is used for array declaration [<expr>],
@@ -77,6 +78,11 @@ typedef struct ast_node {
       struct ast_node *label_value;
       struct ast_node *stmt;
     } labeled_statement;
+    struct struct_union {
+      sds ident;
+      // store the struct declaration type in the list
+      struct slist member_declarations;
+    } struct_union_declaration;
   };
 } *astn;
 
