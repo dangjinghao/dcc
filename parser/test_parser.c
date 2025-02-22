@@ -10,7 +10,7 @@ int process_expr(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn n = parse_expression(&parser);
   sds buf = sdsempty();
-  buf = convert_ast_to_repr(n, buf);
+  buf = convert_ast_to_json(n, buf,false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
@@ -25,7 +25,7 @@ int process_declaration(struct lexer *lexer) {
   astn n = ast_new(ast_list);
   parse_external_declaration(&parser, n);
   sds buf = sdsempty();
-  buf = convert_ast_to_repr(n, buf);
+  buf = convert_ast_to_json(n, buf,false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
@@ -38,7 +38,7 @@ int process_trans_unit(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn n = parse_translation_unit(&parser);
   sds buf = sdsempty();
-  buf = convert_ast_to_repr(n, buf);
+  buf = convert_ast_to_json(n, buf, false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
@@ -51,7 +51,7 @@ int process_statement(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn n = parse_statement(&parser);
   sds buf = sdsempty();
-  buf = convert_ast_to_repr(n, buf);
+  buf = convert_ast_to_json(n, buf,false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);

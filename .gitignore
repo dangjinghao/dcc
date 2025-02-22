@@ -7,3 +7,4 @@ compile_commands.json
 /.vscode
 *.out
 vgcore.*
+/analysis/data.json

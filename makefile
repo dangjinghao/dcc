@@ -47,6 +47,6 @@ endif
 test: $(OBJS) makefile $(TEST_FILE_OBJ)
 
 	$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY)
-	$(RUN) ./test.out 
+	$(RUN) ./test.out > analysis/data.json
 
 .PHONY: run gdb clean test
