@@ -102,12 +102,16 @@ sds convert_enum_qualifier_to_string(enum type_qualifier q, sds buf) {
   return buf;
 }
 
+/**
+ * @brief 
+ * 
+ * @param n 
+ * @param buf 
+ * @param shallow true: print the ast node only, not the children
+ * @return sds 
+ */
 sds convert_ast_to_json(astn n, sds buf, bool shallow) {
   if (!n) {
-    return buf;
-  }
-  if (shallow) {
-    buf = sdscat(buf, "{\"name\":\"???\"}");
     return buf;
   }
 
@@ -162,32 +166,44 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     buf = sdscatprintf(buf, "{\"name\":\"id-%s\"}", n->ident);
     break;
   case ast_expr_unary: {
-    buf = sdscatprintf("{name:\"<%s-%s> %s\",\"children\":[",
+    buf = sdscatprintf("{\"name\":\"<%s-%s> %s\",\"children\":[",
                        convert_ast_type_to_string(n->type),
                        n->unary.postfix ? "post" : "front",
                        convert_token_type_to_string(n->unary.op));
-    buf = convert_ast_to_json(n->unary.expr, buf, shallow);
+    if (!shallow) {
+      buf = convert_ast_to_json(n->unary.expr, buf, shallow);
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"}");
+    }
     buf = sdscat(buf, "]}");
     break;
   }
   case ast_expr_binop: {
     buf = sdscatprintf(buf, "{\"name\":\"%s\",\"children\":[",
                        convert_token_type_to_string(n->binop.op));
-    buf = convert_ast_to_json(n->binop.lhs, buf, shallow);
-    buf = sdscat(buf, ",");
-    buf = convert_ast_to_json(n->binop.rhs, buf, shallow);
+    if (!shallow) {
+      buf = convert_ast_to_json(n->binop.lhs, buf, shallow);
+      buf = sdscat(buf, ",");
+      buf = convert_ast_to_json(n->binop.rhs, buf, shallow);
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"}");
+    }
     buf = sdscat(buf, "]}");
     break;
   }
   case ast_expr_ternary: {
     buf = sdscatprintf(buf, "{\"name\":\"%s\",\"children\":[",
                        convert_ast_type_to_string(n->type));
-    buf = convert_ast_to_json(n->ternary.cond, buf, shallow);
-    buf = sdscat(buf, ",");
-    buf = convert_ast_to_json(n->ternary._t, buf, shallow);
-    buf = sdscat(buf, ",");
-    buf = convert_ast_to_json(n->ternary._f, buf, shallow);
-    buf = sdscat(buf, "]}");
+    if (!shallow) {
+      buf = convert_ast_to_json(n->ternary.cond, buf, shallow);
+      buf = sdscat(buf, ",");
+      buf = convert_ast_to_json(n->ternary._t, buf, shallow);
+      buf = sdscat(buf, ",");
+      buf = convert_ast_to_json(n->ternary._f, buf, shallow);
+      buf = sdscat(buf, "]}");
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"}");
+    }
     break;
   }
   case ast_declaration: {
@@ -201,11 +217,15 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     }
 
     astn ref;
-    slist_foreach(&n->declaration.type_chain, ref) {
-      buf = convert_ast_to_json(ref, buf, shallow);
-      buf = sdscat(buf, ",");
+    if (!shallow) {
+      slist_foreach(&n->declaration.type_chain, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
     }
-    if (n->declaration.extdata) {
+    if (n->declaration.extdata && !shallow) {
       buf = convert_ast_to_json(n->declaration.extdata, buf, shallow);
     }
     if (buf[sdslen(buf) - 1] == ',') {
@@ -217,9 +237,13 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
   case ast_list: {
     buf = sdscat(buf, "{\"name\":\"list\",\"children\":[");
     astn ref;
-    slist_foreach(&n->list, ref) {
-      buf = convert_ast_to_json(ref, buf, shallow);
-      buf = sdscat(buf, ",");
+    if (!shallow) {
+      slist_foreach(&n->list, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
     }
     if (buf[sdslen(buf) - 1] == ',') {
       sdssetlen(buf, sdslen(buf) - 1);
@@ -252,7 +276,11 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
                          convert_token_type_to_string(n->ctype.type));
       buf = sdscat(buf, ",");
     }
-    buf = convert_ast_to_json(n->ctype.user_defined_type, buf, shallow);
+    if (!shallow) {
+      buf = convert_ast_to_json(n->ctype.user_defined_type, buf, shallow);
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"}");
+    }
     if (buf[sdslen(buf) - 1] == ',') {
       sdssetlen(buf, sdslen(buf) - 1);
     }
@@ -262,7 +290,7 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     buf = sdscatprintf(buf, "{\"name\":\"%s: \",\"children\":[",
                        convert_token_type_to_string(n->labeled_statement.type));
 
-    if (n->labeled_statement.label_value) {
+    if (n->labeled_statement.label_value && !shallow) {
       buf = convert_ast_to_json(n->labeled_statement.label_value, buf, shallow);
       buf = sdscat(buf, ",");
     }
@@ -272,16 +300,21 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
   case ast_expr_typecast:
     buf = sdscat(buf, "{\"name\":\"typecast\",\"children\":[");
     astn ref;
-    slist_foreach(&n->typecast.type_chain, ref) {
-      buf = convert_ast_to_json(ref, buf, shallow);
-      buf = sdscat(buf, ",");
+    if (!shallow) {
+      slist_foreach(&n->typecast.type_chain, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
     }
     buf = convert_ast_to_json(n->typecast.expr, buf, shallow);
     buf = sdscat(buf, "]}");
     break;
   case ast_ref:
-    buf = sdscatprintf(buf, "{\"name\":\"ref-%s\"}",
-                       convert_ast_type_to_string(n->ref->type));
+    buf = sdscatprintf(buf, "{\"name\":\"ref\",\"children\":[");
+    buf = convert_ast_to_json(n->ref, buf, true);
+    buf = sdscat(buf, "]}");
     break;
   }
   return buf;
