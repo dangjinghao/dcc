@@ -19,12 +19,13 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
   slist_init(&parser->tagtab);
   parser->global_block = parser->interruptable_block =
       parser->current_function_block = NULL;
+  parser->global_uid = parser->local_uid = 0;
 }
 
 void parser_snapshot(parser _new, parser _old) {
+  *_new = *_old;
   _new->lexer = malloc(sizeof(struct lexer));
   lexer_snapshot(_new->lexer, _old->lexer);
-  _new->current_token = _old->current_token;
   // bad hack
   if (_old->current_token == TOK_IDENT ||
       _old->current_token == TOK_LIT_STRING) {
@@ -162,8 +163,14 @@ void parser_declare_new_symbol(parser parser, astn n) {
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
 }
 
-size_t parser_get_local_uid(parser parser) { return parser->local_uid++; }
-size_t parser_get_global_uid(parser parser) { return parser->global_uid++; }
+size_t parser_get_local_uid(parser parser) {
+  log_debug("get local uid %ld", parser->local_uid);
+  return parser->local_uid++;
+}
+size_t parser_get_global_uid(parser parser) {
+  log_debug("get global uid %ld", parser->global_uid);
+  return parser->global_uid++;
+}
 
 void parser_set_declaration_uid(astn n, parser parser) {
   if (n->declaration.ident) {
