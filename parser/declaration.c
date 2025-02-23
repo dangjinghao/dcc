@@ -22,11 +22,11 @@
 astn parse_translation_unit(parser parser) {
   assert(g_is_translation_unit_firstset(parser));
 
-  astn n = ast_new(ast_list);
+  astn n = ast_new(ast_trans_unit);
   parser->global_block = n;
   parser->global_uid = parser->local_uid = 1;
   while (g_is_external_declaration_firstset(parser)) {
-    parse_external_declaration(parser, n);
+    parse_external_declaration(parser, &n->trans_unit.list);
     parser->local_uid = 1;
   }
   parser_consume_with(parser, TOK_EOF);
@@ -164,13 +164,38 @@ astn parse_declaration_specifiers(parser parser) {
   }
   return n;
 }
+/**
+ * @brief consume the final optional `,`, even though it is not in the <initializer-list> procedure
+ * 
+ * @param parser 
+ * @return astn 
+ */
+astn parse_initializer_list(parser parser) {
+  assert(g_is_initializer_list_firstset(parser));
+  astn n = ast_new(ast_initializer_list);
+  while (g_is_initializer_firstset(parser)) {
+    slist_add_tail(&n->initializer_list.list, parse_initializer(parser));
+    if (parser->current_token == ',') {
+      parser_consume(parser);
+    } else {
+      break;
+    }
+  }
+  return n;
+}
 
 astn parse_initializer(parser parser) {
   assert(g_is_initializer_firstset(parser));
+  astn n = ast_new(ast_initializer);
   if (parser->current_token == '{') {
-    BUILDING();
+    parser_consume(parser);
+    n->initializer.init = parse_initializer_list(parser);
+    parser_consume_with(parser, '}');
+  } else {
+    n->initializer.init = parse_assign_expr(parser);
   }
-  return parse_assign_expr(parser);
+
+  return n;
 }
 
 /**
@@ -211,8 +236,8 @@ astn parse_parameter_declaration(parser parser) {
 }
 
 slist parse_parameter_type_list(parser p, astn astp) {
-  assert(astp->type == ast_list);
-  slist params = &astp->list;
+  assert(astp->type == ast_parameters);
+  slist params = &astp->parameters.list;
   assert(g_is_parameter_list_firstset(p));
   astn param = parse_parameter_declaration(p);
   slist_add_tail(params, param);
@@ -260,17 +285,17 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
       slist_add_tail(type_chain, content_type);
     } else {
       parser_consume(parser);
-      astn content_type = ast_new(ast_list);
+      astn parameters = ast_new(ast_parameters);
       if (parser->current_token == ')') {
         // int F(); in C language, it means F with any parameters
         // but this way had been deprecated in C23
-        // we should use int F(void) instead
-        slist_add_tail(&content_type->list, g_create_void_param());
+        // we should rewrite to `int F(void)`
+        slist_add_tail(&parameters->parameters.list, g_create_void_param());
       } else {
-        parse_parameter_type_list(parser, content_type);
+        parse_parameter_type_list(parser, parameters);
       }
       parser_consume_with(parser, ')');
-      slist_add_tail(type_chain, content_type);
+      slist_add_tail(type_chain, parameters);
     }
   }
   return type_chain;
@@ -357,7 +382,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
                      "function definition without parameters declaration");
     }
     astn p;
-    slist_foreach(&ps->list, p) {
+    slist_foreach(&ps->parameters.list, p) {
       sds id = p->declaration.ident;
       if (g_is_void_param(p)) {
         continue;
@@ -384,38 +409,36 @@ astn parse_init_declarator(parser parser, astn decl_specs,
  * 
  * @param parser 
  * @param current_block 
- * @return astn 
  */
-astn parse_external_declaration(parser parser, astn current_block) {
+void parse_external_declaration(parser parser, slist block) {
   assert(g_is_external_declaration_firstset(parser));
-  assert(current_block->type == ast_list);
   astn decl_specs = parse_declaration_specifiers(parser);
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
   if (g_is_init_declarator_firstset(parser)) {
     init_declarator = parse_init_declarator(parser, decl_specs, false);
     assert(init_declarator->type == ast_declaration);
-    slist_add_tail(&current_block->list, init_declarator);
+    slist_add_tail(block, init_declarator);
     if (g_is_function_definition(init_declarator)) {
-      return current_block;
+      return;
     }
     while (parser->current_token == ',') {
       parser_consume(parser);
       init_declarator =
           parse_init_declarator(parser, ast_copy(decl_specs), false);
       assert(init_declarator->type == ast_declaration);
-      slist_add_tail(&current_block->list, init_declarator);
+      slist_add_tail(block, init_declarator);
     }
   } else {
     // struct or union declaration without identifier
     astn n = ast_new(ast_declaration);
     slist type_chain = &n->declaration.type_chain;
     slist_add_tail(type_chain, decl_specs);
-    slist_add_tail(&current_block->list, n);
+    slist_add_tail(block, n);
   }
   parser_consume_with(parser, ';');
 
-  return current_block;
+  return;
 }
 
 astn parse_specifier_qualifiers(parser parser) {

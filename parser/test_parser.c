@@ -10,7 +10,7 @@ int process_expr(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn n = parse_expression(&parser);
   sds buf = sdsempty();
-  buf = convert_ast_to_json(n, buf,false);
+  buf = convert_ast_to_json(n, buf, false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
@@ -22,10 +22,10 @@ int process_expr(struct lexer *lexer) {
 int process_declaration(struct lexer *lexer) {
   struct parser parser;
   parser_from_lexer(&parser, lexer);
-  astn n = ast_new(ast_list);
-  parse_external_declaration(&parser, n);
+  astn n = ast_new(ast_block);
+  parse_external_declaration(&parser, &n->block.list);
   sds buf = sdsempty();
-  buf = convert_ast_to_json(n, buf,false);
+  buf = convert_ast_to_json(n, buf, false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
@@ -51,7 +51,7 @@ int process_statement(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn n = parse_statement(&parser);
   sds buf = sdsempty();
-  buf = convert_ast_to_json(n, buf,false);
+  buf = convert_ast_to_json(n, buf, false);
   ast_free(n);
   printf("%s\n", buf);
   sdsfree(buf);
@@ -175,9 +175,11 @@ int ptc_function_def() {
   return 0;
 }
 
-int ptc_struct(){
+int ptc_struct() {
   struct lexer lexer;
-  lexer_from_string(&lexer,"typedef struct stu{int id: 4;union {int i;char c;}_t;} STU;STU stu;");
+  lexer_from_string(
+      &lexer,
+      "typedef struct stu{int id: 4;union {int i;char c;}_t;} STU;STU stu;");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
@@ -209,8 +211,29 @@ int ptc_decl_def_decl() {
 
 int ptc_decl_def_decl_redef() {
   struct lexer lexer;
+  lexer_from_string(
+      &lexer, "int A();extern int A(); int A(); int A(){} int A();int A(){}");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_completed_code() {
+  struct lexer lexer;
   lexer_from_string(&lexer,
-                    "int A();extern int A(); int A(); int A(){} int A();int A(){}");
+                    "int ** (*v1)(int,char (*)(void)) = 0; int F(int,char c);"
+                    "void main(int arg){int v2 = 2; {v2 = 20; int v3 = 3; "
+                    "F(1,2);} F(3,4);} int arg = 2;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_initializer_list() {
+  struct lexer lexer;
+  lexer_from_string(&lexer,
+                    "int A[] = {1,2,3,4,5,6,7,8,9,10}, v1 = 1;struct{char a;char "
+                    "s[10];int is[10];} s = {'c',\"Hello\",{1,2,3,4,5},};");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;

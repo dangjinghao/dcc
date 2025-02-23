@@ -95,11 +95,11 @@ static astn parse_unary_advanced_postfix_if_need(parser parser, astn unary) {
       parser_consume(parser);
       return unary;
     }
-    astn args = ast_new(ast_list);
-    slist_add_tail(&args->list, parse_assign_expr(parser));
+    astn args = ast_new(ast_arguments);
+    slist_add_tail(&args->arguments.list, parse_assign_expr(parser));
     while (parser->current_token == ',') {
       parser_consume(parser);
-      slist_add_tail(&args->list, parse_assign_expr(parser));
+      slist_add_tail(&args->arguments.list, parse_assign_expr(parser));
     }
     unary->unary.extdata = args;
     parser_consume_with(parser, ')');

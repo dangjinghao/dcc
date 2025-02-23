@@ -9,7 +9,8 @@ We call this AST `reduced AST`.
 
 - [x] use slist instead of dynarray for performance
 - [x] refactor repr to generate a visual AST result
-- [ ] struct parser
+- [x] struct parser
+- [ ] convert_ast_to_json refactor to scaffold 
 - [ ] parser_check_constant_expr
 - use llvm c api instead of my llvm scaffold in codegen stage
   - expr

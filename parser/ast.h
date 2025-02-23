@@ -11,12 +11,17 @@ enum ast_type {
   ast_expr_primary,
   ast_expr_typecast,
   ast_declaration,
-  ast_list,
   ast_ctype,
   ast_ident,
   ast_labeled_statement,
   ast_ref,
   ast_struct_union_declaration,
+  ast_parameters,
+  ast_arguments,
+  ast_block,
+  ast_trans_unit,
+  ast_initializer,
+  ast_initializer_list,
 };
 
 enum type_qualifier {
@@ -35,7 +40,7 @@ typedef struct ast_node {
     struct unary {
       int op;
       char postfix;
-      // used for array subscript(expr type), function call(block), get member(by arrow or dot)(ident type)
+      // used for array subscript(expr type), function call(arguments), get member(by arrow or dot)(ident type)
       struct ast_node *extdata;
       struct ast_node *expr;
     } unary;
@@ -55,14 +60,14 @@ typedef struct ast_node {
       enum tok_type type;
       union token v;
     } primary;
-    struct slist list;
     struct declaration {
       sds ident;
-      // initializer/function body/struct declaration bitfield
+      // initializer/function body/struct declaration bitfield (expr)
       struct ast_node *extdata;
       size_t uid;
+      // it contains those node type:
       // ast_expr_unary is used for array declaration [<expr>],
-      // ast_block is used for function parameters(<parameter-type-list>),
+      // ast_parameters is used for function parameters(<parameter-type-list>),
       // ast_ctype
       struct slist type_chain;
     } declaration;
@@ -83,11 +88,30 @@ typedef struct ast_node {
       // store the struct declaration type in the list
       struct slist member_declarations;
     } struct_union_declaration;
+
+    struct parameters {
+      struct slist list;
+    } parameters;
+    struct block {
+      struct slist list;
+    } block;
+    struct trans_unit {
+      struct slist list;
+    } trans_unit;
+    struct arguments {
+      struct slist list;
+    } arguments;
+    struct initializer_list {
+      struct slist list;
+    } initializer_list;
+    struct initializer {
+      // expr or initializer_list
+      struct ast_node *init;
+    } initializer;
   };
 } *astn;
 
 struct ast_node *ast_new(enum ast_type type);
-astn ast_new_empty_statement();
 void ast_free(astn node);
 astn ast_copy(astn n);
 

@@ -1,5 +1,4 @@
 #include "ast.h"
-#include "log/log.h"
 #include "slist/slist.h"
 
 astn ast_new(enum ast_type type) {
@@ -9,25 +8,31 @@ astn ast_new(enum ast_type type) {
   case ast_declaration:
     slist_init(&node->declaration.type_chain);
     break;
-  case ast_list:
-    slist_init(&node->list);
-    break;
   case ast_expr_typecast:
     slist_init(&node->typecast.type_chain);
     break;
   case ast_struct_union_declaration:
     slist_init(&node->struct_union_declaration.member_declarations);
     break;
+  case ast_parameters:
+    slist_init(&node->parameters.list);
+    break;
+  case ast_block:
+    slist_init(&node->block.list);
+    break;
+  case ast_trans_unit:
+    slist_init(&node->trans_unit.list);
+    break;
+  case ast_arguments:
+    slist_init(&node->arguments.list);
+    break;
+  case ast_initializer_list:
+    slist_init(&node->initializer_list.list);
+    break;
   default:
     break;
   }
   return node;
-}
-
-astn ast_new_empty_statement() {
-  astn stmt = ast_new(ast_expr_primary);
-  stmt->primary.type = TOK_EOF;
-  return stmt;
 }
 
 astn ast_copy(astn n) {
@@ -71,14 +76,6 @@ astn ast_copy(astn n) {
       slist_add_tail(&new->declaration.type_chain, copy);
     }
     break;
-  case ast_list: {
-    astn ref;
-    slist_foreach(&n->list, ref) {
-      astn copy = ast_copy(ref);
-      slist_add_tail(&new->list, copy);
-    }
-    break;
-  }
   case ast_ctype:
     new->ctype.qualifier = n->ctype.qualifier;
     new->ctype.type = n->ctype.type;
@@ -111,9 +108,54 @@ astn ast_copy(astn n) {
     }
     break;
   }
-  default:
-    log_panic("Wrong ast type %d", n->type);
+  case ast_parameters: {
+    astn ref;
+    slist_foreach(&n->parameters.list, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->parameters.list, copy);
+    }
     break;
+  }
+  case ast_block: {
+    astn ref;
+    slist_foreach(&n->block.list, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->block.list, copy);
+    }
+    break;
+  }
+  case ast_trans_unit: {
+    astn ref;
+    slist_foreach(&n->trans_unit.list, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->trans_unit.list, copy);
+    }
+    break;
+  }
+  case ast_arguments: {
+    astn ref;
+    slist_foreach(&n->arguments.list, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->arguments.list, copy);
+    }
+    break;
+  }
+  case ast_initializer: {
+    new->initializer.init = ast_copy(n->initializer.init);
+    break;
+  }
+  case ast_ref: {
+    new->ref = n->ref;
+    break;
+  }
+  case ast_initializer_list: {
+    astn ref;
+    slist_foreach(&n->initializer_list.list, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->initializer_list.list, copy);
+    }
+    break;
+  }
   }
   return new;
 }
@@ -161,12 +203,6 @@ void ast_free(astn node) {
     sdsfree(node->declaration.ident);
     break;
   }
-  case ast_list: {
-    astn ref;
-    slist_foreach(&node->list, ref) { ast_free(ref); }
-    slist_free(&node->list);
-    break;
-  }
   case ast_ctype: {
     ast_free(node->ctype.user_defined_type);
     break;
@@ -197,10 +233,40 @@ void ast_free(astn node) {
     slist_free(&node->struct_union_declaration.member_declarations);
     break;
   }
-  default:
-    log_panic("Wrong ast type %d", node->type);
+  case ast_parameters: {
+    astn ref;
+    slist_foreach(&node->parameters.list, ref) { ast_free(ref); }
+    slist_free(&node->parameters.list);
     break;
   }
-
+  case ast_block: {
+    astn ref;
+    slist_foreach(&node->block.list, ref) { ast_free(ref); }
+    slist_free(&node->block.list);
+    break;
+  }
+  case ast_trans_unit: {
+    astn ref;
+    slist_foreach(&node->trans_unit.list, ref) { ast_free(ref); }
+    slist_free(&node->trans_unit.list);
+    break;
+  }
+  case ast_arguments: {
+    astn ref;
+    slist_foreach(&node->arguments.list, ref) { ast_free(ref); }
+    slist_free(&node->arguments.list);
+    break;
+  }
+  case ast_initializer: {
+    ast_free(node->initializer.init);
+    break;
+  }
+  case ast_initializer_list: {
+    astn ref;
+    slist_foreach(&node->initializer_list.list, ref) { ast_free(ref); }
+    slist_free(&node->initializer_list.list);
+    break;
+  }
+  }
   free(node);
 }

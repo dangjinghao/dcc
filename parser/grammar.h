@@ -311,6 +311,15 @@ static inline bool g_is_initializer_firstset(parser parser) {
 }
 
 /**
+ * @grammar
+ * <initializer-list> ::= <initializer>
+ *                     | <initializer-list> , <initializer>
+ */
+static inline bool g_is_initializer_list_firstset(parser parser) {
+  return g_is_initializer_firstset(parser);
+}
+
+/**
  * @brief because of the implementation features, we have to modify the BNF grammar to 
  * make it support define function in compound statement.
  * @grammar
@@ -459,7 +468,7 @@ static inline bool g_is_parameter_type_list_firstset(parser parser) {
 static inline astn g_get_function_params(astn declaration) {
   assert(declaration->type == ast_declaration);
   astn ref = slist_peek_head(&declaration->declaration.type_chain);
-  if (ref->type == ast_list) {
+  if (ref->type == ast_parameters) {
     return ref;
   }
   return NULL;
@@ -526,7 +535,7 @@ static inline bool g_is_struct_declarator_list_firstset(parser parser) {
 
 static inline astn g_get_function_body(astn declaration) {
   if (declaration->declaration.extdata) {
-    assert(declaration->declaration.extdata->type == ast_list);
+    assert(declaration->declaration.extdata->type == ast_block);
     return declaration->declaration.extdata;
   }
   return NULL;
@@ -540,6 +549,12 @@ static inline bool g_is_function_definition(astn declaration) {
 static inline bool g_is_empty_statement(astn statement) {
   return statement->type == ast_expr_primary &&
          statement->primary.type == TOK_EOF;
+}
+
+static inline astn ast_new_empty_statement() {
+  astn stmt = ast_new(ast_expr_primary);
+  stmt->primary.type = TOK_EOF;
+  return stmt;
 }
 
 static inline astn g_create_empty_statement() {

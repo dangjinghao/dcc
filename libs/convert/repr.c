@@ -175,6 +175,13 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     } else {
       buf = sdscat(buf, "{\"name\":\"<...>\"}");
     }
+    buf = sdscat(buf, ",");
+    if (n->unary.extdata) {
+      buf = convert_ast_to_json(n->unary.extdata, buf, shallow);
+    }
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
     buf = sdscat(buf, "]}");
     break;
   }
@@ -216,17 +223,47 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
       buf = sdscatprintf(buf, "{\"name\":\"<empty-id>\"},");
     }
 
+    {
+      buf =
+          sdscatprintf(buf, "{\"name\":\"<type-declaration> \",\"children\":[");
+      astn ref;
+      if (!shallow) {
+        slist_foreach(&n->declaration.type_chain, ref) {
+          buf = convert_ast_to_json(ref, buf, shallow);
+          buf = sdscat(buf, ",");
+        }
+      } else {
+        buf = sdscat(buf, "{\"name\":\"<...>\"},");
+      }
+      if (buf[sdslen(buf) - 1] == ',') {
+        sdssetlen(buf, sdslen(buf) - 1);
+      }
+      buf = sdscat(buf, "]},");
+    }
+
+    if (n->declaration.extdata && !shallow) {
+      buf = convert_ast_to_json(n->declaration.extdata, buf, shallow);
+    } else if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+
+    buf = sdscat(buf, "]}");
+    break;
+  }
+  case ast_initializer: {
+    buf = convert_ast_to_json(n->initializer.init, buf, shallow);
+    break;
+  }
+  case ast_block: {
+    buf = sdscat(buf, "{\"name\":\"block\",\"children\":[");
     astn ref;
     if (!shallow) {
-      slist_foreach(&n->declaration.type_chain, ref) {
+      slist_foreach(&n->block.list, ref) {
         buf = convert_ast_to_json(ref, buf, shallow);
         buf = sdscat(buf, ",");
       }
     } else {
       buf = sdscat(buf, "{\"name\":\"<...>\"},");
-    }
-    if (n->declaration.extdata && !shallow) {
-      buf = convert_ast_to_json(n->declaration.extdata, buf, shallow);
     }
     if (buf[sdslen(buf) - 1] == ',') {
       sdssetlen(buf, sdslen(buf) - 1);
@@ -234,11 +271,45 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     buf = sdscat(buf, "]}");
     break;
   }
-  case ast_list: {
-    buf = sdscat(buf, "{\"name\":\"list\",\"children\":[");
+  case ast_parameters: {
+    buf = sdscat(buf, "{\"name\":\"parameters\",\"children\":[");
     astn ref;
     if (!shallow) {
-      slist_foreach(&n->list, ref) {
+      slist_foreach(&n->parameters.list, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
+    }
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, "]}");
+    break;
+  }
+  case ast_arguments: {
+    buf = sdscat(buf, "{\"name\":\"arguments\",\"children\":[");
+    astn ref;
+    if (!shallow) {
+      slist_foreach(&n->arguments.list, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
+    }
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, "]}");
+    break;
+  }
+  case ast_trans_unit: {
+    buf = sdscat(buf, "{\"name\":\"trans_unit\",\"children\":[");
+    astn ref;
+    if (!shallow) {
+      slist_foreach(&n->trans_unit.list, ref) {
         buf = convert_ast_to_json(ref, buf, shallow);
         buf = sdscat(buf, ",");
       }
@@ -338,6 +409,24 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     }
     buf = sdscat(buf, "]}");
     break;
+  case ast_initializer_list: {
+    buf = sdscat(buf, "{\"name\":\"initializer_list\",\"children\":[");
+    astn ref;
+    if (!shallow) {
+      slist_foreach(&n->initializer_list.list, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
+    }
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, "]}");
+
+    break;
+  }
   }
   return buf;
 }
@@ -468,12 +557,17 @@ char *convert_ast_type_to_string(enum ast_type t) {
     STRCASE(ast_expr_ternary);
     STRCASE(ast_expr_unary);
     STRCASE(ast_ident);
-    STRCASE(ast_list);
     STRCASE(ast_ctype);
     STRCASE(ast_labeled_statement);
     STRCASE(ast_expr_typecast);
     STRCASE(ast_struct_union_declaration);
     STRCASE(ast_ref);
+    STRCASE(ast_parameters);
+    STRCASE(ast_arguments);
+    STRCASE(ast_block);
+    STRCASE(ast_trans_unit);
+    STRCASE(ast_initializer);
+    STRCASE(ast_initializer_list);
   }
   return NULL;
 }

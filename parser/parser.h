@@ -51,10 +51,11 @@ astn parse_init_declarator(parser parser, astn decl_specs,
                            bool delay_alloc_uid);
 slist parse_declarator(parser parser, slist type_chain);
 astn parse_constant_expr(parser parser);
-astn parse_external_declaration(parser parser, astn block);
+void parse_external_declaration(parser parser, slist block);
 astn parse_labeled_statement(parser p);
 astn parse_statement(parser p);
 astn parse_translation_unit(parser parser);
 astn parse_compound_statement(parser parser);
 slist parse_type_name(parser parser, slist type_chain);
+astn parse_initializer(parser parser);
 #endif
