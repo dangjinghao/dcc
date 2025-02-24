@@ -33,7 +33,7 @@ void parser_pop_scope(parser parser);
 void parser_push_scope(parser parser);
 astn parser_get_typedef_by_type_name(parser parser, sds ident);
 bool parser_is_current_block_global(parser parser);
-void parser_declare_new_struct_union(parser parser, astn n);
+void parser_declare_new_tag(parser parser, astn n);
 void parser_declare_new_symbol(parser parser, astn n);
 bool parser_check_constant_expr(astn expr);
 size_t parser_get_local_uid(parser parser);

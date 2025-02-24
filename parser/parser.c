@@ -90,7 +90,11 @@ astn parser_find_declaration_in_all_scope_table(sds ident, slist tab) {
     if (data == __parser_scope_fence_ptr) {
       continue;
     }
-    if (sdscmp(data->declaration.ident, ident) == 0) {
+    if (data->type == ast_declaration &&
+        sdscmp(data->declaration.ident, ident) == 0) {
+      return data;
+    } else if (data->type == ast_struct_union_declaration &&
+               sdscmp(data->struct_union_declaration.ident, ident) == 0) {
       return data;
     }
   }
@@ -167,13 +171,18 @@ void parser_declare_new_symbol(parser parser, astn n) {
   } else if (exists_declaration && decl_specs->ctype.storage != TOK_KW_EXTERN &&
              g_get_declaration_specifier(exists_declaration)->ctype.storage !=
                  TOK_KW_EXTERN) {
-    compiler_error(parser->lexer, "redefined symbol %s", n->declaration.ident);
+    compiler_error(parser->lexer, "redefined symbol `%s`", n->declaration.ident);
   }
   parser_set_declaration_uid(n, parser);
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
 }
-
-void parser_declare_new_struct_union(parser parser, astn n) {
+/**
+ * @brief declare a new struct/union/enum tag
+ * 
+ * @param parser 
+ * @param n 
+ */
+void parser_declare_new_tag(parser parser, astn n) {
   if (n->struct_union_declaration.ident == NULL) {
     log_debug("this is an abstract struct declarator, skipping declaration");
     return;
@@ -181,11 +190,12 @@ void parser_declare_new_struct_union(parser parser, astn n) {
   astn exists_declaration = parser_find_declaration_in_current_scope_table(
       n->struct_union_declaration.ident, &parser->tagtab);
   if (exists_declaration) {
-    compiler_error(parser->lexer, "redefined struct/union %s",
+    compiler_error(parser->lexer, "redefined struct/union with identifier `%s`",
                    n->struct_union_declaration.ident);
   }
   parser_add_declaration_to_current_scope_table(n, &parser->tagtab);
 }
+
 
 size_t parser_get_local_uid(parser parser) {
   log_debug("get local uid %ld", parser->local_uid);

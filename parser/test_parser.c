@@ -177,13 +177,27 @@ int ptc_function_def() {
 
 int ptc_struct() {
   struct lexer lexer;
-  lexer_from_string(
-      &lexer,
-      "typedef struct stu{int id: 4;union {int i;char c;}_t;} STU;STU stu;");
+  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu s2;");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
+int ptc_struct_undef() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu2 s2;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_struct_redef() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu {char* id;};");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 
 int ptc_extern() {
   struct lexer lexer;
@@ -231,9 +245,9 @@ int ptc_completed_code() {
 
 int ptc_initializer_list() {
   struct lexer lexer;
-  lexer_from_string(&lexer,
-                    "int A[] = {1,2,3,4,5,6,7,8,9,10}, v1 = 1;struct{char a;char "
-                    "s[10];int is[10];} s = {'c',\"Hello\",{1,2,3,4,5},};");
+  lexer_from_string(
+      &lexer, "int A[] = {1,2,3,4,5,6,7,8,9,10}, v1 = 1;struct{char a;char "
+              "s[10];int is[10];} s = {'c',\"Hello\",{1,2,3,4,5},};");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;

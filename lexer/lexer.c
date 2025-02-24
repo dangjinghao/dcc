@@ -207,8 +207,8 @@ char *lexer_get_token_str_in_token_table(enum tok_type type,
       }
       table++;
     }
+    return convert_token_type_enum_to_repr(type);
   } else {
-
     while (table->str) {
       if (type == table->type) {
         return table->str;

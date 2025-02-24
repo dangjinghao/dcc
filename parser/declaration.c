@@ -57,8 +57,8 @@ void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
     }
   } else {
     log_panic("invalid type: current_tok: %s,prev_tok: %s",
-              convert_token_type_to_string(tok),
-              convert_token_type_to_string(prev_type));
+              convert_token_type_enum_to_repr(tok),
+              convert_token_type_enum_to_repr(prev_type));
   }
 }
 
@@ -98,7 +98,6 @@ astn parse_struct_or_union_specifier(parser parser) {
   parser_consume(parser);
   if (parser->current_token == TOK_IDENT) {
     n->struct_union_declaration.ident = parser->lexer->lex_token._ident;
-    parser_declare_new_struct_union(parser, n);
     parser_consume(parser);
   }
   if (parser->current_token == '{') {
@@ -108,8 +107,24 @@ astn parse_struct_or_union_specifier(parser parser) {
           parser, &n->struct_union_declaration.member_declarations);
     }
     parser_consume_with(parser, '}');
+    if (n->struct_union_declaration.ident) {
+      parser_declare_new_tag(parser, n);
+    }
   } else {
     // struct declaration, check if it exists
+    if (!n->struct_union_declaration.ident) {
+      compiler_error(parser->lexer,
+                     "struct/union declaration without an identifier");
+    }
+    astn ref = parser_find_declaration_in_all_scope_table(
+        n->struct_union_declaration.ident, &parser->tagtab);
+    if (!ref) {
+      compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
+                     n->struct_union_declaration.ident);
+    }
+    ast_free(n);
+    n = ast_new(ast_ref);
+    n->ref = ref;
   }
   return n;
 }
@@ -253,7 +268,7 @@ slist parse_parameter_type_list(parser p, astn astp) {
       break;
     } else {
       compiler_error(p->lexer, "Unexpected token: %s",
-                     convert_token_type_to_string(p->current_token));
+                     convert_token_type_enum_to_repr(p->current_token));
     }
   }
   return params;
