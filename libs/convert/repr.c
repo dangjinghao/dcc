@@ -119,24 +119,24 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
   case ast_expr_primary:
     switch (n->primary.type) {
     case TOK_LIT_INT:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-int> %ld\"}",
-                       convert_ast_type_enum_to_repr(n->type), n->primary.v._int);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-int> %ld\"}",
+                         convert_ast_type_enum_to_repr(n->type),
+                         n->primary.v._int);
       break;
     case TOK_LIT_UINT:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-uint> %lu\"}",
-                       convert_ast_type_enum_to_repr(n->type), n->primary.v._uint);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-uint> %lu\"}",
+                         convert_ast_type_enum_to_repr(n->type),
+                         n->primary.v._uint);
       break;
     case TOK_LIT_LONG:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-long> %ld\"}",
-                       convert_ast_type_enum_to_repr(n->type), n->primary.v._int);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-long> %ld\"}",
+                         convert_ast_type_enum_to_repr(n->type),
+                         n->primary.v._int);
       break;
     case TOK_LIT_ULONG:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-ulong> %lu\"}",
-                       convert_ast_type_enum_to_repr(n->type), n->primary.v._uint);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-ulong> %lu\"}",
+                         convert_ast_type_enum_to_repr(n->type),
+                         n->primary.v._uint);
       break;
     case TOK_LIT_FLOAT:
       buf = sdscatprintf(buf, "{\"name\":\"<%s-float> %f\"}",
@@ -149,14 +149,14 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
                          n->primary.v._double);
       break;
     case TOK_LIT_CHAR:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-char> %c\"}",
-                       convert_ast_type_enum_to_repr(n->type), n->primary.v._char);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-char> %c\"}",
+                         convert_ast_type_enum_to_repr(n->type),
+                         n->primary.v._char);
       break;
     case TOK_LIT_STRING:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-string> %s\"}",
-                       convert_ast_type_enum_to_repr(n->type), n->primary.v._str);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-string> %s\"}",
+                         convert_ast_type_enum_to_repr(n->type),
+                         n->primary.v._str);
       break;
     default:
       log_panic("this primary type is not supported");
@@ -358,8 +358,9 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     buf = sdscat(buf, "]}");
     break;
   case ast_labeled_statement:
-    buf = sdscatprintf(buf, "{\"name\":\"%s: \",\"children\":[",
-                       convert_token_type_enum_to_repr(n->labeled_statement.type));
+    buf = sdscatprintf(
+        buf, "{\"name\":\"%s: \",\"children\":[",
+        convert_token_type_enum_to_repr(n->labeled_statement.type));
 
     if (n->labeled_statement.label_value && !shallow) {
       buf = convert_ast_to_json(n->labeled_statement.label_value, buf, shallow);
@@ -425,6 +426,33 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     }
     buf = sdscat(buf, "]}");
 
+    break;
+  }
+  case ast_jump_statement: {
+    buf = sdscat(buf, "{\"name\":\"jump_statement\",\"children\":[");
+    switch (n->jump_statement.type) {
+    case TOK_KW_GOTO:
+      buf = sdscatprintf(buf, "{\"name\":\"<goto>\"},");
+      buf = convert_ast_to_json(n->jump_statement.expr, buf, shallow);
+      break;
+    case TOK_KW_CONTINUE:
+      buf = sdscatprintf(buf, "{\"name\":\"<continue>\"},");
+      break;
+    case TOK_KW_BREAK:
+      buf = sdscatprintf(buf, "{\"name\":\"<break>\"},");
+      break;
+    case TOK_KW_RETURN:
+      buf = sdscatprintf(buf, "{\"name\":\"<return>\"},");
+      buf = convert_ast_to_json(n->jump_statement.expr, buf, shallow);
+      break;
+    default:
+      log_panic("invalid jump statement type");
+    }
+    if (n->jump_statement.target_block) {
+      buf = sdscat(buf, ",");
+      buf = convert_ast_to_json(n->jump_statement.target_block, buf, true);
+    }
+    buf = sdscat(buf, "]}");
     break;
   }
   }
@@ -568,6 +596,7 @@ char *convert_ast_type_enum_to_repr(enum ast_type t) {
     STRCASE(ast_trans_unit);
     STRCASE(ast_initializer);
     STRCASE(ast_initializer_list);
+    STRCASE(ast_jump_statement);
   }
   return NULL;
 }

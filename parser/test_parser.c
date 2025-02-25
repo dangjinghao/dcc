@@ -177,14 +177,18 @@ int ptc_function_def() {
 
 int ptc_struct() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu s2;");
+  lexer_from_string(
+      &lexer,
+      "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu s2;");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
 int ptc_struct_undef() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu2 s2;");
+  lexer_from_string(
+      &lexer,
+      "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu2 s2;");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
@@ -192,12 +196,12 @@ int ptc_struct_undef() {
 
 int ptc_struct_redef() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} STU;struct stu {char* id;};");
+  lexer_from_string(&lexer, "struct stu{int id: 4;union {int i;char c;}_t;} "
+                            "STU;struct stu {char* id;};");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
 }
-
 
 int ptc_extern() {
   struct lexer lexer;
@@ -253,6 +257,13 @@ int ptc_initializer_list() {
   return 0;
 }
 
+int ptc_jump_statement() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "int main(){goto label;{{label: return 0;}}}");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
 [[gnu::constructor]] void init() {
   log_color_enable(true);
   log_set_level(LOG_LEVEL_DEBUG);

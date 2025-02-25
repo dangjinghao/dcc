@@ -43,7 +43,35 @@ astn parse_compound_statement(parser parser) {
 }
 astn parse_selection_statement(parser p) { BUILDING(); }
 astn parse_iteration_statement(parser p) { BUILDING(); }
-astn parse_jump_statement(parser p) { BUILDING(); }
+astn parse_jump_statement(parser p) {
+  assert(g_is_jump_statement_firstset(p));
+  astn jump = ast_new(ast_jump_statement);
+  switch (p->current_token) {
+  case TOK_KW_GOTO:
+    jump->jump_statement.type = TOK_KW_GOTO;
+    parser_consume(p);
+    jump->jump_statement.expr = parse_ident(p);
+    break;
+  case TOK_KW_CONTINUE:
+  case TOK_KW_BREAK:
+    jump->jump_statement.type = p->current_token;
+    parser_consume(p);
+    jump->jump_statement.target_block = p->interruptable_block;
+    assert(jump->jump_statement.target_block);
+    break;
+  case TOK_KW_RETURN:
+    jump->jump_statement.type = TOK_KW_RETURN;
+    parser_consume(p);
+    if (g_is_expression_firstset(p)) {
+      jump->jump_statement.expr = parse_expression(p);
+    }
+    jump->jump_statement.target_block = p->current_function_block;
+    assert(jump->jump_statement.target_block);
+    break;
+  }
+  parser_consume_with(p, ';');
+  return jump;
+}
 
 astn parse_statement(parser p) {
   assert(g_is_statement_firstset(p));

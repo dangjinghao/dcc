@@ -22,6 +22,7 @@ enum ast_type {
   ast_trans_unit,
   ast_initializer,
   ast_initializer_list,
+  ast_jump_statement,
 };
 
 enum type_qualifier {
@@ -108,6 +109,11 @@ typedef struct ast_node {
       // expr or initializer_list
       struct ast_node *init;
     } initializer;
+    struct jump_statement {
+      enum tok_type type;
+      struct ast_node *target_block;
+      struct ast_node *expr;
+    } jump_statement;
   };
 } *astn;
 

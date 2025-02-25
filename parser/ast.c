@@ -156,6 +156,11 @@ astn ast_copy(astn n) {
     }
     break;
   }
+  case ast_jump_statement: {
+    new->jump_statement.type = n->jump_statement.type;
+    new->jump_statement.expr = ast_copy(n->jump_statement.expr);
+    break;
+  }
   }
   return new;
 }
@@ -265,6 +270,10 @@ void ast_free(astn node) {
     astn ref;
     slist_foreach(&node->initializer_list.list, ref) { ast_free(ref); }
     slist_free(&node->initializer_list.list);
+    break;
+  }
+  case ast_jump_statement: {
+    ast_free(node->jump_statement.expr);
     break;
   }
   }
