@@ -11,6 +11,9 @@ typedef struct parser {
   struct slist idtab;
   // enum, struct, union
   struct slist tagtab;
+  // for codegen stage, save extern and normal declaration, the result is merged,
+  // only extern declaration or normal declaration for one same symbol would be saved.
+  struct slist symtab;
   // for strin or static in function which would be promoted to global
   astn global_block;
   // for break, continue, case and default

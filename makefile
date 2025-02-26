@@ -1,12 +1,18 @@
+MAKEFLAGS ?= -j $(shell nproc)
+
 TARGET := dcc
 SRCS := $(shell find . -name "*.c" ! -name "test*")
 OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
-INCS := libs lexer parser
+INCS := libs lexer parser 
 
-CFLAGS := -ggdb -Og -MMD -std=gnu99 $(addprefix -I,$(INCS)) 
-CFLAGS += -Wall -Wno-stringop-truncation -Wno-format-truncation -Wno-unused-but-set-variable -Wunused-function
-LDFLAGS :=
+CFLAGS := -ggdb -Og -MMD -std=gnu2x -Wall -Wextra  $(addprefix -I,$(INCS)) $(shell llvm-config --cflags)
+CFLAGS += -Wno-stringop-truncation \
+		  -Wno-format-truncation \
+		  -Wno-unused-but-set-variable \
+		  -Wno-unused-parameter \
+		  -Wno-unused-function
+LDFLAGS := $(shell llvm-config --libs)
 
 ARGS :=
 

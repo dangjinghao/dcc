@@ -2,12 +2,12 @@
 #define SLIST_H
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #define SLIST_MALLOC malloc
 #define SLIST_FREE free
-
+#define SLIST_ASSIGN_INIT { NULL, NULL }
 typedef struct slist {
   struct slist *next;
   /* points to the last node (tail) in the head node */
@@ -184,4 +184,30 @@ static inline size_t slist_length(slist list) {
   slist_foreach(list, _) { len++; }
   return len;
 }
+
+static inline void slist_remove(slist list, void *data) {
+  for (slist p = list; p->next; p = p->next) {
+    if (p->next->data == data) {
+      slist tmp = p->next;
+      p->next = p->next->next;
+      if (tmp == list->data) {
+        list->data = NULL;
+        assert(p->next == NULL);
+      }
+      SLIST_FREE(tmp);
+      return;
+    }
+  }
+}
+
+static inline bool slist_exists(slist list, void *data) {
+  void *d;
+  slist_foreach(list, d) {
+    if (d == data) {
+      return true;
+    }
+  }
+  return false;
+}
+
 #endif

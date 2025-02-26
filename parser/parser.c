@@ -17,6 +17,7 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
   parser_consume(parser);
   slist_init(&parser->idtab);
   slist_init(&parser->tagtab);
+  slist_init(&parser->symtab);
   parser->global_block = parser->interruptable_block =
       parser->current_function_block = NULL;
   parser->global_uid = parser->local_uid = 0;
@@ -33,6 +34,7 @@ void parser_snapshot(parser _new, parser _old) {
   }
   slist_copy(&_new->idtab, &_old->idtab);
   slist_copy(&_new->tagtab, &_old->tagtab);
+  slist_copy(&_new->symtab, &_old->symtab);
 }
 
 /**
@@ -55,6 +57,7 @@ void parser_destory(parser parser) {
   }
   slist_free(&parser->idtab);
   slist_free(&parser->tagtab);
+  slist_free(&parser->symtab);
   free(parser->lexer);
 }
 
@@ -147,6 +150,38 @@ bool parser_is_current_block_global(parser parser) {
   return parser->current_function_block == NULL;
 }
 
+static astn __parser_declaration_ident_exists(slist declaration_list, astn n) {
+  astn ref;
+  slist_foreach(declaration_list, ref) {
+    if (sdscmp(ref->declaration.ident, n->declaration.ident) == 0) {
+      return ref;
+    }
+  }
+  return NULL;
+}
+/**
+ * @brief Add a declaration to the symtab, usually used for re-locate extern symbol in codegen stage
+ * 
+ * @param parser 
+ * @param n 
+ */
+void parser_add_to_symtab(parser parser, astn n) {
+  assert(n->type == ast_declaration);
+  astn exists = __parser_declaration_ident_exists(&parser->symtab, n);
+  if (exists &&
+      g_get_declaration_specifier(exists)->ctype.storage == TOK_KW_EXTERN) {
+    log_debug("found defined extern declaration in symtab, remove: %s",
+              n->declaration.ident);
+    slist_remove(&parser->symtab, exists);
+  } else if (exists && g_get_declaration_specifier(exists)->ctype.storage !=
+                           TOK_KW_EXTERN) {
+    log_debug(
+        "there has been a strong symbol `%s` in symtab, just ignore adding",
+        n->declaration.ident);
+  }
+  slist_add_head(&parser->symtab, n);
+}
+
 /**
  * @brief add declaration to the current scope table,
  * set the uid for the declaration
@@ -163,18 +198,21 @@ void parser_declare_new_symbol(parser parser, astn n) {
   astn exists_declaration = parser_find_declaration_in_current_scope_table(
       n->declaration.ident, &parser->idtab);
   if (exists_declaration && decl_specs->ctype.storage == TOK_KW_EXTERN) {
-
-    log_debug(
-        "multiple declaration with a new extern declaration, do nothing: %s",
-        n->declaration.ident);
+    log_debug("multiple extern declaration, do nothing: %s",
+              n->declaration.ident);
     return;
   } else if (exists_declaration && decl_specs->ctype.storage != TOK_KW_EXTERN &&
              g_get_declaration_specifier(exists_declaration)->ctype.storage !=
                  TOK_KW_EXTERN) {
-    compiler_error(parser->lexer, "redefined symbol `%s`", n->declaration.ident);
+    compiler_error(parser->lexer, "redefined symbol `%s`",
+                   n->declaration.ident);
   }
   parser_set_declaration_uid(n, parser);
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
+  if (parser_is_current_block_global(parser) || decl_specs->ctype.storage == TOK_KW_EXTERN) {
+    // we need add the extern symbol which is defined in block scope to symtab
+    parser_add_to_symtab(parser, n);
+  }
 }
 /**
  * @brief declare a new struct/union/enum tag
@@ -195,7 +233,6 @@ void parser_declare_new_tag(parser parser, astn n) {
   }
   parser_add_declaration_to_current_scope_table(n, &parser->tagtab);
 }
-
 
 size_t parser_get_local_uid(parser parser) {
   log_debug("get local uid %ld", parser->local_uid);
