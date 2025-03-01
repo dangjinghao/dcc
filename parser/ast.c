@@ -70,6 +70,7 @@ astn ast_copy(astn n) {
   case ast_declaration:
     new->declaration.ident = sdsdup(n->declaration.ident);
     new->declaration.extdata = ast_copy(n->declaration.extdata);
+    new->declaration.scope_ref = n->declaration.scope_ref;
     astn ref;
     slist_foreach(&n->declaration.type_chain, ref) {
       astn copy = ast_copy(ref);

@@ -363,7 +363,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     // if it is a function declaration, we should add an `extern` storage to
     // distinguish it from a function definition simply.
     // we put this process in there because the later parser_declare_new_symbol needs the
-    // extern to determine whether it is a function declaration or not.
+    // extern to determine whether should it be added to the symtab.
     log_debug("add extern storage specifier to function declaration: %s",
               n->declaration.ident);
 
@@ -373,6 +373,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
   if (!delay_alloc_id) {
     // this symbol declaration would be delayed to the function definition process
     // and it should only be used in the function parameter parse process
+    n->declaration.scope_ref = parser->current_function_block;
     parser_declare_new_symbol(parser, n);
   }
   if (parser->current_token == '=') {
@@ -406,6 +407,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
         compiler_error(parser->lexer,
                        "there is a function parameter without an identifier");
       }
+      p->declaration.scope_ref = parser->current_function_block;
       parser_declare_new_symbol(parser, p);
     }
 

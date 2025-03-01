@@ -1,3 +1,4 @@
+#include "ast.h"
 #include "builder.h"
 #include "convert/convert.h"
 #include "parser.h"
@@ -13,7 +14,7 @@
 int process_trans_unit(struct lexer *lexer) {
   struct parser parser;
   parser_from_lexer(&parser, lexer);
-  parse_translation_unit(&parser);
+  astn u = parse_translation_unit(&parser);
 
   astn d;
   sds buf = sdsempty();
@@ -24,6 +25,7 @@ int process_trans_unit(struct lexer *lexer) {
   }
   sdsfree(buf);
   parser_destory(&parser);
+  ast_free(u);
   return 0;
 }
 

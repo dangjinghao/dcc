@@ -24,6 +24,7 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] refactor repr to generate a visual AST result
 - [x] struct parser
 - [ ] parser_check_constant_expr
+- [ ] expand typedef 
 - use llvm c api instead of my llvm scaffold in codegen stage
   - expr
   - ternary expr support

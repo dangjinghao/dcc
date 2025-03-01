@@ -1,5 +1,6 @@
 ColumnLimit: 80
 
+IndentWidth: 2
 CommentPragmas: ''
 ReflowComments: false
 UseTab: Never

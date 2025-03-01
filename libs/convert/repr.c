@@ -240,7 +240,11 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
       }
       buf = sdscat(buf, "]},");
     }
-
+    if(n->declaration.scope_ref){
+      buf = sdscat(buf, "{\"name\":\"<scope>\",\"children\":[");
+      buf = convert_ast_to_json(n->declaration.scope_ref, buf, shallow);
+      buf = sdscat(buf, "]},");
+    }
     if (n->declaration.extdata && !shallow) {
       buf = convert_ast_to_json(n->declaration.extdata, buf, shallow);
     } else if (buf[sdslen(buf) - 1] == ',') {

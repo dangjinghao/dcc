@@ -28,7 +28,7 @@ static inline void slist_init(slist list) {
  * if n == 0, return the head node.
  * If n is out of range, return NULL.
  */
-static inline slist slist_get_list_node(slist list, long n) {
+static inline slist slist_get(slist list, long n) {
   if (n == -1) {
     return (slist)list->data;
   }
@@ -209,5 +209,6 @@ static inline bool slist_exists(slist list, void *data) {
   }
   return false;
 }
+
 
 #endif

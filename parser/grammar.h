@@ -597,4 +597,8 @@ static inline astn g_get_declaration_specifier(astn declaration) {
   return slist_peek_tail(&declaration->declaration.type_chain);
 }
 
+static inline astn g_get_declaration_base_type(astn declaration){
+  assert(declaration->type == ast_declaration);
+  return slist_peek_head(&declaration->declaration.type_chain);
+}
 #endif
