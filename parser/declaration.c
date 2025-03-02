@@ -264,7 +264,7 @@ slist parse_parameter_type_list(parser p, astn astp) {
     } else if (p->current_token == TOK_SYM_VARARGS) {
       parser_consume(p);
 
-      slist_add_tail(params, g_create_varargs());
+      slist_add_tail(params, g_create_varargs_param());
       break;
     } else {
       compiler_error(p->lexer, "Unexpected token: %s",

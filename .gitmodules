@@ -8,3 +8,6 @@
 	path = libs/macro
 	url = mygit:djh/cmacro
 
+[submodule "libs/dynarray"]
+	path = libs/dynarray
+	url = mygit:djh/dynarray

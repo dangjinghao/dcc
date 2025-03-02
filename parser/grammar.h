@@ -568,14 +568,28 @@ static inline bool g_is_function_declaration(astn declaration) {
          !g_get_function_body(declaration);
 }
 
-static inline bool g_is_varargs(astn n) {
-  return n->type == ast_ctype && n->ctype.type == TOK_SYM_VARARGS;
+static inline astn g_create_varargs_param() {
+  astn n = ast_new(ast_declaration);
+  astn ctype = ast_new(ast_ctype);
+  ctype->ctype.type = TOK_SYM_VARARGS;
+  slist_add_head(&n->declaration.type_chain, ctype);
+  return n;
 }
 
-static inline astn g_create_varargs() {
-  astn n = ast_new(ast_ctype);
-  n->ctype.type = TOK_SYM_VARARGS;
-  return n;
+static inline bool g_is_varargs_param(astn n) {
+  assert(n->type == ast_declaration);
+  astn ctype = slist_peek_head(&n->declaration.type_chain);
+  return ctype->ctype.type == TOK_SYM_VARARGS;
+}
+
+static inline bool g_is_function_varargs(astn n) {
+  astn params = g_get_function_params(n);
+  assert(params);
+  assert(params->type == ast_parameters);
+  if (g_is_varargs_param(slist_peek_tail(&params->parameters.list))) {
+    return true;
+  }
+  return false;
 }
 
 static inline astn g_create_void_param() {
@@ -592,13 +606,31 @@ static inline bool g_is_void_param(astn n) {
   return ctype->ctype.type == TOK_KW_VOID;
 }
 
+static inline bool g_is_function_void_param(astn n) {
+  astn params = g_get_function_params(n);
+  assert(params);
+  assert(params->type == ast_parameters);
+  if (g_is_void_param(slist_peek_head(&params->parameters.list))) {
+    return true;
+  }
+  return false;
+}
+
 static inline astn g_get_declaration_specifier(astn declaration) {
   assert(declaration->type == ast_declaration);
   return slist_peek_tail(&declaration->declaration.type_chain);
 }
 
-static inline astn g_get_declaration_base_type(astn declaration){
+static inline astn g_get_declaration_base_type(astn declaration) {
   assert(declaration->type == ast_declaration);
   return slist_peek_head(&declaration->declaration.type_chain);
+}
+static inline astn g_get_function_return_base_type(astn n) {
+  assert(g_get_function_params(n));
+  return slist_get(&n->declaration.type_chain, 2)->data;
+}
+static inline bool g_is_declaration_in_function_scope(astn n) {
+  assert(n->type == ast_declaration);
+  return n->declaration.scope_ref != NULL;
 }
 #endif
