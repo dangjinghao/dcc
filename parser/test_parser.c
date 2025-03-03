@@ -134,6 +134,14 @@ int ptc_typedef2() {
   return 0;
 }
 
+int ptc_typedef3(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "typedef const int *I;typedef volatile I* IP;const IP **v, v1;volatile const int ****v2;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 int ptc_func_declaration() {
   struct lexer lexer;
   lexer_from_string(&lexer, "int func(int a, int (*)(int,char) ,...);");

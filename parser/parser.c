@@ -260,6 +260,8 @@ void parser_set_declaration_uid(astn n, parser parser) {
 void parser_unfold_type_chain(parser parser, slist type_chain) {
   astn tail = slist_peek_tail(type_chain);
   assert(tail->type == ast_ctype);
+  enum type_qualifier qual = tail->ctype.qualifier;
+  enum tok_type storage = tail->ctype.storage;
   if (tail->ctype.type == TOK_KW_TYPEDEF) {
     astn n = tail->ctype.user_defined_type;
     assert(n->type == ast_ref);
@@ -270,9 +272,10 @@ void parser_unfold_type_chain(parser parser, slist type_chain) {
     slist_foreach(typedef_typechain, t) {
       slist_add_tail(type_chain, ast_copy(t));
     }
-    // set typedef
+    // reset typedef
     n = slist_peek_tail(type_chain);
     assert(n->type == ast_ctype && n->ctype.storage == TOK_KW_TYPEDEF);
-    n->ctype.storage = TOK_UNKNOWN;
+    n->ctype.qualifier |= qual;
+    n->ctype.storage = storage;
   }
 }
