@@ -77,6 +77,7 @@ sds convert_enum_qualifier_to_string(enum type_qualifier q, sds buf) {
   int c = 0;
   if (q & TYPE_QUAL_CONST) {
     buf = sdscat(buf, "CONST");
+    c++;
   }
   if (q & TYPE_QUAL_VOLATILE) {
     if (c) {
@@ -337,7 +338,7 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
       sds qual_buf = sdsempty();
       buf = sdscatprintf(
           buf, "{\"name\":\"<qualifier> %s\"}",
-          convert_enum_qualifier_to_string(n->ctype.qualifier, qual_buf));
+          qual_buf = convert_enum_qualifier_to_string(n->ctype.qualifier, qual_buf));
       sdsfree(qual_buf);
       buf = sdscat(buf, ",");
     }
