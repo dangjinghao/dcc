@@ -42,6 +42,7 @@ bool parser_check_constant_expr(astn expr);
 size_t parser_get_local_uid(parser parser);
 size_t parser_get_global_uid(parser parser);
 void parser_set_declaration_uid(astn n, parser parser);
+void parser_unfold_type_chain(parser parser, slist type_chain);
 
 sds parse_remove_type_chain_ident(slist type_chain);
 astn parse_unary(parser parser);

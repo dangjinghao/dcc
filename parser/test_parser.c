@@ -117,6 +117,23 @@ int ptc_typedef_statement() {
   return 0;
 }
 
+int ptc_typedf_redef() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "typedef int i;i i;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_typedef2() {
+  struct lexer lexer;
+  lexer_from_string(&lexer, "typedef int i,*ip;i a = 1; ip b = &a; typedef "
+                            "struct{i I; ip p;} ST; ST sn;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
 int ptc_func_declaration() {
   struct lexer lexer;
   lexer_from_string(&lexer, "int func(int a, int (*)(int,char) ,...);");

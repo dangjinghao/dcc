@@ -69,6 +69,7 @@ astn parse_struct_declarator(parser parser, astn decl_specs) {
   if (g_is_declarator_firstset(parser)) {
     parse_declarator(parser, type_chain);
     slist_add_tail(type_chain, decl_specs);
+    parser_unfold_type_chain(parser, type_chain);
     n->declaration.ident = parse_remove_type_chain_ident(type_chain);
   }
   if (parser->current_token == ':') {
@@ -129,6 +130,8 @@ astn parse_struct_or_union_specifier(parser parser) {
   return n;
 }
 
+astn parse_enum(parser parser) { BUILDING(); }
+
 /* {<declaration-specifier>}+ */
 astn parse_declaration_specifiers(parser parser) {
   assert(g_is_declaration_specifier_firstset(parser));
@@ -162,11 +165,10 @@ astn parse_declaration_specifiers(parser parser) {
         parser_consume(parser);
       } else if (g_is_struct_or_union_specifier(parser)) {
         tn->type = parser->current_token;
-        astn n = parse_struct_or_union_specifier(parser);
-        tn->user_defined_type = n;
+        tn->user_defined_type = parse_struct_or_union_specifier(parser);
       } else if (g_is_enum_specifier(parser)) {
-        // we should convert enum to int when we meet it
-        BUILDING();
+        tn->type = parser->current_token;
+        tn->user_defined_type = parse_enum(parser);
       } else {
         parse_set_normal_type_specifier(tn, parser);
         parser_consume(parser);
@@ -357,6 +359,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
   slist type_chain = &n->declaration.type_chain;
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, decl_specs);
+  parser_unfold_type_chain(parser, type_chain);
   n->declaration.ident = parse_remove_type_chain_ident(type_chain);
   if (g_get_function_params(n) && parser->current_token != '{') {
     // we should not use g_is_function_declaration(n) because the function is waiting for parsing.
@@ -451,6 +454,7 @@ void parse_external_declaration(parser parser, slist block) {
     astn n = ast_new(ast_declaration);
     slist type_chain = &n->declaration.type_chain;
     slist_add_tail(type_chain, decl_specs);
+    parser_unfold_type_chain(parser, type_chain);
     slist_add_tail(block, n);
   }
   parser_consume_with(parser, ';');
@@ -476,6 +480,7 @@ slist parse_type_name(parser parser, slist type_chain) {
 
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, spec_qual);
+  parser_unfold_type_chain(parser, type_chain);
   if (parse_remove_type_chain_ident(type_chain)) {
     compiler_error(parser->lexer, "<type-name> should not have an identifier.");
   }

@@ -178,6 +178,7 @@ void parser_add_to_symtab(parser parser, astn n) {
     log_debug(
         "there has been a strong symbol `%s` in symtab, just ignore adding",
         n->declaration.ident);
+    return;
   }
   slist_add_head(&parser->symtab, n);
 }
@@ -209,7 +210,8 @@ void parser_declare_new_symbol(parser parser, astn n) {
   }
   parser_set_declaration_uid(n, parser);
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
-  if (parser_is_current_block_global(parser) || decl_specs->ctype.storage == TOK_KW_EXTERN) {
+  if (parser_is_current_block_global(parser) ||
+      decl_specs->ctype.storage == TOK_KW_EXTERN) {
     // we need add the extern symbol which is defined in block scope to symtab
     parser_add_to_symtab(parser, n);
   }
@@ -252,5 +254,25 @@ void parser_set_declaration_uid(astn n, parser parser) {
     }
   } else {
     log_debug("this is an abstract declarator, skipping allocate uid");
+  }
+}
+
+void parser_unfold_type_chain(parser parser, slist type_chain) {
+  astn tail = slist_peek_tail(type_chain);
+  assert(tail->type == ast_ctype);
+  if (tail->ctype.type == TOK_KW_TYPEDEF) {
+    astn n = tail->ctype.user_defined_type;
+    assert(n->type == ast_ref);
+    n = n->ref;
+    ast_free(slist_pop_tail(type_chain));
+    astn t;
+    slist typedef_typechain = &n->declaration.type_chain;
+    slist_foreach(typedef_typechain, t) {
+      slist_add_tail(type_chain, ast_copy(t));
+    }
+    // set typedef
+    n = slist_peek_tail(type_chain);
+    assert(n->type == ast_ctype && n->ctype.storage == TOK_KW_TYPEDEF);
+    n->ctype.storage = TOK_UNKNOWN;
   }
 }
