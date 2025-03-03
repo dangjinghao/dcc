@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include <llvm-c/Types.h>
 enum ast_type {
   ast_expr_unary = 1,
   ast_expr_binop,
@@ -72,6 +73,7 @@ typedef struct ast_node {
       // ast_parameters is used for function parameters(<parameter-type-list>),
       // ast_ctype
       struct slist type_chain;
+      LLVMValueRef V;
     } declaration;
     struct ctype {
       enum type_qualifier qualifier;

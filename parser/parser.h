@@ -11,17 +11,17 @@ typedef struct parser {
   struct slist idtab;
   // enum, struct, union
   struct slist tagtab;
-  // for codegen stage, save extern and normal declaration, the result is merged,
-  // only extern declaration or normal declaration for one same symbol would be saved.
+  // save weak and strong symbol, unnecessary to remove weak symbol.
+  // order: strong symbol --> weak symbol,
+  // this order is important, because we can only traverse the list from head to tail
+  // strong symbol with same ident will be found first, just like 'cover' the weak symbol
   struct slist symtab;
-  // for strin or static in function which would be promoted to global
-  astn global_block;
   // for break, continue, case and default
-  astn interruptable_block;
+  astn interruptable_scope;
   // for return statement
-  astn current_function_block;
+  astn current_function_scope;
   // for unique id declaration
-  size_t global_uid, local_uid;
+  size_t uidcnt;
 } *parser;
 void parser_from_lexer(parser parser, struct lexer *lexer);
 void parser_snapshot(parser _new, parser _old);
@@ -39,10 +39,9 @@ bool parser_is_current_block_global(parser parser);
 void parser_declare_new_tag(parser parser, astn n);
 void parser_declare_new_symbol(parser parser, astn n);
 bool parser_check_constant_expr(astn expr);
-size_t parser_get_local_uid(parser parser);
-size_t parser_get_global_uid(parser parser);
-void parser_set_declaration_uid(astn n, parser parser);
+size_t parser_get_uid(parser parser);
 void parser_unfold_type_chain(parser parser, slist type_chain);
+void parser_symtab_remove_weak_symbols(slist symtab);
 
 sds parse_remove_type_chain_ident(slist type_chain);
 astn parse_unary(parser parser);

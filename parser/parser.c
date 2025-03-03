@@ -18,9 +18,8 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
   slist_init(&parser->idtab);
   slist_init(&parser->tagtab);
   slist_init(&parser->symtab);
-  parser->global_block = parser->interruptable_block =
-      parser->current_function_block = NULL;
-  parser->global_uid = parser->local_uid = 0;
+  parser->interruptable_scope = parser->current_function_scope = NULL;
+  parser->uidcnt = 0;
 }
 
 void parser_snapshot(parser _new, parser _old) {
@@ -147,40 +146,24 @@ astn parser_get_typedef_by_type_name(parser parser, sds ident) {
 
 bool parser_is_current_block_global(parser parser) {
   // find NULL in the idtab
-  return parser->current_function_block == NULL;
+  return parser->current_function_scope == NULL;
 }
 
-static astn __parser_declaration_ident_exists(slist declaration_list, astn n) {
-  astn ref;
-  slist_foreach(declaration_list, ref) {
-    if (sdscmp(ref->declaration.ident, n->declaration.ident) == 0) {
-      return ref;
-    }
-  }
-  return NULL;
-}
 /**
- * @brief Add a declaration to the symtab, usually used for re-locate extern symbol in codegen stage
+ * @brief Add a declaration to the symtab, usually used for merge extern symbol and symbol definition in codegen stage
  * 
  * @param parser 
  * @param n 
  */
 void parser_add_to_symtab(parser parser, astn n) {
   assert(n->type == ast_declaration);
-  astn exists = __parser_declaration_ident_exists(&parser->symtab, n);
-  if (exists &&
-      g_get_declaration_specifier(exists)->ctype.storage == TOK_KW_EXTERN) {
-    log_debug("found defined extern declaration in symtab, remove: %s",
-              n->declaration.ident);
-    slist_remove(&parser->symtab, exists);
-  } else if (exists && g_get_declaration_specifier(exists)->ctype.storage !=
-                           TOK_KW_EXTERN) {
-    log_debug(
-        "there has been a strong symbol `%s` in symtab, just ignore adding",
-        n->declaration.ident);
-    return;
+  if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
+    log_debug("add weak symbol to symtab: %s", n->declaration.ident);
+    slist_add_tail(&parser->symtab, n);
+  } else {
+    log_debug("add strong symbol to symtab: %s", n->declaration.ident);
+    slist_add_head(&parser->symtab, n);
   }
-  slist_add_head(&parser->symtab, n);
 }
 
 /**
@@ -208,7 +191,11 @@ void parser_declare_new_symbol(parser parser, astn n) {
     compiler_error(parser->lexer, "redefined symbol `%s`",
                    n->declaration.ident);
   }
-  parser_set_declaration_uid(n, parser);
+  if (n->declaration.ident) {
+    n->declaration.uid = parser_get_uid(parser);
+  } else {
+    log_debug("this is an abstract declarator, skipping allocate uid");
+  }
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
   if (parser_is_current_block_global(parser) ||
       decl_specs->ctype.storage == TOK_KW_EXTERN) {
@@ -236,25 +223,9 @@ void parser_declare_new_tag(parser parser, astn n) {
   parser_add_declaration_to_current_scope_table(n, &parser->tagtab);
 }
 
-size_t parser_get_local_uid(parser parser) {
-  log_debug("get local uid %ld", parser->local_uid);
-  return parser->local_uid++;
-}
-size_t parser_get_global_uid(parser parser) {
-  log_debug("get global uid %ld", parser->global_uid);
-  return parser->global_uid++;
-}
-
-void parser_set_declaration_uid(astn n, parser parser) {
-  if (n->declaration.ident) {
-    if (parser_is_current_block_global(parser)) {
-      n->declaration.uid = parser_get_global_uid(parser);
-    } else {
-      n->declaration.uid = parser_get_local_uid(parser);
-    }
-  } else {
-    log_debug("this is an abstract declarator, skipping allocate uid");
-  }
+size_t parser_get_uid(parser parser) {
+  log_debug("get uid %ld", parser->uidcnt);
+  return parser->uidcnt++;
 }
 
 void parser_unfold_type_chain(parser parser, slist type_chain) {
@@ -277,5 +248,34 @@ void parser_unfold_type_chain(parser parser, slist type_chain) {
     assert(n->type == ast_ctype && n->ctype.storage == TOK_KW_TYPEDEF);
     n->ctype.qualifier |= qual;
     n->ctype.storage = storage;
+  }
+}
+
+static bool __parser_symtab_find_strong_symbols(slist symtab, sds id) {
+  astn n;
+  slist_foreach(symtab, n) {
+    assert(n->type == ast_declaration);
+    // traverse until extern symbol
+    if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
+      break;
+    }
+
+    if (sdscmp(n->declaration.ident, id) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void parser_symtab_remove_weak_symbols(slist symtab) {
+  astn n;
+  slist_foreach(symtab, n) {
+    if(g_get_declaration_specifier(n)->ctype.storage != TOK_KW_EXTERN) {
+      continue;
+    }
+    if (__parser_symtab_find_strong_symbols(symtab, n->declaration.ident)) {
+      log_debug("remove weak symbol from symtab: %s", n->declaration.ident);
+      slist_remove(symtab, n);
+    }
   }
 }

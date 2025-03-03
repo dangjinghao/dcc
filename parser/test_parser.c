@@ -124,11 +124,10 @@ int ptc_typedf_redef() {
   lexer_destroy(&lexer);
   return 0;
 }
-
 int ptc_typedef2() {
   struct lexer lexer;
   lexer_from_string(&lexer, "typedef int i,*ip;i a = 1; ip b = &a; typedef "
-                            "struct{i I; ip p;} ST; ST sn;");
+                            "struct{i i; ip p;} ST; ST sn;");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
@@ -136,7 +135,15 @@ int ptc_typedef2() {
 
 int ptc_typedef3(){
   struct lexer lexer;
-  lexer_from_string(&lexer, "typedef const int *I;typedef volatile I* IP;const IP **v, v1;volatile const int ****v2;");
+  lexer_from_string(&lexer, "typedef const int *I;typedef volatile I* IP;static const IP **v, v1;static volatile const int ****v2;");
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+  return 0;
+}
+
+int ptc_extern_subscope(){
+  struct lexer lexer;
+  lexer_from_string(&lexer, "int F(){{extern F2(); F2();}} int F2(){return 0;} int F2();");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;
@@ -266,7 +273,7 @@ int ptc_completed_code() {
   lexer_from_string(&lexer,
                     "int ** (*v1)(int,char (*)(void)) = 0; int F(int,char c);"
                     "void main(int arg){int v2 = 2; {v2 = 20; int v3 = 3; "
-                    "F(1,2);} F(3,4);} int arg = 2;");
+                    "F(1,2);} F(3,4);} int arg = 2;int F(int i,char c){return i + c;}");
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
   return 0;

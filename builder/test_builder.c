@@ -19,6 +19,7 @@ int process_trans_unit(struct lexer *lexer) {
   struct builder b;
   builder_create(&b, "test", u);
   astn d;
+  parser_symtab_remove_weak_symbols(&parser.symtab);
   slist_foreach(&parser.symtab, d) { build_declaration(&b, d); }
   LLVMVerifyModule(b.module, LLVMAbortProcessAction, NULL);
   LLVMDumpModule(b.module);
@@ -39,7 +40,7 @@ void tbc_extern_multi_type() {
 
 void tbc_storages() {
   struct lexer lexer;
-  lexer_from_string(&lexer, "static int v;extern int ev; int x2;");
+  lexer_from_string(&lexer, "extern int xv;static int v;float x2;int xv;");
   process_trans_unit(&lexer);
 
   lexer_destroy(&lexer);
@@ -52,7 +53,7 @@ void tbc_func() {
   lexer_destroy(&lexer);
 }
 
-void tbc_vafunc(){
+void tbc_vafunc() {
   struct lexer lexer;
   lexer_from_string(&lexer, "void f(int a,char b,short c,...);");
   process_trans_unit(&lexer);

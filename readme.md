@@ -25,7 +25,8 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] struct parser
 - [x] va, void test
 - [x] expand typedef 
-- [ ] fix `typedef int I;I I;`
+- [x] fix `typedef int I;{I I;}`
+- [ ] struct and {} initializer
 - [ ] parser_check_constant_expr
 - use llvm c api instead of my llvm scaffold in codegen stage
   - expr

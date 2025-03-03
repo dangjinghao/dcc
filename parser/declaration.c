@@ -21,16 +21,12 @@
  */
 astn parse_translation_unit(parser parser) {
   assert(g_is_translation_unit_firstset(parser));
-
   astn n = ast_new(ast_trans_unit);
-  parser->global_block = n;
-  parser->global_uid = parser->local_uid = 1;
+  parser->uidcnt = 1;
   while (g_is_external_declaration_firstset(parser)) {
     parse_external_declaration(parser, &n->trans_unit.list);
-    parser->local_uid = 1;
   }
   parser_consume_with(parser, TOK_EOF);
-  parser->global_block = NULL;
   return n;
 }
 
@@ -137,7 +133,6 @@ astn parse_declaration_specifiers(parser parser) {
   assert(g_is_declaration_specifier_firstset(parser));
   astn n = ast_new(ast_ctype);
   struct ctype *tn = &n->ctype;
-
   while (g_is_declaration_specifier_firstset(parser)) {
     if (g_is_type_qualifier_firstset(parser)) {
       parse_set_type_qualifier(
@@ -153,6 +148,12 @@ astn parse_declaration_specifiers(parser parser) {
       tn->storage = parser->current_token;
       parser_consume(parser);
     } else {
+      if (tn->type != TOK_UNKNOWN) {
+        // tn->type != TOK_UNKNOWN is used to solve this problem: typedef int A; A A;
+        // if we don't use this flag, A would be recognized as a type specifier twice
+        // it's unexpected situation
+        break;
+      }
       assert(g_is_type_specifier_firstset(parser));
       if (g_is_typedef_name_firstset(parser)) {
         tn->type = TOK_KW_TYPEDEF;
@@ -376,7 +377,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
   if (!delay_alloc_id) {
     // this symbol declaration would be delayed to the function definition process
     // and it should only be used in the function parameter parse process
-    n->declaration.scope_ref = parser->current_function_block;
+    n->declaration.scope_ref = parser->current_function_scope;
     parser_declare_new_symbol(parser, n);
   }
   if (parser->current_token == '=') {
@@ -393,7 +394,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
                      "function definition is not allowed in non-global scope");
     }
     parser_push_scope(parser);
-    parser->current_function_block = n;
+    parser->current_function_scope = n;
     // add params to the scope
     astn ps = g_get_function_params(n);
     if (!ps) {
@@ -410,13 +411,13 @@ astn parse_init_declarator(parser parser, astn decl_specs,
         compiler_error(parser->lexer,
                        "there is a function parameter without an identifier");
       }
-      p->declaration.scope_ref = parser->current_function_block;
+      p->declaration.scope_ref = parser->current_function_scope;
       parser_declare_new_symbol(parser, p);
     }
 
     // function body
     n->declaration.extdata = parse_compound_statement(parser);
-    parser->current_function_block = NULL;
+    parser->current_function_scope = NULL;
     parser_pop_scope(parser);
   }
   return n;
