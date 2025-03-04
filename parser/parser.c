@@ -270,7 +270,7 @@ static bool __parser_symtab_find_strong_symbols(slist symtab, sds id) {
 void parser_symtab_remove_weak_symbols(slist symtab) {
   astn n;
   slist_foreach(symtab, n) {
-    if(g_get_declaration_specifier(n)->ctype.storage != TOK_KW_EXTERN) {
+    if (g_get_declaration_specifier(n)->ctype.storage != TOK_KW_EXTERN) {
       continue;
     }
     if (__parser_symtab_find_strong_symbols(symtab, n->declaration.ident)) {

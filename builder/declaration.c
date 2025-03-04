@@ -11,6 +11,43 @@
 #include <llvm-c/Types.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+LLVMTypeRef build_convert_struct_type(astn n, builder b) {
+  LLVMTypeRef t;
+  if (n->type == ast_ref) {
+    // the reference of exists struct definition
+    n = n->ref;
+  }
+  // because the symbols order is stack style, the referenced struct type
+  // may not be created.
+  assert(n->type == ast_struct_union_declaration);
+  if (n->struct_union_declaration.V) {
+    t = n->struct_union_declaration.V;
+    log_debug("refering the existed struct type:%s", LLVMGetStructName(t));
+  } else {
+    sds name;
+    if (n->struct_union_declaration.ident) {
+      name = sdscatprintf(sdsempty(), STRUCT_FMT,
+                          n->struct_union_declaration.ident,
+                          n->struct_union_declaration.uid);
+    } else {
+      // abstract struct, use uid
+      name = sdscatprintf(sdsempty(), STRUCT_ABSTRACT_FMT,
+                          n->struct_union_declaration.uid);
+    }
+    log_debug("create struct definition with name: %s", name);
+
+    t = LLVMStructCreateNamed(b->context, name);
+    sdsfree(name);
+    assert(n->struct_union_declaration.V == NULL);
+    n->struct_union_declaration.V = t;
+    // TODO: currently, we just add an int type to this struct definition
+    LLVMTypeRef elements[] = {LLVMInt32TypeInContext(b->context)};
+    LLVMStructSetBody(t, elements, 1, false);
+  }
+  return t;
+}
+
 LLVMTypeRef build_convert_base_type(astn n, builder b) {
   assert(n->type == ast_ctype);
   int t = n->ctype.type;
@@ -36,7 +73,8 @@ LLVMTypeRef build_convert_base_type(astn n, builder b) {
     return LLVMDoubleTypeInContext(c);
   case '*':
     return LLVMPointerTypeInContext(c, 0);
-
+  case TOK_KW_STRUCT:
+    return build_convert_struct_type(n->ctype.user_defined_type, b);
   default:
     break;
   }
@@ -116,7 +154,7 @@ LLVMValueRef build_global_variable(builder b, astn n) {
   LLVMValueRef pv = LLVMAddGlobal(b->module, value_type, sym_name);
   sdsfree(sym_name);
   astn decl_specs = g_get_declaration_specifier(n);
-  if (!(decl_specs->ctype.storage == TOK_KW_EXTERN)) {
+  if (decl_specs->ctype.storage != TOK_KW_EXTERN) {
     build_global_variable_init(pv, n, value_type);
   }
   return pv;

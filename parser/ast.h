@@ -67,7 +67,7 @@ typedef struct ast_node {
       // initializer/function body/struct declaration bitfield (expr)
       struct ast_node *extdata;
       size_t uid;
-      struct ast_node* scope_ref;
+      struct ast_node *scope_ref;
       // it contains those node type:
       // ast_expr_unary is used for array declaration [<expr>],
       // ast_parameters is used for function parameters(<parameter-type-list>),
@@ -79,7 +79,7 @@ typedef struct ast_node {
       enum type_qualifier qualifier;
       // trick: fill token_type with 0 or TOK_UNKNOWN
       int type;
-      enum tok_type  signint, storage;
+      enum tok_type signint, storage;
       // used for struct, union, enum, holds a reference only, do not free it
       struct ast_node *user_defined_type;
     } ctype;
@@ -88,8 +88,10 @@ typedef struct ast_node {
       struct ast_node *label_value;
       struct ast_node *stmt;
     } labeled_statement;
-    struct struct_union {
+    struct struct_union_declaration {
       sds ident;
+      size_t uid;
+      LLVMTypeRef V;
       // store the struct declaration type in the list
       struct slist member_declarations;
     } struct_union_declaration;

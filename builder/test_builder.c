@@ -17,45 +17,39 @@ int process_trans_unit(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn u = parse_translation_unit(&parser);
   struct builder b;
-  builder_create(&b, "test", u);
+  builder_create(&b, "test");
   astn d;
   parser_symtab_remove_weak_symbols(&parser.symtab);
-  slist_foreach(&parser.symtab, d) { build_declaration(&b, d); }
+  slist_foreach(&parser.symtab, d) {
+    d->declaration.V = build_declaration(&b, d);
+  }
   LLVMVerifyModule(b.module, LLVMAbortProcessAction, NULL);
-  LLVMDumpModule(b.module);
-  LLVMDisposeModule(b.module);
-  LLVMContextDispose(b.context);
+  char *ir = LLVMPrintModuleToString(b.module);
+  puts(ir);
+  LLVMDisposeMessage(ir);
+  builder_destroy(&b);
   parser_destory(&parser);
   ast_free(u);
   return 0;
 }
 
-void tbc_extern_multi_type() {
+void tbc_entry(char *code) {
   struct lexer lexer;
-  lexer_from_string(&lexer, "int v;double dv;float fv;char cv;");
+  lexer_from_string(&lexer, code);
   process_trans_unit(&lexer);
-
   lexer_destroy(&lexer);
 }
+
+void tbc_extern_multi_type() { tbc_entry("int v;double dv;float fv;char cv;"); }
 
 void tbc_storages() {
-  struct lexer lexer;
-  lexer_from_string(&lexer, "extern int xv;static int v;float x2;int xv;");
-  process_trans_unit(&lexer);
-
-  lexer_destroy(&lexer);
+  tbc_entry("extern int xv;static int v;float x2;int xv;");
 }
 
-void tbc_func() {
-  struct lexer lexer;
-  lexer_from_string(&lexer, "void f();void f2(int a,char b);void f3(void);");
-  process_trans_unit(&lexer);
-  lexer_destroy(&lexer);
-}
+void tbc_func() { tbc_entry("void f();void f2(int a,char b);void f3(void);"); }
 
-void tbc_vafunc() {
-  struct lexer lexer;
-  lexer_from_string(&lexer, "void f(int a,char b,short c,...);");
-  process_trans_unit(&lexer);
-  lexer_destroy(&lexer);
-}
+void tbc_vafunc() { tbc_entry("void f(int a,char b,short c,...);"); }
+
+void tbc_ptr() { tbc_entry("void* ptr;"); }
+
+void tbc_struct() { tbc_entry("struct s {int a;char b;} s; struct s refs; struct{char c; char*s;} abss;"); }
