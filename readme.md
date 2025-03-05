@@ -32,6 +32,7 @@ the parser processing flow is top to down, so when processing the body of functi
 - [ ] union
 - [ ] multi-dim array
 - expr
+- [ ] maybe we can remove the uid, it is not necessary
 - use llvm c api instead of my llvm scaffold in codegen stage
   - expr
   - ternary expr support

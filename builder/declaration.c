@@ -115,8 +115,7 @@ sds build_symbol_name(astn n) {
       // static function variable
       assert(n->declaration.scope_ref->type == ast_declaration);
       assert(n->declaration.scope_ref->declaration.ident);
-      return sdscatprintf(sdsempty(), FUNCTION_STATIC_FMT,
-                          n->declaration.scope_ref->declaration.ident,
+      return sdscatprintf(sdsempty(), STATIC_VAR_FMT,
                           n->declaration.ident, n->declaration.uid);
     } else {
       log_panic("those variables in function scope would drop their name");
@@ -125,7 +124,7 @@ sds build_symbol_name(astn n) {
     // global scope
     if (decl_specs->ctype.storage == TOK_KW_STATIC) {
       // static global variable
-      return sdscatprintf(sdsempty(), GLOBAL_STATIC_FMT, n->declaration.ident,
+      return sdscatprintf(sdsempty(), STATIC_VAR_FMT, n->declaration.ident,
                           n->declaration.uid);
     } else {
       // extern or unknown storage class has the name same as its identifier

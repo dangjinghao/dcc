@@ -2,8 +2,7 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
-const char *GLOBAL_STATIC_FMT = "__%s.%ld";
-const char *FUNCTION_STATIC_FMT = "__%s.%s.%ld";
+const char *STATIC_VAR_FMT = "%s.%ld";
 const char *STRUCT_FMT = "struct.%s.%ld";
 builder builder_create(builder b, char *module_name) {
   b->context = LLVMContextCreate();
