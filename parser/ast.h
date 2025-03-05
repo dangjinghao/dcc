@@ -24,6 +24,8 @@ enum ast_type {
   ast_initializer,
   ast_initializer_list,
   ast_jump_statement,
+  ast_enumeration,
+  ast_enumerator,
 };
 
 enum type_qualifier {
@@ -62,19 +64,6 @@ typedef struct ast_node {
       enum tok_type type;
       union token v;
     } primary;
-    struct declaration {
-      sds ident;
-      // initializer/function body/struct declaration bitfield (expr)
-      struct ast_node *extdata;
-      size_t uid;
-      struct ast_node *scope_ref;
-      // it contains those node type:
-      // ast_expr_unary is used for array declaration [<expr>],
-      // ast_parameters is used for function parameters(<parameter-type-list>),
-      // ast_ctype
-      struct slist type_chain;
-      LLVMValueRef V;
-    } declaration;
     struct ctype {
       enum type_qualifier qualifier;
       // trick: fill token_type with 0 or TOK_UNKNOWN
@@ -88,6 +77,19 @@ typedef struct ast_node {
       struct ast_node *label_value;
       struct ast_node *stmt;
     } labeled_statement;
+    struct declaration {
+      sds ident;
+      // initializer/function body/struct declaration bitfield (expr)
+      struct ast_node *extdata;
+      size_t uid;
+      struct ast_node *scope_ref;
+      // it contains those node type:
+      // ast_expr_unary is used for array declaration [<expr>],
+      // ast_parameters is used for function parameters(<parameter-type-list>),
+      // ast_ctype
+      struct slist type_chain;
+      LLVMValueRef V;
+    } declaration;
     struct struct_union_declaration {
       sds ident;
       // if ident is empty, it is an anonymous struct/union,
@@ -97,7 +99,16 @@ typedef struct ast_node {
       // store the struct declaration type in the list
       struct slist member_declarations;
     } struct_union_declaration;
-
+    struct enumeration {
+      sds ident;
+      size_t uid;
+      struct slist enumerators;
+    } enumeration;
+    struct enumerator {
+      sds ident;
+      long value;
+      size_t uid;
+    } enumerator;
     struct parameters {
       struct slist list;
     } parameters;
@@ -119,7 +130,7 @@ typedef struct ast_node {
     } initializer;
     struct jump_statement {
       enum tok_type type;
-      struct ast_node *target_block;
+      struct ast_node *target_block_ref;
       struct ast_node *expr;
     } jump_statement;
   };
@@ -128,5 +139,5 @@ typedef struct ast_node {
 struct ast_node *ast_new(enum ast_type type);
 void ast_free(astn node);
 astn ast_copy(astn n);
-
+sds ast_declaration_ident(astn n);
 #endif

@@ -24,10 +24,13 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] refactor repr to generate a visual AST result
 - [x] struct parser
 - [x] va, void test
-- [x] expand typedef 
+- [x] expand typedef
 - [x] fix `typedef int I;{I I;}`
 - [x] struct
+- [x] enum
 - [ ] parser_check_constant_expr
+- [ ] parser_eval_const_expr_longZ
+- [ ] replace astn type with size_t in array size declaration
 - [ ] expr
 - [ ] {} initializer
 - [ ] union

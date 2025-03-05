@@ -336,9 +336,9 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     }
     if (n->ctype.qualifier != TYPE_QUAL_NONE) {
       sds qual_buf = sdsempty();
-      buf = sdscatprintf(
-          buf, "{\"name\":\"<qualifier> %s\"}",
-          qual_buf = convert_enum_qualifier_to_string(n->ctype.qualifier, qual_buf));
+      buf = sdscatprintf(buf, "{\"name\":\"<qualifier> %s\"}",
+                         qual_buf = convert_enum_qualifier_to_string(
+                             n->ctype.qualifier, qual_buf));
       sdsfree(qual_buf);
       buf = sdscat(buf, ",");
     }
@@ -453,9 +453,41 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     default:
       log_panic("invalid jump statement type");
     }
-    if (n->jump_statement.target_block) {
+    if (n->jump_statement.target_block_ref) {
       buf = sdscat(buf, ",");
-      buf = convert_ast_to_json(n->jump_statement.target_block, buf, true);
+      buf = convert_ast_to_json(n->jump_statement.target_block_ref, buf, true);
+    }
+    buf = sdscat(buf, "]}");
+    break;
+  }
+  case ast_enumeration: {
+    buf = sdscatprintf(buf, "{\"name\":\"enumeration\",\"children\":[");
+    if (n->enumeration.ident) {
+      buf = sdscatprintf(buf, "{\"name\":\"<id> %s\"},", n->enumeration.ident);
+    } else {
+      buf = sdscatprintf(buf, "{\"name\":\"<empty-id>\"},");
+    }
+    if (!shallow) {
+      astn ref;
+      slist_foreach(&n->enumeration.enumerators, ref) {
+        buf = convert_ast_to_json(ref, buf, shallow);
+        buf = sdscat(buf, ",");
+      }
+    } else {
+      buf = sdscat(buf, "{\"name\":\"<...>\"},");
+    }
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, "]}");
+    break;
+  }
+  case ast_enumerator: {
+    buf = sdscatprintf(buf, "{\"name\":\"enumerator\",\"children\":[");
+    buf = sdscatprintf(buf, "{\"name\":\"<id> %s\"},", n->enumerator.ident);
+    buf = sdscatprintf(buf, "{\"name\":\"<value> %ld\"},", n->enumerator.value);
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
     }
     buf = sdscat(buf, "]}");
     break;
@@ -601,6 +633,8 @@ char *convert_ast_type_enum_to_repr(enum ast_type t) {
     STRCASE(ast_initializer);
     STRCASE(ast_initializer_list);
     STRCASE(ast_jump_statement);
+    STRCASE(ast_enumeration);
+    STRCASE(ast_enumerator);
   }
   return NULL;
 }

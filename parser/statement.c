@@ -56,8 +56,8 @@ astn parse_jump_statement(parser p) {
   case TOK_KW_BREAK:
     jump->jump_statement.type = p->current_token;
     parser_consume(p);
-    jump->jump_statement.target_block = p->interruptable_scope;
-    assert(jump->jump_statement.target_block);
+    jump->jump_statement.target_block_ref = p->interruptable_scope;
+    assert(jump->jump_statement.target_block_ref);
     break;
   case TOK_KW_RETURN:
     jump->jump_statement.type = TOK_KW_RETURN;
@@ -65,8 +65,8 @@ astn parse_jump_statement(parser p) {
     if (g_is_expression_firstset(p)) {
       jump->jump_statement.expr = parse_expression(p);
     }
-    jump->jump_statement.target_block = p->current_function_scope;
-    assert(jump->jump_statement.target_block);
+    jump->jump_statement.target_block_ref = p->current_function_scope;
+    assert(jump->jump_statement.target_block_ref);
     break;
   }
   parser_consume_with(p, ';');

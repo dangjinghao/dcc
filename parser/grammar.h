@@ -67,6 +67,25 @@ static inline bool g_is_enum_specifier(parser parser) {
 
 /**
  * @grammar
+ * <enumerator> ::= <identifier>
+ *               | <identifier> = <constant-expression>
+ * @param parser 
+ */
+static inline bool g_is_enumerator_firstset(parser parser) {
+  return parser->current_token == TOK_IDENT;
+}
+
+/**
+ * @grammar
+ * <enumerator-list> ::= <enumerator>
+ *                    | <enumerator-list> , <enumerator>
+ * 
+ */
+static inline bool g_is_enumerator_list_firstset(parser parser) {
+  return g_is_enumerator_firstset(parser);
+}
+/**
+ * @grammar
  * <struct-or-union> ::= struct
  *                    | union
  * @param parser 

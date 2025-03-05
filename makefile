@@ -12,7 +12,7 @@ CFLAGS += -Wno-stringop-truncation \
 		  -Wno-unused-but-set-variable \
 		  -Wno-unused-parameter \
 		  -Wno-unused-function
-LDFLAGS := $(shell llvm-config --libs)
+LDFLAGS := $(shell llvm-config --libs --ldflags)
 
 ARGS :=
 

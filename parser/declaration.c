@@ -3,7 +3,6 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
-#include "macro/macro.h"
 #include "parser.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
@@ -70,7 +69,7 @@ astn parse_struct_declarator(parser parser, astn decl_specs) {
   }
   if (parser->current_token == ':') {
     parser_consume_with(parser, ':');
-    n->declaration.extdata = parse_constant_expr(parser);
+    n->declaration.extdata = parse_constant_expr(parser, CONST_EXPR_ALL);
   }
   return n;
 }
@@ -109,12 +108,12 @@ astn parse_struct_or_union_specifier(parser parser) {
     }
     log_debug("add uid to struct declaration")
   } else {
-    // struct declaration, check if it exists
+    // struct declaration, check if it existing
     if (!n->struct_union_declaration.ident) {
       compiler_error(parser->lexer,
                      "struct/union declaration without an identifier");
     }
-    astn ref = parser_find_declaration_in_all_scope_table(
+    astn ref = parser_find_ident_in_all_scope_table(
         n->struct_union_declaration.ident, &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
@@ -127,7 +126,66 @@ astn parse_struct_or_union_specifier(parser parser) {
   return n;
 }
 
-astn parse_enum(parser parser) { BUILDING(); }
+astn parse_enumerator(parser parser, slist enumerators, long *enum_counter) {
+  assert(g_is_enumerator_firstset(parser));
+  astn n = ast_new(ast_enumerator);
+  n->enumerator.ident = parser->lexer->lex_token._ident;
+  parser_consume(parser);
+  if (parser->current_token == '=') {
+    parser_consume(parser);
+    astn const_expr = parse_constant_expr(parser, CONST_EXPR_INTEGER_ONLY);
+    n->enumerator.value = parser_eval_const_expr_long(const_expr);
+    *enum_counter = n->enumerator.value;
+    ast_free(const_expr);
+  } else {
+    n->enumerator.value = *enum_counter;
+  }
+  *enum_counter += 1;
+  slist_add_tail(enumerators, n);
+  parser_declare_new_enumerator(parser, n);
+  return n;
+}
+
+astn parse_enumeration(parser parser) {
+  assert(g_is_enum_specifier(parser));
+  parser_consume_with(parser, TOK_KW_ENUM);
+  astn n = ast_new(ast_enumeration);
+  if (parser->current_token == TOK_IDENT) {
+    n->enumeration.ident = parser->lexer->lex_token._ident;
+    parser_consume(parser);
+  }
+  if (parser->current_token == '{') {
+    parser_consume(parser);
+    long enum_counter = 0;
+    while (g_is_enumerator_firstset(parser)) {
+      parse_enumerator(parser, &n->enumeration.enumerators, &enum_counter);
+      if (parser->current_token == ',') {
+        parser_consume(parser);
+      } else {
+        break;
+      }
+    }
+    parser_consume_with(parser, '}');
+    if (n->enumeration.ident) {
+      parser_declare_new_tag(parser, n);
+    }
+  } else {
+    if (!n->enumeration.ident) {
+      compiler_error(parser->lexer,
+                     "enumeration declaration without an identifier");
+    }
+    astn ref = parser_find_ident_in_all_scope_table(n->enumeration.ident,
+                                                    &parser->tagtab);
+    if (!ref) {
+      compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
+                     n->enumeration.ident);
+    }
+    ast_free(n);
+    n = ast_new(ast_ref);
+    n->ref = ref;
+  }
+  return n;
+}
 
 /* {<declaration-specifier>}+ */
 astn parse_declaration_specifiers(parser parser) {
@@ -170,7 +228,7 @@ astn parse_declaration_specifiers(parser parser) {
         tn->user_defined_type = parse_struct_or_union_specifier(parser);
       } else if (g_is_enum_specifier(parser)) {
         tn->type = parser->current_token;
-        tn->user_defined_type = parse_enum(parser);
+        tn->user_defined_type = parse_enumeration(parser);
       } else {
         parse_set_normal_type_specifier(tn, parser);
         parser_consume(parser);
@@ -298,7 +356,7 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
       astn content_type = ast_new(ast_expr_unary);
       content_type->unary.op = '[';
       if (parser->current_token != ']') {
-        content_type->unary.expr = parse_constant_expr(parser);
+        content_type->unary.expr = parse_constant_expr(parser, CONST_EXPR_ALL);
       }
       parser_consume_with(parser, ']');
       slist_add_tail(type_chain, content_type);

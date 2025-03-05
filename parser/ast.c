@@ -1,4 +1,6 @@
 #include "ast.h"
+#include "convert/convert.h"
+#include "log/log.h"
 #include "slist/slist.h"
 
 astn ast_new(enum ast_type type) {
@@ -28,6 +30,9 @@ astn ast_new(enum ast_type type) {
     break;
   case ast_initializer_list:
     slist_init(&node->initializer_list.list);
+    break;
+  case ast_enumeration:
+    slist_init(&node->enumeration.enumerators);
     break;
   default:
     break;
@@ -71,6 +76,7 @@ astn ast_copy(astn n) {
     new->declaration.ident = sdsdup(n->declaration.ident);
     new->declaration.extdata = ast_copy(n->declaration.extdata);
     new->declaration.scope_ref = n->declaration.scope_ref;
+    new->declaration.uid = n->declaration.uid;
     astn ref;
     slist_foreach(&n->declaration.type_chain, ref) {
       astn copy = ast_copy(ref);
@@ -104,6 +110,7 @@ astn ast_copy(astn n) {
         n->struct_union_declaration.ident
             ? sdsdup(n->struct_union_declaration.ident)
             : NULL;
+    new->struct_union_declaration.uid = n->struct_union_declaration.uid;
     astn ref;
     slist_foreach(&n->struct_union_declaration.member_declarations, ref) {
       astn copy = ast_copy(ref);
@@ -162,6 +169,24 @@ astn ast_copy(astn n) {
   case ast_jump_statement: {
     new->jump_statement.type = n->jump_statement.type;
     new->jump_statement.expr = ast_copy(n->jump_statement.expr);
+    new->jump_statement.target_block_ref = n->jump_statement.target_block_ref;
+    break;
+  }
+  case ast_enumeration: {
+    new->enumeration.ident =
+        n->enumeration.ident ? sdsdup(n->enumeration.ident) : NULL;
+    new->enumeration.uid = n->enumeration.uid;
+    astn ref;
+    slist_foreach(&n->enumeration.enumerators, ref) {
+      astn copy = ast_copy(ref);
+      slist_add_tail(&new->enumeration.enumerators, copy);
+    }
+    break;
+  }
+  case ast_enumerator: {
+    new->enumerator.ident = sdsdup(n->enumerator.ident);
+    new->enumerator.value = n->enumerator.value;
+    new->enumerator.uid = n->enumerator.uid;
     break;
   }
   }
@@ -279,6 +304,33 @@ void ast_free(astn node) {
     ast_free(node->jump_statement.expr);
     break;
   }
+  case ast_enumeration: {
+    astn ref;
+    slist_foreach(&node->enumeration.enumerators, ref) { ast_free(ref); }
+    slist_free(&node->enumeration.enumerators);
+    sdsfree(node->enumeration.ident);
+    break;
+  }
+  case ast_enumerator:
+    sdsfree(node->enumerator.ident);
+    break;
   }
   free(node);
+}
+
+sds ast_declaration_ident(astn n) {
+  switch (n->type) {
+  case ast_declaration:
+    return n->declaration.ident;
+  case ast_struct_union_declaration:
+    return n->struct_union_declaration.ident;
+  case ast_enumeration:
+    return n->enumeration.ident;
+  case ast_enumerator:
+    return n->enumerator.ident;
+  default:
+    log_error("unexpected ast declartion type: %s",
+              convert_ast_type_enum_to_repr(n->type));
+  }
+  return NULL;
 }

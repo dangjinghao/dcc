@@ -49,7 +49,7 @@ astn parse_primary_expr(parser parser) {
   case TOK_IDENT: {
     node = parse_ident(parser);
     astn ref_id =
-        parser_find_declaration_in_all_scope_table(node->ident, &parser->idtab);
+        parser_find_ident_in_all_scope_table(node->ident, &parser->idtab);
     if (!ref_id) {
       compiler_error(parser->lexer, "Undefined identifier %s", node->ident);
     }
@@ -460,11 +460,11 @@ astn parse_expression(parser parser) {
   return node;
 }
 
-astn parse_constant_expr(parser parser) {
+astn parse_constant_expr(parser parser, enum constant_expr_check_flag flag) {
   struct lexer lexer;
   lexer_snapshot(&lexer, parser->lexer);
   astn e = parse_assign_expr(parser);
-  if (!parser_check_constant_expr(e)) {
+  if (!parser_check_constant_expr(e,flag)) {
     compiler_error(&lexer, "Expected constant expression");
   }
   return e;
