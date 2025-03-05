@@ -108,7 +108,6 @@ astn parse_struct_or_union_specifier(parser parser) {
       parser_declare_new_tag(parser, n);
     }
     log_debug("add uid to struct declaration")
-    n->struct_union_declaration.uid = parser_get_uid(parser);
   } else {
     // struct declaration, check if it exists
     if (!n->struct_union_declaration.ident) {

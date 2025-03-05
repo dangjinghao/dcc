@@ -14,5 +14,4 @@ LLVMValueRef build_declaration(builder b, astn n);
 extern const char *GLOBAL_STATIC_FMT;
 extern const char *FUNCTION_STATIC_FMT;
 extern const char *STRUCT_FMT;
-extern const char *STRUCT_ABSTRACT_FMT;
 #endif

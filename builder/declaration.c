@@ -23,25 +23,26 @@ LLVMTypeRef build_convert_struct_type(astn n, builder b) {
     log_debug("refering the existed struct type:%s", LLVMGetStructName(t));
   } else {
     assert(n->type == ast_struct_union_declaration);
-    sds name;
+    // TODO: currently, we just add an int type to this struct definition
+    LLVMTypeRef elements[] = {LLVMInt32TypeInContext(b->context)};
+    size_t elements_count = 1;
+    
     if (n->struct_union_declaration.ident) {
+      sds name;
       name = sdscatprintf(sdsempty(), STRUCT_FMT,
                           n->struct_union_declaration.ident,
                           n->struct_union_declaration.uid);
+      log_debug("create struct definition with name: %s", name);
+      t = LLVMStructCreateNamed(b->context, name);
+      LLVMStructSetBody(t, elements, elements_count, false);
+      sdsfree(name);
     } else {
-      // abstract struct, use uid
-      name = sdscatprintf(sdsempty(), STRUCT_ABSTRACT_FMT,
-                          n->struct_union_declaration.uid);
+      log_debug("create anonymous struct definition");
+      t = LLVMStructTypeInContext(b->context, elements, elements_count, false);
     }
-    log_debug("create struct definition with name: %s", name);
-
-    t = LLVMStructCreateNamed(b->context, name);
-    sdsfree(name);
+    
     assert(n->struct_union_declaration.V == NULL);
     n->struct_union_declaration.V = t;
-    // TODO: currently, we just add an int type to this struct definition
-    LLVMTypeRef elements[] = {LLVMInt32TypeInContext(b->context)};
-    LLVMStructSetBody(t, elements, 1, false);
   }
   return t;
 }

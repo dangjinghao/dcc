@@ -185,16 +185,14 @@ void parser_declare_new_symbol(parser parser, astn n) {
     log_debug("multiple extern declaration, do nothing: %s",
               n->declaration.ident);
     return;
-  } else if (existing_declaration && decl_specs->ctype.storage != TOK_KW_EXTERN &&
+  } else if (existing_declaration &&
+             decl_specs->ctype.storage != TOK_KW_EXTERN &&
              g_get_declaration_specifier(existing_declaration)->ctype.storage !=
                  TOK_KW_EXTERN) {
     compiler_error(parser->lexer, "redefined symbol %s", n->declaration.ident);
   }
-  if (n->declaration.ident) {
-    n->declaration.uid = parser_get_uid(parser);
-  } else {
-    log_debug("this is an abstract declarator, skipping allocate uid");
-  }
+  
+  n->declaration.uid = parser_get_uid(parser);
   parser_add_declaration_to_current_scope_table(n, &parser->idtab);
   if (parser_is_current_block_global(parser) ||
       decl_specs->ctype.storage == TOK_KW_EXTERN) {
@@ -219,6 +217,7 @@ void parser_declare_new_tag(parser parser, astn n) {
     compiler_error(parser->lexer, "redefined struct/union with identifier %s",
                    n->struct_union_declaration.ident);
   }
+  n->struct_union_declaration.uid = parser_get_uid(parser);
   parser_add_declaration_to_current_scope_table(n, &parser->tagtab);
 }
 

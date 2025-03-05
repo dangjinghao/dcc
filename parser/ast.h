@@ -90,6 +90,8 @@ typedef struct ast_node {
     } labeled_statement;
     struct struct_union_declaration {
       sds ident;
+      // if ident is empty, it is an anonymous struct/union,
+      // do not allocate the uid for it
       size_t uid;
       LLVMTypeRef V;
       // store the struct declaration type in the list
