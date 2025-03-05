@@ -12,6 +12,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+dynarray build_struct_member_declaration_type(astn n, builder b, dynarray arr) {
+  assert(n->type == ast_struct_union_declaration);
+  astn struct_declaration;
+  slist_foreach(&n->struct_union_declaration.member_declarations,
+                struct_declaration) {
+    LLVMTypeRef t = build_variable_declaration_type(b, struct_declaration);
+    dynarray_add(arr, &t);
+  }
+  return arr;
+}
+
 LLVMTypeRef build_convert_struct_type(astn n, builder b) {
   LLVMTypeRef t;
   if (n->type == ast_ref) {
@@ -23,10 +34,11 @@ LLVMTypeRef build_convert_struct_type(astn n, builder b) {
     log_debug("refering the existed struct type:%s", LLVMGetStructName(t));
   } else {
     assert(n->type == ast_struct_union_declaration);
-    // TODO: currently, we just add an int type to this struct definition
-    LLVMTypeRef elements[] = {LLVMInt32TypeInContext(b->context)};
-    size_t elements_count = 1;
-    
+    struct dynarray dyn_elements;
+    dynarray_default(&dyn_elements, sizeof(LLVMTypeRef));
+    build_struct_member_declaration_type(n, b, &dyn_elements);
+    size_t elements_count = dyn_elements.used;
+    LLVMTypeRef *elements = dyn_elements.data;
     if (n->struct_union_declaration.ident) {
       sds name;
       name = sdscatprintf(sdsempty(), STRUCT_FMT,
@@ -40,7 +52,7 @@ LLVMTypeRef build_convert_struct_type(astn n, builder b) {
       log_debug("create anonymous struct definition");
       t = LLVMStructTypeInContext(b->context, elements, elements_count, false);
     }
-    
+    dynarray_free(&dyn_elements);
     assert(n->struct_union_declaration.V == NULL);
     n->struct_union_declaration.V = t;
   }
@@ -115,8 +127,8 @@ sds build_symbol_name(astn n) {
       // static function variable
       assert(n->declaration.scope_ref->type == ast_declaration);
       assert(n->declaration.scope_ref->declaration.ident);
-      return sdscatprintf(sdsempty(), STATIC_VAR_FMT,
-                          n->declaration.ident, n->declaration.uid);
+      return sdscatprintf(sdsempty(), STATIC_VAR_FMT, n->declaration.ident,
+                          n->declaration.uid);
     } else {
       log_panic("those variables in function scope would drop their name");
     }

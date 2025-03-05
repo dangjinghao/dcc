@@ -26,13 +26,12 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] va, void test
 - [x] expand typedef 
 - [x] fix `typedef int I;{I I;}`
-- [ ] struct
+- [x] struct
 - [ ] parser_check_constant_expr
+- [ ] expr
 - [ ] {} initializer
 - [ ] union
 - [ ] multi-dim array
-- expr
-- [ ] maybe we can remove the uid, it is not necessary
 - use llvm c api instead of my llvm scaffold in codegen stage
   - expr
   - ternary expr support

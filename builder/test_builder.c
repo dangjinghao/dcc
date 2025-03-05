@@ -54,10 +54,9 @@ void tbc_vafunc() { tbc_entry("void f(int a,char b,short c,...);"); }
 void tbc_ptr() { tbc_entry("void* ptr;"); }
 
 void tbc_struct() {
-  tbc_entry("struct s {int a;char b;} s; struct s refs; struct{char c; "
-            "char*s;} abss;");
+  tbc_entry("struct s {int a;char b; struct{short s; int d;}s;} s; struct s refs; struct{char c; "
+            "char*s; struct{short s;}s;} abss;");
 }
-
 void tbc_multi_subscope_extern() {
   tbc_entry("int F1(){extern Fe();{extern Fe();}} int F2(){extern Fe(); "
             "{extern Fe();}}");
