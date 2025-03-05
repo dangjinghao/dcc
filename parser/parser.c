@@ -64,7 +64,7 @@ int parser_consume_with(parser parser, int token) {
   if (parser->current_token == token) {
     return parser_consume(parser);
   }
-  compiler_error(parser->lexer, "Expected token `%s`, got `%s`",
+  compiler_error(parser->lexer, "Expected token %s, got %s",
                  lexer_token_to_string(token),
                  lexer_token_to_string(parser->current_token));
   return 0;
@@ -82,7 +82,7 @@ void parser_pop_scope(parser parser) {
   log_debug("pop scope at line %ld", parser->lexer->ln);
   astn r;
   while ((r = slist_pop_head(&parser->idtab)) != __parser_scope_fence_ptr) {
-    log_debug("pop declaration `%s`", r->declaration.ident);
+    log_debug("pop declaration %s", r->declaration.ident);
   }
 }
 
@@ -122,10 +122,10 @@ astn parser_find_declaration_in_current_scope_table(sds ident, slist tab) {
 
 void parser_add_declaration_to_current_scope_table(astn n, slist tab) {
   if (n->type == ast_declaration) {
-    log_debug("add declaration `%s` to current scope", n->declaration.ident);
+    log_debug("add declaration %s to current scope", n->declaration.ident);
 
   } else if (n->type == ast_struct_union_declaration) {
-    log_debug("add struct declaration `%s` to current scope",
+    log_debug("add struct declaration %s to current scope",
               n->struct_union_declaration.ident);
   }
   slist_add_head(tab, n);
@@ -179,17 +179,16 @@ void parser_declare_new_symbol(parser parser, astn n) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
-  astn exists_declaration = parser_find_declaration_in_current_scope_table(
+  astn existing_declaration = parser_find_declaration_in_current_scope_table(
       n->declaration.ident, &parser->idtab);
-  if (exists_declaration && decl_specs->ctype.storage == TOK_KW_EXTERN) {
+  if (existing_declaration && decl_specs->ctype.storage == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
               n->declaration.ident);
     return;
-  } else if (exists_declaration && decl_specs->ctype.storage != TOK_KW_EXTERN &&
-             g_get_declaration_specifier(exists_declaration)->ctype.storage !=
+  } else if (existing_declaration && decl_specs->ctype.storage != TOK_KW_EXTERN &&
+             g_get_declaration_specifier(existing_declaration)->ctype.storage !=
                  TOK_KW_EXTERN) {
-    compiler_error(parser->lexer, "redefined symbol `%s`",
-                   n->declaration.ident);
+    compiler_error(parser->lexer, "redefined symbol %s", n->declaration.ident);
   }
   if (n->declaration.ident) {
     n->declaration.uid = parser_get_uid(parser);
@@ -214,10 +213,10 @@ void parser_declare_new_tag(parser parser, astn n) {
     log_debug("this is an abstract struct declarator, skipping declaration");
     return;
   }
-  astn exists_declaration = parser_find_declaration_in_current_scope_table(
+  astn existing_declaration = parser_find_declaration_in_current_scope_table(
       n->struct_union_declaration.ident, &parser->tagtab);
-  if (exists_declaration) {
-    compiler_error(parser->lexer, "redefined struct/union with identifier `%s`",
+  if (existing_declaration) {
+    compiler_error(parser->lexer, "redefined struct/union with identifier %s",
                    n->struct_union_declaration.ident);
   }
   parser_add_declaration_to_current_scope_table(n, &parser->tagtab);
@@ -250,13 +249,21 @@ void parser_unfold_type_chain(parser parser, slist type_chain) {
     n->ctype.storage = storage;
   }
 }
-
-static bool __parser_symtab_find_strong_symbols(slist symtab, sds id) {
+/**
+ * @brief remove repeated weak symbols from symtab, 
+ * 
+ * @param symtab 
+ * @param until 
+ * @return true 
+ * @return false 
+ */
+static bool __parser_symtab_symbol_exist_until(slist symtab, astn until) {
+  sds id = until->declaration.ident;
   astn n;
   slist_foreach(symtab, n) {
     assert(n->type == ast_declaration);
     // traverse until extern symbol
-    if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
+    if (n == until) {
       break;
     }
 
@@ -273,9 +280,33 @@ void parser_symtab_remove_weak_symbols(slist symtab) {
     if (g_get_declaration_specifier(n)->ctype.storage != TOK_KW_EXTERN) {
       continue;
     }
-    if (__parser_symtab_find_strong_symbols(symtab, n->declaration.ident)) {
+    if (__parser_symtab_symbol_exist_until(symtab, n)) {
       log_debug("remove weak symbol from symtab: %s", n->declaration.ident);
       slist_remove(symtab, n);
     }
   }
+}
+
+/**
+ * @brief the order of the strong symbol is reversed, so we need to reorder it
+ * 
+ */
+slist parser_reorder_strong_symbols(slist symtab) {
+  struct slist new_symtab;
+  slist_init(&new_symtab);
+  astn n;
+  slist_foreach(symtab, n) {
+    if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
+      log_debug("reorder: add extern symbol to new symtab: %s",
+                n->declaration.ident);
+      slist_add_tail(&new_symtab, n);
+    } else {
+      log_debug("reorder: add strong symbol to new symtab: %s",
+                n->declaration.ident);
+      slist_add_head(&new_symtab, n);
+    }
+  }
+  slist_free(symtab);
+  *symtab = new_symtab;
+  return symtab;
 }

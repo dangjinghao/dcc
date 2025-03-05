@@ -15,16 +15,14 @@
 LLVMTypeRef build_convert_struct_type(astn n, builder b) {
   LLVMTypeRef t;
   if (n->type == ast_ref) {
-    // the reference of exists struct definition
+    // the reference of existing struct definition
     n = n->ref;
-  }
-  // because the symbols order is stack style, the referenced struct type
-  // may not be created.
-  assert(n->type == ast_struct_union_declaration);
-  if (n->struct_union_declaration.V) {
+    assert(n->type == ast_struct_union_declaration);
+    assert(n->struct_union_declaration.V);
     t = n->struct_union_declaration.V;
     log_debug("refering the existed struct type:%s", LLVMGetStructName(t));
   } else {
+    assert(n->type == ast_struct_union_declaration);
     sds name;
     if (n->struct_union_declaration.ident) {
       name = sdscatprintf(sdsempty(), STRUCT_FMT,

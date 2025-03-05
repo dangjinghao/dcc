@@ -20,6 +20,7 @@ int process_trans_unit(struct lexer *lexer) {
   builder_create(&b, "test");
   astn d;
   parser_symtab_remove_weak_symbols(&parser.symtab);
+  parser_reorder_strong_symbols(&parser.symtab);
   slist_foreach(&parser.symtab, d) {
     d->declaration.V = build_declaration(&b, d);
   }
@@ -52,4 +53,12 @@ void tbc_vafunc() { tbc_entry("void f(int a,char b,short c,...);"); }
 
 void tbc_ptr() { tbc_entry("void* ptr;"); }
 
-void tbc_struct() { tbc_entry("struct s {int a;char b;} s; struct s refs; struct{char c; char*s;} abss;"); }
+void tbc_struct() {
+  tbc_entry("struct s {int a;char b;} s; struct s refs; struct{char c; "
+            "char*s;} abss;");
+}
+
+void tbc_multi_subscope_extern() {
+  tbc_entry("int F1(){extern Fe();{extern Fe();}} int F2(){extern Fe(); "
+            "{extern Fe();}}");
+}

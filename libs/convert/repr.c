@@ -576,7 +576,7 @@ size_t convert_token_type_to_size(enum tok_type t) {
   case TOK_KW_SHORT:
     return sizeof(short);
   default:
-    log_panic("unsupported type:`%s`", convert_token_type_enum_to_repr(t));
+    log_panic("unsupported type: %s", convert_token_type_enum_to_repr(t));
   }
   return 0;
 }

@@ -42,6 +42,7 @@ bool parser_check_constant_expr(astn expr);
 size_t parser_get_uid(parser parser);
 void parser_unfold_type_chain(parser parser, slist type_chain);
 void parser_symtab_remove_weak_symbols(slist symtab);
+slist parser_reorder_strong_symbols(slist symtab);
 
 sds parse_remove_type_chain_ident(slist type_chain);
 astn parse_unary(parser parser);
