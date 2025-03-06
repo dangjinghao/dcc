@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "ast.h"
+#include "convert/convert.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
@@ -124,11 +125,6 @@ astn parser_find_ident_in_current_scope_table(sds ident, slist tab) {
 void parser_add_symbol_to_current_scope_table(astn n, slist tab) {
   log_debug("add declaration %s to current scope", ast_declaration_ident(n));
   slist_add_head(tab, n);
-}
-
-bool parser_check_constant_expr(astn expr, enum constant_expr_check_flag flag) {
-  return true;
-  BUILDING();
 }
 
 astn parser_get_typedef_by_type_name(parser parser, sds ident) {
@@ -337,8 +333,165 @@ slist parser_reorder_strong_symbols(slist symtab) {
   return symtab;
 }
 
-unsigned long parser_eval_const_expr_long(astn expr) {
-  assert(parser_check_constant_expr(expr, CONST_EXPR_ALL));
-  return 0;
-  BUILDING();
+long parser_eval_const_int_expr(astn expr) {
+  assert(parser_check_constant_int_expr(expr));
+  if (expr->type == ast_ref) {
+    expr = expr->ref;
+  }
+  switch (expr->type) {
+  case ast_enumerator: {
+    return expr->enumerator.value;
+  }
+  case ast_expr_primary: {
+    switch (expr->primary.type) {
+    case TOK_LIT_INT:
+    case TOK_LIT_LONG:
+      return expr->primary.v._int;
+    case TOK_LIT_UINT:
+    case TOK_LIT_ULONG:
+      return expr->primary.v._uint;
+    case TOK_LIT_CHAR:
+      return expr->primary.v._char;
+    default:
+      log_panic(
+          "unexpected primary type when evaluating constant int expression: %s",
+          lexer_token_to_string(expr->primary.type));
+    }
+  }
+  case ast_expr_binop: {
+    long long lhs = parser_eval_const_int_expr(expr->binop.lhs);
+    long long rhs = parser_eval_const_int_expr(expr->binop.rhs);
+    switch (expr->binop.op) {
+    case '+':
+      return lhs + rhs;
+    case '-':
+      return lhs - rhs;
+    case '*':
+      return lhs * rhs;
+    case '/':
+      return lhs / rhs;
+    case '%':
+      return lhs % rhs;
+    case TOK_SYM_LSHIFT:
+      return lhs << rhs;
+    case TOK_SYM_RSHIFT:
+      return lhs >> rhs;
+    case TOK_SYM_LEQ:
+      return lhs <= rhs;
+    case TOK_SYM_GEQ:
+      return lhs >= rhs;
+    case TOK_SYM_NEQ:
+      return lhs != rhs;
+    case TOK_SYM_EQ:
+      return lhs == rhs;
+    case '&':
+      return lhs & rhs;
+    case '|':
+      return lhs | rhs;
+    case '^':
+      return lhs ^ rhs;
+    case TOK_SYM_LOGIC_AND:
+      return lhs && rhs;
+    case TOK_SYM_LOGIC_OR:
+      return lhs || rhs;
+    case '<':
+      return lhs < rhs;
+    case '>':
+      return lhs > rhs;
+    case ',':
+      return rhs;
+    default:
+      log_panic(
+          "unexpected binop type when evaluating constant int expression: %s",
+          lexer_token_to_string(expr->binop.op));
+    }
+  }
+  case ast_expr_ternary: {
+    return parser_eval_const_int_expr(expr->ternary.cond)
+               ? parser_eval_const_int_expr(expr->ternary._t)
+               : parser_eval_const_int_expr(expr->ternary._f);
+  }
+  case ast_expr_unary: {
+    switch (expr->unary.op) {
+    case '+':
+      return +parser_eval_const_int_expr(expr->unary.expr);
+    case '-':
+      return -parser_eval_const_int_expr(expr->unary.expr);
+    case '~':
+      return ~parser_eval_const_int_expr(expr->unary.expr);
+    case '!':
+      return !parser_eval_const_int_expr(expr->unary.expr);
+    case TOK_KW_SIZEOF:
+    case '&':
+    case '[':
+    case '.':
+      BUILDING();
+    default:
+      log_panic(
+          "unexpected unary type when evaluating constant int expression: %s",
+          lexer_token_to_string(expr->unary.op));
+    }
+  }
+  case ast_expr_typecast: {
+    BUILDING();
+  }
+  default:
+    log_panic(
+        "unexpected ast node type when checking constant int expression: %s",
+        convert_ast_type_enum_to_repr(expr->type));
+  }
+  return false;
+}
+
+bool parser_check_constant_int_expr(astn expr) {
+  if (expr->type == ast_ref) {
+    expr = expr->ref;
+  }
+  switch (expr->type) {
+  case ast_enumerator:
+    return true;
+  case ast_expr_primary: {
+    return expr->primary.type == TOK_LIT_INT ||
+           expr->primary.type == TOK_LIT_UINT ||
+           expr->primary.type == TOK_LIT_LONG ||
+           expr->primary.type == TOK_LIT_ULONG ||
+           expr->primary.type == TOK_LIT_CHAR;
+  }
+  case ast_expr_binop: {
+    return parser_check_constant_int_expr(expr->binop.lhs) &&
+           parser_check_constant_int_expr(expr->binop.rhs);
+  }
+  case ast_expr_ternary: {
+    return parser_check_constant_int_expr(expr->ternary.cond) &&
+           parser_check_constant_int_expr(expr->ternary._t) &&
+           parser_check_constant_int_expr(expr->ternary._f);
+  }
+  case ast_expr_unary: {
+    switch (expr->unary.op) {
+    case '+':
+    case '-':
+    case '~':
+    case '!':
+    case '&':
+    case TOK_KW_SIZEOF:
+      return true;
+    case '[':
+    case '.':
+      BUILDING();
+    default:
+      log_panic(
+          "unexpected unary type when checking constant int expression: %s",
+          lexer_token_to_string(expr->unary.op));
+    }
+    break;
+  }
+  case ast_expr_typecast: {
+    return parser_check_constant_int_expr(expr->typecast.expr);
+  }
+  default:
+    log_panic(
+        "unexpected ast node type when checking constant int expression: %s",
+        convert_ast_type_enum_to_repr(expr->type));
+  }
+  return false;
 }

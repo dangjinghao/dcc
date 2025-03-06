@@ -59,7 +59,6 @@ int process_statement(struct lexer *lexer) {
   return 0;
 }
 
-x
 void tpc_entry(char *code, int (*process_func)(struct lexer *)) {
   struct lexer lexer;
   lexer_from_string(&lexer, code);
@@ -206,9 +205,8 @@ void tpc_initializer_list() {
 void tpc_jump_statement() {
   tpc_entry_trans_unit("int main(){goto label;{{label: return 0;}}}");
 }
-
 void tpc_enum() {
-  tpc_entry_trans_unit("enum E{A,B,C};enum E e = A; enum {A0 = A, B0 = B, C0} E1;");
+  tpc_entry_trans_unit("enum E{A,B,C = 10 + B};enum E e = A; enum {A0 = A, B0 = B, C0} E1;");
 }
 
 void tpc_redef_enum_struct() {

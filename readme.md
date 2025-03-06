@@ -28,13 +28,15 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] fix `typedef int I;{I I;}`
 - [x] struct
 - [x] enum
-- [ ] parser_check_constant_expr
-- [ ] parser_eval_const_expr_longZ
-- [ ] replace astn type with size_t in array size declaration
+- [x] parser_check_constant_int_expr
+- [x] parser_eval_const_int_expr
+- [ ] replace int constant astn type with size_t in array size declaration
 - [ ] expr
 - [ ] {} initializer
-- [ ] union
+- [ ] sizeof constant expression
 - [ ] multi-dim array
+- [ ] union
+- [ ] attribute
 - use llvm c api instead of my llvm scaffold in codegen stage
   - expr
   - ternary expr support

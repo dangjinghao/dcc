@@ -69,7 +69,7 @@ astn parse_struct_declarator(parser parser, astn decl_specs) {
   }
   if (parser->current_token == ':') {
     parser_consume_with(parser, ':');
-    n->declaration.extdata = parse_constant_expr(parser, CONST_EXPR_ALL);
+    n->declaration.extdata = parse_constant_int_expr(parser);
   }
   return n;
 }
@@ -133,8 +133,8 @@ astn parse_enumerator(parser parser, slist enumerators, long *enum_counter) {
   parser_consume(parser);
   if (parser->current_token == '=') {
     parser_consume(parser);
-    astn const_expr = parse_constant_expr(parser, CONST_EXPR_INTEGER_ONLY);
-    n->enumerator.value = parser_eval_const_expr_long(const_expr);
+    astn const_expr = parse_constant_int_expr(parser);
+    n->enumerator.value = parser_eval_const_int_expr(const_expr);
     *enum_counter = n->enumerator.value;
     ast_free(const_expr);
   } else {
@@ -356,7 +356,7 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
       astn content_type = ast_new(ast_expr_unary);
       content_type->unary.op = '[';
       if (parser->current_token != ']') {
-        content_type->unary.expr = parse_constant_expr(parser, CONST_EXPR_ALL);
+        content_type->unary.expr = parse_constant_int_expr(parser);
       }
       parser_consume_with(parser, ']');
       slist_add_tail(type_chain, content_type);
