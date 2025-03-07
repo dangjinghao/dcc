@@ -56,8 +56,8 @@ astn parse_jump_statement(parser p) {
   case TOK_KW_BREAK:
     jump->jump_statement.type = p->current_token;
     parser_consume(p);
-    jump->jump_statement.target_block_ref = p->interruptable_scope;
-    assert(jump->jump_statement.target_block_ref);
+    jump->jump_statement.scope_ref = p->interruptable_scope;
+    assert(jump->jump_statement.scope_ref);
     break;
   case TOK_KW_RETURN:
     jump->jump_statement.type = TOK_KW_RETURN;
@@ -65,8 +65,8 @@ astn parse_jump_statement(parser p) {
     if (g_is_expression_firstset(p)) {
       jump->jump_statement.expr = parse_expression(p);
     }
-    jump->jump_statement.target_block_ref = p->current_function_scope;
-    assert(jump->jump_statement.target_block_ref);
+    jump->jump_statement.scope_ref = p->current_function_scope;
+    assert(jump->jump_statement.scope_ref);
     break;
   }
   parser_consume_with(p, ';');
@@ -104,6 +104,7 @@ astn parse_labeled_statement(parser p) {
   // goto label has the same first set as normal expression statement,
   // we can use snapshot
   astn label = NULL;
+  astn scope_ref = NULL;
   enum tok_type label_type = p->current_token;
   switch (p->current_token) {
   case TOK_IDENT: {
@@ -123,11 +124,16 @@ astn parse_labeled_statement(parser p) {
     break;
   }
   case TOK_KW_CASE: {
-    BUILDING();
+    parser_consume(p);
+    label = parse_constant_int_expr(p);
+    parser_consume_with(p, ':');
+    scope_ref = p->switch_scope;
     break;
   }
   case TOK_KW_DEFAULT: {
-    BUILDING();
+    parser_consume(p);
+    parser_consume_with(p, ':');
+    scope_ref = p->switch_scope;
     break;
   }
   }
@@ -136,6 +142,6 @@ astn parse_labeled_statement(parser p) {
   ls->labeled_statement.type = label_type;
   ls->labeled_statement.label_value = label;
   ls->labeled_statement.stmt = stmt;
-
+  ls->labeled_statement.scope_ref = scope_ref;
   return ls;
 }

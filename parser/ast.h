@@ -76,6 +76,8 @@ typedef struct ast_node {
       enum tok_type type;
       struct ast_node *label_value;
       struct ast_node *stmt;
+      // used for case, default 
+      struct ast_node *scope_ref;
     } labeled_statement;
     struct declaration {
       sds ident;
@@ -130,7 +132,7 @@ typedef struct ast_node {
     } initializer;
     struct jump_statement {
       enum tok_type type;
-      struct ast_node *target_block_ref;
+      struct ast_node *scope_ref;
       struct ast_node *expr;
     } jump_statement;
   };

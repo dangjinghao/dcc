@@ -169,7 +169,7 @@ astn ast_copy(astn n) {
   case ast_jump_statement: {
     new->jump_statement.type = n->jump_statement.type;
     new->jump_statement.expr = ast_copy(n->jump_statement.expr);
-    new->jump_statement.target_block_ref = n->jump_statement.target_block_ref;
+    new->jump_statement.scope_ref = n->jump_statement.scope_ref;
     break;
   }
   case ast_enumeration: {

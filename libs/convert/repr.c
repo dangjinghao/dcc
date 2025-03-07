@@ -453,9 +453,9 @@ sds convert_ast_to_json(astn n, sds buf, bool shallow) {
     default:
       log_panic("invalid jump statement type");
     }
-    if (n->jump_statement.target_block_ref) {
+    if (n->jump_statement.scope_ref) {
       buf = sdscat(buf, ",");
-      buf = convert_ast_to_json(n->jump_statement.target_block_ref, buf, true);
+      buf = convert_ast_to_json(n->jump_statement.scope_ref, buf, true);
     }
     buf = sdscat(buf, "]}");
     break;

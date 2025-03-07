@@ -32,6 +32,7 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] parser_eval_const_int_expr
 - [ ] replace int constant astn type with size_t in array size declaration
 - [ ] expr
+  - [ ] struct get member
 - [ ] {} initializer
 - [ ] sizeof constant expression
 - [ ] multi-dim array
