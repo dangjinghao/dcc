@@ -4,6 +4,7 @@
 
 const char *STATIC_VAR_FMT = "%s.%ld";
 const char *STRUCT_FMT = "struct.%s.%ld";
+const char *VAR_FMT = "v.%ld";
 builder builder_create(builder b, char *module_name) {
   b->context = LLVMContextCreate();
   b->module = LLVMModuleCreateWithNameInContext(module_name, b->context);

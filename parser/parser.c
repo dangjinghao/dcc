@@ -13,7 +13,7 @@ int parser_consume(parser parser) {
 }
 
 void parser_from_lexer(parser parser, struct lexer *lexer) {
-  parser->lexer = malloc(sizeof(struct lexer));
+  parser->lexer = calloc(1, sizeof(struct lexer));
   lexer_snapshot(parser->lexer, lexer);
   parser_consume(parser);
   slist_init(&parser->idtab);
@@ -25,7 +25,7 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
 
 void parser_snapshot(parser _new, parser _old) {
   *_new = *_old;
-  _new->lexer = malloc(sizeof(struct lexer));
+  _new->lexer = calloc(1, sizeof(struct lexer));
   lexer_snapshot(_new->lexer, _old->lexer);
   // bad hack
   if (_old->current_token == TOK_IDENT ||
@@ -74,7 +74,7 @@ int parser_consume_with(parser parser, int token) {
 static struct ast_node __parser_scope_fence,
     *__parser_scope_fence_ptr = &__parser_scope_fence;
 void parser_push_scope(parser parser) {
-  log_debug("push scope at line %ld", parser->lexer->ln);
+  log_trace("push scope at line %ld", parser->lexer->ln);
   slist_add_head(&parser->idtab, __parser_scope_fence_ptr);
   slist_add_head(&parser->tagtab, __parser_scope_fence_ptr);
 }
@@ -245,7 +245,7 @@ void parser_declare_new_tag(parser parser, astn n) {
 }
 
 size_t parser_get_uid(parser parser) {
-  log_debug("allocating uid %ld", parser->uidcnt);
+  log_trace("allocating uid %ld", parser->uidcnt);
   return parser->uidcnt++;
 }
 
@@ -319,11 +319,11 @@ slist parser_reorder_strong_symbols(slist symtab) {
   astn n;
   slist_foreach(symtab, n) {
     if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
-      log_debug("reorder: add extern symbol to new symtab: %s",
+      log_trace("reorder: add extern symbol to new symtab: %s",
                 n->declaration.ident);
       slist_add_tail(&new_symtab, n);
     } else {
-      log_debug("reorder: add strong symbol to new symtab: %s",
+      log_trace("reorder: add strong symbol to new symtab: %s",
                 n->declaration.ident);
       slist_add_head(&new_symtab, n);
     }

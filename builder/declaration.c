@@ -6,6 +6,7 @@
 #include "log/log.h"
 #include "macro/macro.h"
 #include "sds/sds.h"
+#include "slist/slist.h"
 #include <assert.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
@@ -130,7 +131,8 @@ sds build_symbol_name(astn n) {
       return sdscatprintf(sdsempty(), STATIC_VAR_FMT, n->declaration.ident,
                           n->declaration.uid);
     } else {
-      log_panic("those variables in function scope would drop their name");
+      // those variables in function scope would drop their name
+      return sdscatprintf(sdsempty(), VAR_FMT, n->declaration.uid);
     }
   } else {
     // global scope
@@ -170,6 +172,27 @@ LLVMValueRef build_global_variable(builder b, astn n) {
   return pv;
 }
 
+void build_alloca_variable_init(builder b, astn n, LLVMValueRef pv) {
+  if (n->declaration.extdata) {
+    astn init = n->declaration.extdata;
+    assert(init->type == ast_initializer);
+    log_trace("alloca variable %s has initializer",
+              LLVMGetValueName2(pv, &(size_t){}));
+    auto v = build_expression(b, init->initializer.init);
+    LLVMBuildStore(b->builder, v->v, pv);
+  }
+}
+
+LLVMValueRef build_alloca_variable(builder b, astn n) {
+  assert(n->type == ast_declaration);
+  sds sym_name = build_symbol_name(n);
+  LLVMTypeRef value_type = build_variable_declaration_type(b, n);
+  auto pv = LLVMBuildAlloca(b->builder, value_type, sym_name);
+  sdsfree(sym_name);
+  build_alloca_variable_init(b, n, pv);
+  return pv;
+}
+
 dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
   assert(params->type == ast_parameters);
   astn param_declaration;
@@ -194,12 +217,12 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
  */
 LLVMValueRef build_function_prototype(builder b, astn n) {
   assert(g_get_function_params(n));
-  sds sym_name = build_symbol_name(n);
+  sds func_name = build_symbol_name(n);
   LLVMTypeRef ret_type = build_variable_declaration_type(b, n);
   LLVMValueRef v;
   if (g_is_function_void_param(n)) {
     auto func = LLVMFunctionType(ret_type, NULL, 0, 0);
-    v = LLVMAddFunction(b->module, sym_name, func);
+    v = LLVMAddFunction(b->module, func_name, func);
   } else {
     bool is_va = false;
     if (g_is_function_varargs(n)) {
@@ -209,11 +232,34 @@ LLVMValueRef build_function_prototype(builder b, astn n) {
     dynarray_default(&params, sizeof(astn));
     build_function_parameters_type(b, g_get_function_params(n), &params);
     auto func = LLVMFunctionType(ret_type, params.data, params.used, is_va);
-    v = LLVMAddFunction(b->module, sym_name, func);
+    v = LLVMAddFunction(b->module, func_name, func);
     dynarray_free(&params);
   }
-  sdsfree(sym_name);
+  sdsfree(func_name);
   return v;
+}
+
+void build_function_body(builder b, astn n, LLVMValueRef v) {
+  astn body = g_get_function_body(n);
+  assert(body->type == ast_block);
+  auto entry_block = LLVMAppendBasicBlockInContext(b->context, v, "entry");
+  LLVMPositionBuilderAtEnd(b->builder, entry_block);
+
+  astn stmt;
+  slist_foreach(&body->block.list, stmt) {
+    if (stmt->type == ast_declaration) {
+      build_declaration(b, stmt);
+    } else {
+      BUILDING();
+    }
+  }
+  astn func_return_base_type = g_get_function_return_base_type(n);
+  auto default_type = build_convert_base_type(func_return_base_type, b);
+  if (LLVMGetTypeKind(default_type) == LLVMVoidTypeKind) {
+    LLVMBuildRetVoid(b->builder);
+    return;
+  }
+  LLVMBuildRet(b->builder, LLVMConstNull(default_type));
 }
 
 /**
@@ -223,7 +269,7 @@ LLVMValueRef build_function_prototype(builder b, astn n) {
  * @param n a declaration that should not be typedef storage class
  * @return LLVMValueRef 
  */
-LLVMValueRef build_declaration(builder b, astn n) {
+void build_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   astn decl_specs = g_get_declaration_specifier(n);
   assert(decl_specs->ctype.storage != TOK_KW_TYPEDEF);
@@ -233,11 +279,12 @@ LLVMValueRef build_declaration(builder b, astn n) {
     // function declaration or definition
     v = build_function_prototype(b, n);
     if (g_is_function_definition(n)) {
-      BUILDING();
+      build_function_body(b, n, v);
     }
-  } else if (g_is_declaration_in_function_scope(n)) {
+  } else if (g_is_declaration_in_function_scope(n) &&
+             decl_specs->ctype.storage != TOK_KW_EXTERN) {
     // variable in function
-    BUILDING();
+    v = build_alloca_variable(b, n);
   } else {
     v = build_global_variable(b, n);
   }
@@ -254,5 +301,20 @@ LLVMValueRef build_declaration(builder b, astn n) {
   default:
     break;
   }
-  return v;
+  struct slist ptr_type_chain;
+  slist_copy(&ptr_type_chain, &n->declaration.type_chain);
+  log_trace("add pointer type to llvm typed value: %s",
+            LLVMGetValueName2(v, &(size_t){}));
+  astn ptr = ast_new(ast_ctype);
+  ptr->ctype.type = '*';
+  slist_add_head(&ptr_type_chain, ptr);
+  n->declaration.V = llvm_typed_value_new(v, &ptr_type_chain);
+}
+
+LLVMTypeRef build_get_declaration_points_to_type(builder b,
+                                                 llvm_typed_value v) {
+  astn n1st = slist_peek_head(&v->type_chain);
+  assert(n1st->type == ast_ctype && n1st->ctype.type == '*');
+  astn n2nd = slist_get(&v->type_chain, 2)->data;
+  return build_convert_base_type(n2nd, b);
 }

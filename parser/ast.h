@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include "type/type.h"
 #include <llvm-c/Types.h>
 enum ast_type {
   ast_expr_unary = 1,
@@ -76,7 +77,7 @@ typedef struct ast_node {
       enum tok_type type;
       struct ast_node *label_value;
       struct ast_node *stmt;
-      // used for case, default 
+      // used for case, default
       struct ast_node *scope_ref;
     } labeled_statement;
     struct declaration {
@@ -85,12 +86,14 @@ typedef struct ast_node {
       struct ast_node *extdata;
       size_t uid;
       struct ast_node *scope_ref;
-      // it contains those node type:
-      // ast_expr_unary is used for array declaration [<expr>],
-      // ast_parameters is used for function parameters(<parameter-type-list>),
-      // ast_ctype
+      /* the logical type chain of the declaration,
+       * it contains those node type:
+       * ast_expr_unary is used for array declaration [<expr>],
+       * ast_parameters is used for function parameters(<parameter-type-list>),
+       * ast_ctype
+       */
       struct slist type_chain;
-      LLVMValueRef V;
+      llvm_typed_value V;
     } declaration;
     struct struct_union_declaration {
       sds ident;

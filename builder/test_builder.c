@@ -1,6 +1,7 @@
 #include "ast.h"
 #include "builder.h"
 #include "lexer.h"
+#include "log/log.h"
 #include "parser.h"
 #include "slist/slist.h"
 #include <llvm-c/Analysis.h>
@@ -8,8 +9,8 @@
 
 [[gnu::constructor]] void init() {
   log_color_enable(true);
-  log_set_level(LOG_LEVEL_DEBUG);
-  log_debug("test_builder init");
+  log_set_level(LOG_LEVEL_TRACE);
+  log_trace("test_builder init");
 }
 
 int process_trans_unit(struct lexer *lexer) {
@@ -21,9 +22,7 @@ int process_trans_unit(struct lexer *lexer) {
   astn d;
   parser_symtab_remove_weak_symbols(&parser.symtab);
   parser_reorder_strong_symbols(&parser.symtab);
-  slist_foreach(&parser.symtab, d) {
-    d->declaration.V = build_declaration(&b, d);
-  }
+  slist_foreach(&parser.symtab, d) { build_declaration(&b, d); }
   LLVMVerifyModule(b.module, LLVMAbortProcessAction, NULL);
   char *ir = LLVMPrintModuleToString(b.module);
   puts(ir);
@@ -54,10 +53,13 @@ void tbc_vafunc() { tbc_entry("void f(int a,char b,short c,...);"); }
 void tbc_ptr() { tbc_entry("void* ptr;"); }
 
 void tbc_struct() {
-  tbc_entry("struct s {int a;char b; struct{short s; int d;}s;} s; struct s refs; struct{char c; "
+  tbc_entry("struct s {int a;char b; struct{short s; int d;}s;} s; struct s "
+            "refs; struct{char c; "
             "char*s; struct{short s;}s;} abss;");
 }
 void tbc_multi_subscope_extern() {
   tbc_entry("int F1(){extern Fe();{extern Fe();}} int F2(){extern Fe(); "
             "{extern Fe();}}");
 }
+
+void tbc_func_def() { tbc_entry("char* f();char* f(){int a = 1;}"); }

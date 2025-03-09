@@ -18,6 +18,8 @@ int V;
 
 the parser processing flow is top to down, so when processing the body of function `F`, V refers to `extern int V`, but in fact after the full code is parsed, `V` symbol means `int V`. We have to re-locate the symbol that a ast node **refers** by symtab in codegen stage.That's why we need symtab which save the extern or normal declarations.
 
+Now we just ignore the full functional codegen implementation of global variable initializer. Take more care of runtime codegen (e.g. code in function) until we complete it.
+
 ## TODO LIST
 
 - [x] use slist instead of dynarray for performance
@@ -30,9 +32,9 @@ the parser processing flow is top to down, so when processing the body of functi
 - [x] enum
 - [x] parser_check_constant_int_expr
 - [x] parser_eval_const_int_expr
-- [ ] replace int constant astn type with size_t in array size declaration
 - [ ] expr
   - [ ] struct get member
+- [ ] string reference table in builder
 - [ ] {} initializer
 - [ ] sizeof constant expression
 - [ ] multi-dim array
