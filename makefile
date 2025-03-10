@@ -39,14 +39,14 @@ compile_commands.json: makefile $(SRCS)
 	@bear -- make build -j
 
 clean:
-	@$(RM) $(TARGET) $(OBJS) $(DEPS) test.out
+	@$(RM) $(shell find -name "*.o") $(shell find -name "*.d") test.out
 
 ifneq (,$(filter test,$(MAKECMDGOALS)))
-TEST_FILE ?= test.c
+TEST_ENTRY ?= test.c:main
+TEST_FILE := $(word 1, $(subst :, ,$(TEST_ENTRY)))
 TEST_FILE_OBJ := $(TEST_FILE:.c=.o)
-ifndef TEST_ENTRY
-TEST_ENTRY := main
-endif
+TEST_ENTRY_FUNC := $(word 2, $(subst :, ,$(TEST_ENTRY)))
+
 ifeq ($(wildcard $(TEST_FILE)),)
 $(error "TEST_FILE:$(TEST_FILE) not found")
 endif
@@ -54,7 +54,7 @@ endif
 
 test: $(OBJS) makefile $(TEST_FILE_OBJ)
 
-	@$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY)
+	$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY_FUNC)
 	@if [ -z "$(RUN)" ] ; then \
 		$(RUN) ./test.out > analysis/data.json ; \
 	else \

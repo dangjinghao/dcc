@@ -34,6 +34,7 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] parser_eval_const_int_expr
 - [ ] expr
   - [ ] struct get member
+- [ ] re-orginize all api
 - [ ] string reference table in builder
 - [ ] {} initializer
 - [ ] sizeof constant expression
