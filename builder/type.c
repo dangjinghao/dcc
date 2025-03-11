@@ -108,6 +108,8 @@ slist build_type_chain_expr_primary(astn n) {
   slist type_chain = calloc(1, sizeof(struct slist));
   slist_init(type_chain);
   astn base_type = ast_new(ast_ctype);
+  base_type->ctype.signint = TOK_KW_SIGNED;
+  
   switch (n->primary.type) {
   case TOK_LIT_INT:
     base_type->ctype.type = TOK_KW_INT;

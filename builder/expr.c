@@ -8,14 +8,20 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
+typedef LLVMValueRef (*llvm_func_t)(LLVMBuilderRef, LLVMValueRef, LLVMValueRef,
+                                    const char *);
 /**
- * @brief the sub-branch of build_expression which handles the '+' operator with type cast 
+ * @brief 
  * 
  * @param b 
  * @param binop 
+ * @param llvm_build_f [0]: int function, [1]: fp function
+ * @param f_names 
  * @return llvm_typed_value 
  */
-llvm_typed_value build_expr_binop_plus(builder b, astn binop) {
+llvm_typed_value build_expr_binop_template(builder b, astn binop,
+                                           llvm_func_t llvm_build_f[2],
+                                           char *f_names[2]) {
   llvm_typed_value lhs = build_expression(b, binop->binop.lhs);
   llvm_typed_value rhs = build_expression(b, binop->binop.rhs);
   llvm_typed_value *exprs =
@@ -23,12 +29,55 @@ llvm_typed_value build_expr_binop_plus(builder b, astn binop) {
   astn base_type = slist_peek_head(&exprs[0]->type_chain);
   if (g_is_int_family_tok(base_type->ctype.type)) {
     return llvm_typed_value_new(
-        LLVMBuildAdd(b->builder, exprs[0]->v, exprs[1]->v, "iadd"),
+        llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
         &exprs[0]->type_chain);
   } else if (base_type->ctype.type == TOK_KW_FLOAT ||
              base_type->ctype.type == TOK_KW_DOUBLE) {
     return llvm_typed_value_new(
-        LLVMBuildFAdd(b->builder, exprs[0]->v, exprs[1]->v, "fadd"),
+        llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
+        &exprs[0]->type_chain);
+  }
+  BUILDING();
+}
+
+llvm_typed_value build_expr_binop_plus(builder b, astn binop) {
+  llvm_func_t llvm_build_f[2] = {LLVMBuildAdd, LLVMBuildFAdd};
+  char *f_names[2] = {"iadd", "fadd"};
+  return build_expr_binop_template(b, binop, llvm_build_f, f_names);
+}
+
+llvm_typed_value build_expr_binop_sub(builder b, astn binop) {
+  llvm_func_t llvm_build_f[2] = {LLVMBuildSub, LLVMBuildFSub};
+  char *f_names[2] = {"isub", "fsub"};
+  return build_expr_binop_template(b, binop, llvm_build_f, f_names);
+}
+
+llvm_typed_value build_expr_binop_mul(builder b, astn binop) {
+  llvm_func_t llvm_build_f[2] = {LLVMBuildMul, LLVMBuildFMul};
+  char *f_names[2] = {"imul", "fmul"};
+  return build_expr_binop_template(b, binop, llvm_build_f, f_names);
+}
+
+llvm_typed_value build_expr_binop_div(builder b, astn binop) {
+  llvm_typed_value lhs = build_expression(b, binop->binop.lhs);
+  llvm_typed_value rhs = build_expression(b, binop->binop.rhs);
+  llvm_typed_value *exprs =
+      build_2_values_type_upper_cast(b, (llvm_typed_value[]){lhs, rhs});
+  astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  if (g_is_int_family_tok(base_type->ctype.type) &&
+      base_type->ctype.signint == TOK_KW_SIGNED) {
+    return llvm_typed_value_new(
+        LLVMBuildSDiv(b->builder, exprs[0]->v, exprs[1]->v, "sdiv"),
+        &exprs[0]->type_chain);
+  } else if (g_is_int_family_tok(base_type->ctype.type) &&
+             base_type->ctype.signint == TOK_KW_UNSIGNED) {
+    return llvm_typed_value_new(
+        LLVMBuildUDiv(b->builder, exprs[0]->v, exprs[1]->v, "udiv"),
+        &exprs[0]->type_chain);
+  } else if (base_type->ctype.type == TOK_KW_FLOAT ||
+             base_type->ctype.type == TOK_KW_DOUBLE) {
+    return llvm_typed_value_new(
+        LLVMBuildFDiv(b->builder, exprs[0]->v, exprs[1]->v, "fdiv"),
         &exprs[0]->type_chain);
   }
   BUILDING();
@@ -50,7 +99,17 @@ llvm_typed_value build_expr_binop(builder b, astn n) {
   case '+': {
     return build_expr_binop_plus(b, n);
   }
-}
+  case '-': {
+    return build_expr_binop_sub(b, n);
+  }
+  case '*': {
+    return build_expr_binop_mul(b, n);
+  }
+  case '/': {
+    return build_expr_binop_div(b, n);
+  }
+  }
+
   BUILDING();
 }
 

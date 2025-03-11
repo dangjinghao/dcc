@@ -217,6 +217,10 @@ void tpc_redef_enum_enum() {
   tpc_entry_trans_unit("enum E{A,B,C}; enum E {CC};");
 }
 
+void tpc_unsigned() {
+  tpc_entry_trans_unit("void F(){int v = 2/1u;}");
+}
+
 [[gnu::constructor]] void init() {
   log_color_enable(true);
   log_set_level(LOG_LEVEL_DEBUG);
