@@ -48,14 +48,14 @@ TEST_FILE_OBJ := $(TEST_FILE:.c=.o)
 TEST_ENTRY_FUNC := $(word 2, $(subst :, ,$(TEST_ENTRY)))
 
 ifeq ($(wildcard $(TEST_FILE)),)
-$(error "TEST_FILE:$(TEST_FILE) not found")
+$(error "TEST_FILE: $(TEST_FILE) not found")
 endif
 endif
 
 test: $(OBJS) makefile $(TEST_FILE_OBJ)
 
 	$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY_FUNC)
-	@if [ -z "$(RUN)" ] ; then \
+	@if [ -z "$(RUN)" -a "$(shell echo "$(TEST_ENTRY)"|grep "^parser")" ] ; then \
 		$(RUN) ./test.out > analysis/data.json ; \
 	else \
 		$(RUN) ./test.out ; \

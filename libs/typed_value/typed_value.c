@@ -1,4 +1,4 @@
-#include "type.h"
+#include "typed_value.h"
 #include <stdlib.h>
 
 llvm_typed_value llvm_typed_value_new(LLVMValueRef v, slist type_chain) {

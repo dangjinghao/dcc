@@ -235,9 +235,13 @@ astn parse_declaration_specifiers(parser parser) {
       }
     }
   }
-  // special case for unsigned
-  if (tn->signint != TOK_UNKNOWN && tn->type == TOK_UNKNOWN) {
+  if (tn->type == TOK_UNKNOWN) {
+    log_trace("set default type to int");
     tn->type = TOK_KW_INT;
+  }
+  if (tn->signint == TOK_UNKNOWN && g_is_int_family_tok(tn->type)) {
+    log_trace("set default signint to signed");
+    tn->signint = TOK_KW_SIGNED;
   }
   return n;
 }
@@ -427,7 +431,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     // distinguish it from a function definition simply.
     // we put this process in there because the later parser_declare_new_symbol needs the
     // extern to determine whether should it be added to the symtab.
-    log_debug("add extern storage specifier to function declaration: %s",
+    log_trace("add extern storage specifier to function declaration: %s",
               n->declaration.ident);
 
     decl_specs->ctype.storage = TOK_KW_EXTERN;

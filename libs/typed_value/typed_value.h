@@ -4,7 +4,7 @@
 #include <llvm-c/Types.h>
 typedef struct llvm_typed_value {
   LLVMValueRef v;
-  /** the physical llvm type chain of the declaration,
+  /** the physical llvm type chain of the declaration, should be used only in non-base type processing
    * if it in the declaration, it maybe a ptr points to the type chain of the declaration
    */
   struct slist type_chain;

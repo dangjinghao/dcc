@@ -4,7 +4,7 @@
 #include "lexer.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
-#include "type/type.h"
+#include "typed_value/typed_value.h"
 #include <llvm-c/Types.h>
 enum ast_type {
   ast_expr_unary = 1,

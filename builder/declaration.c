@@ -24,7 +24,7 @@ dynarray build_struct_member_declaration_type(astn n, builder b, dynarray arr) {
   return arr;
 }
 
-LLVMTypeRef build_convert_struct_type(astn n, builder b) {
+LLVMTypeRef build_convert_struct_type(builder b, astn n) {
   LLVMTypeRef t;
   if (n->type == ast_ref) {
     // the reference of existing struct definition
@@ -60,7 +60,7 @@ LLVMTypeRef build_convert_struct_type(astn n, builder b) {
   return t;
 }
 
-LLVMTypeRef build_convert_base_type(astn n, builder b) {
+LLVMTypeRef build_convert_base_type(builder b, astn n) {
   assert(n->type == ast_ctype);
   int t = n->ctype.type;
   auto c = b->context;
@@ -86,7 +86,7 @@ LLVMTypeRef build_convert_base_type(astn n, builder b) {
   case '*':
     return LLVMPointerTypeInContext(c, 0);
   case TOK_KW_STRUCT:
-    return build_convert_struct_type(n->ctype.user_defined_type, b);
+    return build_convert_struct_type(b, n->ctype.user_defined_type);
   default:
     break;
   }
@@ -111,7 +111,7 @@ LLVMTypeRef build_variable_declaration_type(builder b, astn n) {
   } else if (_t->type == ast_expr_unary) {
     BUILDING();
   }
-  return build_convert_base_type(_t, b);
+  return build_convert_base_type(b, _t);
 }
 
 /**
@@ -179,6 +179,8 @@ void build_alloca_variable_init(builder b, astn n, LLVMValueRef pv) {
     log_trace("alloca variable %s has initializer",
               LLVMGetValueName2(pv, &(size_t){}));
     auto v = build_expression(b, init->initializer.init);
+    log_trace("try to cast the initializer to the variable type");
+    build_convert_type_to(b, v, &n->declaration.type_chain);
     LLVMBuildStore(b->builder, v->v, pv);
   }
 }
@@ -202,7 +204,7 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
       break;
     }
     astn param_base_type = g_get_declaration_base_type(param_declaration);
-    LLVMTypeRef t = build_convert_base_type(param_base_type, b);
+    LLVMTypeRef t = build_convert_base_type(b, param_base_type);
     dynarray_add(arr, &t);
   }
   return arr;
@@ -254,8 +256,8 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     }
   }
   astn func_return_base_type = g_get_function_return_base_type(n);
-  auto default_type = build_convert_base_type(func_return_base_type, b);
-  if (LLVMGetTypeKind(default_type) == LLVMVoidTypeKind) {
+  auto default_type = build_convert_base_type(b, func_return_base_type);
+  if (func_return_base_type->ctype.type == TOK_KW_VOID) {
     LLVMBuildRetVoid(b->builder);
     return;
   }
@@ -316,5 +318,5 @@ LLVMTypeRef build_get_declaration_points_to_type(builder b,
   astn n1st = slist_peek_head(&v->type_chain);
   assert(n1st->type == ast_ctype && n1st->ctype.type == '*');
   astn n2nd = slist_get(&v->type_chain, 2)->data;
-  return build_convert_base_type(n2nd, b);
+  return build_convert_base_type(b, n2nd);
 }
