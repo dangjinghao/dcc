@@ -64,10 +64,8 @@ void tbc_multi_subscope_extern() {
 
 void tbc_func_def() { tbc_entry("char* f();char* f(){int a = 1;}"); }
 
-void tbc_add(){
-  tbc_entry("void F(){int a = 6.9f + 2;}");
-}
+void tbc_add() { tbc_entry("void F(){int a = 6.9f + 2;}"); }
 
-void tbc_arithmetic(){
-  tbc_entry("void F(){int v = 2/1u;}");
-}
+void tbc_arithmetic() { tbc_entry("void F(){int v = 2/1u;}"); }
+
+void tbc_not() { tbc_entry("void F(){int v = !!0;}"); }

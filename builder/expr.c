@@ -2,6 +2,7 @@
 #include "builder.h"
 #include "grammar.h"
 #include "lexer.h"
+#include "log/log.h"
 #include "macro/macro.h"
 #include "slist/slist.h"
 #include "typed_value/typed_value.h"
@@ -31,8 +32,7 @@ llvm_typed_value build_expr_binop_template(builder b, astn binop,
     return llvm_typed_value_new(
         llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
         &exprs[0]->type_chain);
-  } else if (base_type->ctype.type == TOK_KW_FLOAT ||
-             base_type->ctype.type == TOK_KW_DOUBLE) {
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
     return llvm_typed_value_new(
         llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
         &exprs[0]->type_chain);
@@ -74,8 +74,7 @@ llvm_typed_value build_expr_binop_div(builder b, astn binop) {
     return llvm_typed_value_new(
         LLVMBuildUDiv(b->builder, exprs[0]->v, exprs[1]->v, "udiv"),
         &exprs[0]->type_chain);
-  } else if (base_type->ctype.type == TOK_KW_FLOAT ||
-             base_type->ctype.type == TOK_KW_DOUBLE) {
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
     return llvm_typed_value_new(
         LLVMBuildFDiv(b->builder, exprs[0]->v, exprs[1]->v, "fdiv"),
         &exprs[0]->type_chain);
@@ -113,15 +112,75 @@ llvm_typed_value build_expr_binop(builder b, astn n) {
   BUILDING();
 }
 
+llvm_typed_value build_expr_unary_pos(builder b, astn n) {
+  llvm_typed_value expr = build_expression(b, n);
+  // tiny int -> int
+  astn expr_base_type = slist_peek_head(&expr->type_chain);
+  // create a temporary int type and its corresponsed type chain
+  slist int_type_chain = build_base_type_chain_by_lit(TOK_LIT_INT);
+
+  int cmp = build_type_compare_promote_level(expr_base_type,
+                                             slist_peek_head(int_type_chain));
+  if (cmp == -1) {
+    log_trace("+ unary operator type promotion: tiny int -> int");
+    llvm_typed_value v = build_convert_type_to(b, expr, int_type_chain);
+    return v;
+  }
+  return expr;
+}
+
+llvm_typed_value build_expr_unary_not(builder b, astn n) {
+  // neq 0 then ext to i8
+  llvm_typed_value expr = build_expression(b, n);
+  astn base_type = slist_peek_head(&expr->type_chain);
+  LLVMValueRef eq0;
+  if (g_is_int_family_tok(base_type->ctype.type)) {
+    eq0 = LLVMBuildICmp(
+        b->builder, LLVMIntEQ, expr->v,
+        LLVMConstInt(build_convert_base_type(b, base_type), 0, false), "ieq0");
+
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
+    eq0 = LLVMBuildFCmp(b->builder, LLVMRealUEQ, expr->v,
+                        LLVMConstReal(build_convert_base_type(b, base_type), 0),
+                        "feq0");
+  } else {
+    BUILDING();
+  }
+  auto zext = LLVMBuildZExt(b->builder, eq0, LLVMInt8TypeInContext(b->context),
+                            "zexteq0");
+  return llvm_typed_value_new(zext, build_base_type_chain_by_lit(TOK_LIT_CHAR));
+}
+
+llvm_typed_value build_expr_unary_neg(builder b, astn n) {
+  llvm_typed_value expr = build_expression(b, n);
+  // negation
+  astn base_type = slist_peek_head(&expr->type_chain);
+  if (g_is_int_family_tok(base_type->ctype.type)) {
+    return llvm_typed_value_new(LLVMBuildNeg(b->builder, expr->v, "neg"),
+                                &expr->type_chain);
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
+    return llvm_typed_value_new(LLVMBuildFNeg(b->builder, expr->v, "fneg"),
+                                &expr->type_chain);
+  }
+  BUILDING();
+}
+
 llvm_typed_value build_expr_unary(builder b, astn n) {
-  if (n->unary.postfix) {
+  if (!n->unary.postfix) {
+    // suffix
     switch (n->unary.op) {
-    case '+':
+    case '+': {
+      return build_expr_unary_pos(b, n->unary.expr);
+    }
+    case '-': {
+      return build_expr_unary_neg(b, n->unary.expr);
+    }
+    case '!': {
+      return build_expr_unary_not(b, n->unary.expr);
+    }
     case TOK_SYM_SELF_INC:
     case TOK_SYM_SELF_DEC:
     case TOK_KW_SIZEOF:
-    case '-':
-    case '!':
     case '~':
     case '*':
     case '&':

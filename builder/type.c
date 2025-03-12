@@ -102,15 +102,19 @@ llvm_typed_value build_convert_type_to(builder b, llvm_typed_value v,
             convert_token_type_enum_to_repr(target_type->ctype.type));
   return v;
 }
-
-slist build_type_chain_expr_primary(astn n) {
-  assert(n->type == ast_expr_primary);
+/**
+ * @brief 
+ * 
+ * @param type TOK_LIT_* 
+ * @return slist 
+ */
+slist build_base_type_chain_by_lit(enum tok_type type) {
   slist type_chain = calloc(1, sizeof(struct slist));
   slist_init(type_chain);
   astn base_type = ast_new(ast_ctype);
   base_type->ctype.signint = TOK_KW_SIGNED;
-  
-  switch (n->primary.type) {
+
+  switch (type) {
   case TOK_LIT_INT:
     base_type->ctype.type = TOK_KW_INT;
     break;
@@ -143,6 +147,11 @@ slist build_type_chain_expr_primary(astn n) {
   return type_chain;
 }
 
+slist build_type_chain_expr_primary(astn n) {
+  assert(n->type == ast_expr_primary);
+  return build_base_type_chain_by_lit(n->primary.type);
+}
+
 /**
  * @brief char,unsigned char,short,unsigned short,int,unsigned int,long,unsigned long,float,double
  * 
@@ -151,6 +160,8 @@ slist build_type_chain_expr_primary(astn n) {
  * @return int -1: lhs < rhs, 0: lhs == rhs, 1: lhs > rhs 
  */
 int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
+  assert(lhs_base_type->type == ast_ctype);
+  assert(rhs_base_type->type == ast_ctype);
   static const int type_promote_level[] = {
       [TOK_KW_CHAR - __TOK_KW_START] = 0,  [TOK_KW_SHORT - __TOK_KW_START] = 1,
       [TOK_KW_INT - __TOK_KW_START] = 2,   [TOK_KW_LONG - __TOK_KW_START] = 3,

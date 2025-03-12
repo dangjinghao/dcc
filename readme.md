@@ -8,6 +8,8 @@ the extern declaration in block scope would be ignored in codegen stage
 
 We can delay the static declaration to codegen stage, llvm supports it
 
+We would **not free** the memory in builder stage.
+
 we have to use `parser.symtab` because we cannot process this situation:
 
 ```c
@@ -34,6 +36,7 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] parser_eval_const_int_expr
 - [ ] expr
   - [ ] struct get member
+  - [ ] unary/binop variable test
 - [ ] re-orginize all api
 - [ ] string reference table in builder
 - [ ] {} initializer

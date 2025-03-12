@@ -10,9 +10,11 @@ typedef struct builder {
 void builder_destroy(builder b);
 builder builder_create(builder b, char *module_name);
 
+slist build_base_type_chain_by_lit(enum tok_type type);
 slist build_type_chain_expr_primary(astn n);
 llvm_typed_value build_convert_type_to(builder b, llvm_typed_value v,
                                        slist type_chain);
+int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type);
 
 void build_declaration(builder b, astn n);
 LLVMTypeRef build_convert_base_type(builder b, astn n);

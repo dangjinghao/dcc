@@ -247,6 +247,10 @@ static inline bool g_is_int_family_tok(enum tok_type tok) {
   return ARRAY_IN(reserved_kw, tok, EQ_EQ) || g_is_sign_tok(tok);
 }
 
+static inline bool g_is_fp_family_tok(enum tok_type tok) {
+  return tok == TOK_KW_FLOAT || tok == TOK_KW_DOUBLE;
+}
+
 /**
  * @grammar
  * <init-declarator> ::= <declarator>

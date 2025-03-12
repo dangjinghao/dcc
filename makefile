@@ -54,7 +54,7 @@ endif
 
 test: $(OBJS) makefile $(TEST_FILE_OBJ)
 
-	$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY_FUNC)
+	@$(CC) $(TEST_FILE_OBJ) $(OBJS) $(LDFLAGS) -o test.out -Wl,--defsym=main=$(TEST_ENTRY_FUNC)
 	@if [ -z "$(RUN)" -a "$(shell echo "$(TEST_ENTRY)"|grep "^parser")" ] ; then \
 		$(RUN) ./test.out > analysis/data.json ; \
 	else \
