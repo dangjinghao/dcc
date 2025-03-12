@@ -9,12 +9,12 @@
 #include "slist/slist.h"
 #include <stdbool.h>
 int parser_consume(parser parser) {
-  return parser->current_token = lexer_next_token(parser->lexer);
+  return parser->current_token = lexer_get_next_token(parser->lexer);
 }
 
 void parser_from_lexer(parser parser, struct lexer *lexer) {
   parser->lexer = calloc(1, sizeof(struct lexer));
-  lexer_snapshot(parser->lexer, lexer);
+  lexer_snapshot_new(parser->lexer, lexer);
   parser_consume(parser);
   slist_init(&parser->idtab);
   slist_init(&parser->tagtab);
@@ -26,7 +26,7 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
 void parser_snapshot(parser _new, parser _old) {
   *_new = *_old;
   _new->lexer = calloc(1, sizeof(struct lexer));
-  lexer_snapshot(_new->lexer, _old->lexer);
+  lexer_snapshot_new(_new->lexer, _old->lexer);
   // bad hack
   if (_old->current_token == TOK_IDENT ||
       _old->current_token == TOK_LIT_STRING) {
@@ -66,8 +66,8 @@ int parser_consume_with(parser parser, int token) {
     return parser_consume(parser);
   }
   compiler_error(parser->lexer, "Expected token %s, got %s",
-                 lexer_token_to_string(token),
-                 lexer_token_to_string(parser->current_token));
+                 lexer_token_get_str(token),
+                 lexer_token_get_str(parser->current_token));
   return 0;
 }
 
@@ -355,7 +355,7 @@ long parser_eval_const_int_expr(astn expr) {
     default:
       log_panic(
           "unexpected primary type when evaluating constant int expression: %s",
-          lexer_token_to_string(expr->primary.type));
+          lexer_token_get_str(expr->primary.type));
     }
   }
   case ast_expr_binop: {
@@ -403,7 +403,7 @@ long parser_eval_const_int_expr(astn expr) {
     default:
       log_panic(
           "unexpected binop type when evaluating constant int expression: %s",
-          lexer_token_to_string(expr->binop.op));
+          lexer_token_get_str(expr->binop.op));
     }
   }
   case ast_expr_ternary: {
@@ -429,7 +429,7 @@ long parser_eval_const_int_expr(astn expr) {
     default:
       log_panic(
           "unexpected unary type when evaluating constant int expression: %s",
-          lexer_token_to_string(expr->unary.op));
+          lexer_token_get_str(expr->unary.op));
     }
   }
   case ast_expr_typecast: {
@@ -481,7 +481,7 @@ bool parser_check_constant_int_expr(astn expr) {
     default:
       log_panic(
           "unexpected unary type when checking constant int expression: %s",
-          lexer_token_to_string(expr->unary.op));
+          lexer_token_get_str(expr->unary.op));
     }
     break;
   }

@@ -201,8 +201,8 @@ astn parse_declaration_specifiers(parser parser) {
       if (tn->storage != TOK_UNKNOWN) {
         compiler_error(parser->lexer,
                        "storage class specifier redefined: %s -> %s",
-                       lexer_token_to_string(tn->storage),
-                       lexer_token_to_string(parser->current_token));
+                       lexer_token_get_str(tn->storage),
+                       lexer_token_get_str(parser->current_token));
       }
       tn->storage = parser->current_token;
       parser_consume(parser);

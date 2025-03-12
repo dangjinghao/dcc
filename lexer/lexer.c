@@ -11,14 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-void lexer_from_string(struct lexer *lexer, char *src) {
+void lexer_new_from_string(struct lexer *lexer, char *src) {
   lexer->ln = 1;
   lexer->pos = 0;
   lexer->src = sdsnew(src);
   strcpy(lexer->filename, "<src>");
 }
 
-void lexer_from_fp(struct lexer *lexer, FILE *fp) {
+void lexer_new_from_fp(struct lexer *lexer, FILE *fp) {
   log_debug("Reading file from fp");
   assert(fp);
   lexer->ln = 1;
@@ -34,13 +34,13 @@ void lexer_from_fp(struct lexer *lexer, FILE *fp) {
   strcpy(lexer->filename, "<src>");
 }
 
-void lexer_from_file(struct lexer *lexer, char *filename) {
+void lexer_new_from_file(struct lexer *lexer, char *filename) {
   log_debug("Open file: %s", filename);
   FILE *f = fopen(filename, "r");
   if (!f) {
     log_panic("Failed to open file %s: %s", filename, strerror(errno));
   }
-  lexer_from_fp(lexer, f);
+  lexer_new_from_fp(lexer, f);
   strncpy(lexer->filename, filename, CONST_STRLEN(lexer->filename));
   fclose(f);
 }
@@ -50,12 +50,14 @@ void lexer_destroy(struct lexer *lexer) {
   memset(lexer, 0, sizeof(*lexer));
 }
 
-void lexer_snapshot(struct lexer *dst, struct lexer *src) { *dst = *src; }
+void lexer_snapshot_new(struct lexer *dst, struct lexer *src) { *dst = *src; }
 
-bool lexer_eof(struct lexer *lexer) { return lexer->pos >= sdslen(lexer->src); }
+bool lexer_is_eof(struct lexer *lexer) {
+  return lexer->pos >= sdslen(lexer->src);
+}
 
 int lexer_peek(struct lexer *lexer) {
-  if (lexer_eof(lexer)) {
+  if (lexer_is_eof(lexer)) {
     return EOF;
   }
   return lexer->src[lexer->pos];
@@ -80,7 +82,7 @@ void lexer_eat(struct lexer *lexer, char c) {
 
 bool lexer_try_eat_str(struct lexer *lexer, char *str) {
   struct lexer snapshot;
-  lexer_snapshot(&snapshot, lexer);
+  lexer_snapshot_new(&snapshot, lexer);
   while (lexer_peek(lexer) == *str) {
     lexer_eat(lexer, *str);
     str++;
@@ -89,146 +91,30 @@ bool lexer_try_eat_str(struct lexer *lexer, char *str) {
     return true;
   }
   // restore the snapshot
-  lexer_snapshot(lexer, &snapshot);
+  lexer_snapshot_new(lexer, &snapshot);
   return false;
 }
 
 void lexer_skip_whitespace(struct lexer *lexer) {
   while (true) {
-    if (lexer_eof(lexer)) {
+    if (lexer_is_eof(lexer)) {
       return;
     }
     while (isspace(lexer_peek(lexer))) {
       lexer_consume(lexer);
     }
     if (lexer_try_eat_str(lexer, "//")) {
-      while (!lexer_eof(lexer) && lexer_peek(lexer) != '\n') {
+      while (!lexer_is_eof(lexer) && lexer_peek(lexer) != '\n') {
         lexer_consume(lexer);
       }
     } else if (lexer_try_eat_str(lexer, "/*")) {
-      while (!lexer_eof(lexer) && !lexer_try_eat_str(lexer, "*/")) {
+      while (!lexer_is_eof(lexer) && !lexer_try_eat_str(lexer, "*/")) {
         lexer_consume(lexer);
       }
     } else {
       break;
     }
   }
-}
-
-struct token_table_entry token_kw_table[] = {
-    {.str = "auto", .type = TOK_KW_AUTO},
-    {.str = "break", .type = TOK_KW_BREAK},
-    {.str = "case", .type = TOK_KW_CASE},
-    {.str = "char", .type = TOK_KW_CHAR},
-    {.str = "const", .type = TOK_KW_CONST},
-    {.str = "continue", .type = TOK_KW_CONTINUE},
-    {.str = "default", .type = TOK_KW_DEFAULT},
-    {.str = "do", .type = TOK_KW_DO},
-    {.str = "double", .type = TOK_KW_DOUBLE},
-    {.str = "else", .type = TOK_KW_ELSE},
-    {.str = "enum", .type = TOK_KW_ENUM},
-    {.str = "extern", .type = TOK_KW_EXTERN},
-    {.str = "float", .type = TOK_KW_FLOAT},
-    {.str = "for", .type = TOK_KW_FOR},
-    {.str = "goto", .type = TOK_KW_GOTO},
-    {.str = "if", .type = TOK_KW_IF},
-    {.str = "int", .type = TOK_KW_INT},
-    {.str = "long", .type = TOK_KW_LONG},
-    {.str = "register", .type = TOK_KW_REGISTER},
-    {.str = "return", .type = TOK_KW_RETURN},
-    {.str = "short", .type = TOK_KW_SHORT},
-    {.str = "signed", .type = TOK_KW_SIGNED},
-    {.str = "sizeof", .type = TOK_KW_SIZEOF},
-    {.str = "static", .type = TOK_KW_STATIC},
-    {.str = "struct", .type = TOK_KW_STRUCT},
-    {.str = "switch", .type = TOK_KW_SWITCH},
-    {.str = "typedef", .type = TOK_KW_TYPEDEF},
-    {.str = "union", .type = TOK_KW_UNION},
-    {.str = "unsigned", .type = TOK_KW_UNSIGNED},
-    {.str = "void", .type = TOK_KW_VOID},
-    {.str = "volatile", .type = TOK_KW_VOLATILE},
-    {.str = "while", .type = TOK_KW_WHILE},
-    {NULL, TOK_UNKNOWN},
-};
-
-struct token_table_entry token_multi_char_sym_table[] = {
-    {.str = "...", .type = TOK_SYM_VARARGS}, // high token level
-    {.str = "<=", .type = TOK_SYM_LEQ},
-    {.str = ">=", .type = TOK_SYM_GEQ},
-    {.str = "==", .type = TOK_SYM_EQ},
-    {.str = "!=", .type = TOK_SYM_NEQ},
-    {.str = ">>=", .type = TOK_SYM_SELF_RSHIFT},
-    {.str = ">>", .type = TOK_SYM_RSHIFT},
-    {.str = "<<=", .type = TOK_SYM_SELF_LSHIFT},
-    {.str = "<<", .type = TOK_SYM_LSHIFT},
-    {.str = "+=", .type = TOK_SYM_SELF_ADD},
-    {.str = "-=", .type = TOK_SYM_SELF_SUB},
-    {.str = "*=", .type = TOK_SYM_SELF_MUL},
-    {.str = "/=", .type = TOK_SYM_SELF_DIV},
-    {.str = "%=", .type = TOK_SYM_SELF_MOD},
-    {.str = "|=", .type = TOK_SYM_SELF_BIT_OR},
-    {.str = "^=", .type = TOK_SYM_SELF_BIT_XOR},
-    {.str = "&=", .type = TOK_SYM_SELF_BIT_AND},
-    {.str = "++", .type = TOK_SYM_SELF_INC},
-    {.str = "--", .type = TOK_SYM_SELF_DEC},
-    {.str = "->", .type = TOK_SYM_ARROW},
-    {.str = "||", .type = TOK_SYM_LOGIC_OR},
-    {.str = "&&", .type = TOK_SYM_LOGIC_AND}, // low token level
-    {NULL, TOK_UNKNOWN},
-};
-
-enum tok_type
-lexer_get_token_type_in_token_table(char *str,
-                                    struct token_table_entry *table) {
-
-  while (table->str) {
-    if (strcmp(str, table->str) == 0) {
-      return table->type;
-    }
-    table++;
-  }
-  return TOK_UNKNOWN;
-}
-
-char *lexer_get_token_str_in_token_table(enum tok_type type,
-                                         struct token_table_entry *table) {
-  if (table == NULL) {
-    table = token_multi_char_sym_table;
-    while (table->str) {
-      if (type == table->type) {
-        return table->str;
-      }
-      table++;
-    }
-    table = token_kw_table;
-    while (table->str) {
-      if (type == table->type) {
-        return table->str;
-      }
-      table++;
-    }
-    return convert_token_type_enum_to_repr(type);
-  } else {
-    while (table->str) {
-      if (type == table->type) {
-        return table->str;
-      }
-      table++;
-    }
-  }
-  return NULL;
-}
-
-char *lexer_token_to_string(int type) {
-  static char buf[16] = {0};
-  if (type == TOK_EOF) {
-    return "EOF";
-  } else if (type < 256) {
-    memset(buf, 0, sizeof(buf));
-    buf[0] = type;
-    return buf;
-  }
-  return lexer_get_token_str_in_token_table(type, NULL);
 }
 
 static inline bool lexer_is_ident_start(char c) {
@@ -240,7 +126,7 @@ static inline bool lexer_is_ident_body(char c) {
 }
 static inline bool lexer_is_oct_digit(int c) { return c >= '0' && c <= '7'; }
 
-int lexer_next_ident(struct lexer *lexer) {
+int lexer_get_next_ident(struct lexer *lexer) {
   sds ident = sdsempty();
   char c;
   while (lexer_is_ident_body(c = lexer_peek(lexer))) {
@@ -248,7 +134,7 @@ int lexer_next_ident(struct lexer *lexer) {
     lexer_consume(lexer);
   }
   enum tok_type kw_type =
-      lexer_get_token_type_in_token_table(ident, token_kw_table);
+      lexer_token_get_token_type_in(ident, lexer_token_kw_table);
   if (kw_type != TOK_UNKNOWN) {
     sdsfree(ident);
     return kw_type;
@@ -257,7 +143,7 @@ int lexer_next_ident(struct lexer *lexer) {
   return TOK_IDENT;
 }
 
-int lexer_next_number(struct lexer *lexer, bool decimal_only) {
+int lexer_get_next_number(struct lexer *lexer, bool decimal_only) {
   int base = 10;
   sds number = sdsempty();
   bool is_fp = false;
@@ -383,7 +269,7 @@ int lexer_next_number(struct lexer *lexer, bool decimal_only) {
   return TOK_LIT_INT;
 }
 
-int lexer_next_char(struct lexer *lexer) {
+int lexer_get_next_char(struct lexer *lexer) {
   lexer_eat(lexer, '\'');
   int c;
   size_t idx = 0;
@@ -416,7 +302,7 @@ int lexer_next_char(struct lexer *lexer) {
   return TOK_LIT_CHAR;
 }
 
-int lexer_next_string(struct lexer *lexer) {
+int lexer_get_next_string(struct lexer *lexer) {
   lexer_eat(lexer, '"');
   sds str = sdsempty();
   char c;
@@ -436,19 +322,19 @@ int lexer_next_string(struct lexer *lexer) {
   return TOK_LIT_STRING;
 }
 
-int lexer_next_token(struct lexer *lexer) {
+int lexer_get_next_token(struct lexer *lexer) {
   lexer_skip_whitespace(lexer);
-  if (lexer_eof(lexer)) {
+  if (lexer_is_eof(lexer)) {
     return TOK_EOF;
   }
   char c = lexer_peek(lexer);
   if (lexer_is_ident_start(c)) {
-    return lexer_next_ident(lexer);
+    return lexer_get_next_ident(lexer);
   } else if (isdigit(c)) {
-    return lexer_next_number(lexer, false);
+    return lexer_get_next_number(lexer, false);
   }
   // multi-char symbol
-  struct token_table_entry *table = token_multi_char_sym_table;
+  struct lexer_token_table_entry *table = lexer_token_multi_char_sym_table;
   while (table->str) {
     if (lexer_try_eat_str(lexer, table->str)) {
       return table->type;
@@ -459,13 +345,13 @@ int lexer_next_token(struct lexer *lexer) {
   if (c == '.') {
     lexer_consume(lexer);
     if (isdigit(lexer_peek(lexer))) {
-      return lexer_next_number(lexer, true);
+      return lexer_get_next_number(lexer, true);
     }
     return '.';
   } else if (c == '\'') {
-    return lexer_next_char(lexer);
+    return lexer_get_next_char(lexer);
   } else if (c == '"') {
-    return lexer_next_string(lexer);
+    return lexer_get_next_string(lexer);
   }
   // single char
   lexer_consume(lexer);

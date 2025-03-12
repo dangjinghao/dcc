@@ -35,7 +35,7 @@ int process_trans_unit(struct lexer *lexer) {
 
 void tbc_entry(char *code) {
   struct lexer lexer;
-  lexer_from_string(&lexer, code);
+  lexer_new_from_string(&lexer, code);
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
 }

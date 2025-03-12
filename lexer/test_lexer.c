@@ -1,13 +1,14 @@
 #include "lexer.h"
 #include "log/log.h"
 #include "sds/sds.h"
+#include "token.h"
 #include <stdio.h>
 
 void process(struct lexer *lexer) {
 
   int tok;
-  while ((tok = lexer_next_token(lexer)) != TOK_EOF) {
-    char *X = lexer_get_token_str_in_token_table(tok, NULL);
+  while ((tok = lexer_get_next_token(lexer)) != TOK_EOF) {
+    char *X = lexer_token_get_str_in(tok, NULL);
     if (X)
       printf("<%s>\n", X);
     else if (tok == TOK_IDENT) {
@@ -42,7 +43,7 @@ char *str1 = "'\\''";
 int file_main() {
   struct lexer lexer;
   log_set_level(LOG_LEVEL_DEBUG);
-  lexer_from_file(&lexer, "lexer/lexer.c");
+  lexer_new_from_file(&lexer, "lexer/lexer.c");
   process(&lexer);
   lexer_destroy(&lexer);
 
@@ -51,7 +52,7 @@ int file_main() {
 
 int str_char_main() {
   struct lexer lexer;
-  lexer_from_string(&lexer, str_char1);
+  lexer_new_from_string(&lexer, str_char1);
   process(&lexer);
   lexer_destroy(&lexer);
 
@@ -60,7 +61,7 @@ int str_char_main() {
 
 int stdin_main() {
   struct lexer lexer;
-  lexer_from_fp(&lexer, stdin);
+  lexer_new_from_fp(&lexer, stdin);
   process(&lexer);
   lexer_destroy(&lexer);
   return 0;

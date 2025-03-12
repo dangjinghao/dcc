@@ -65,7 +65,7 @@ astn parse_primary_expr(parser parser) {
     break;
   default:
     compiler_error(parser->lexer, "Unexpected token %s",
-                   lexer_token_to_string(parser->current_token));
+                   lexer_token_get_str(parser->current_token));
   }
 
   return node;
@@ -467,7 +467,7 @@ astn parse_expression(parser parser) {
  */
 astn parse_constant_int_expr(parser parser) {
   struct lexer lexer;
-  lexer_snapshot(&lexer, parser->lexer);
+  lexer_snapshot_new(&lexer, parser->lexer);
   astn e = parse_assign_expr(parser);
   if (!parser_check_constant_int_expr(e)) {
     compiler_error(&lexer, "Expected constant expression");
