@@ -7,7 +7,7 @@
 #include "parser.h"
 #include "slist/slist.h"
 
-astn parse_expression_statement(parser p) {
+astn parse_statement_expression(parser p) {
   assert(g_is_expression_statement_firstset(p));
   // move the empty statement check to the parse_statement
   astn expr;
@@ -25,7 +25,7 @@ astn parse_expression_statement(parser p) {
  * @param parser 
  * @return astn 
  */
-astn parse_compound_statement(parser parser) {
+astn parse_statement_compound(parser parser) {
   assert(g_is_compound_statement_firstset(parser));
   parser_consume_with(parser, '{');
   astn block = ast_new(ast_block);
@@ -41,16 +41,16 @@ astn parse_compound_statement(parser parser) {
   parser_consume_with(parser, '}');
   return block;
 }
-astn parse_selection_statement(parser p) { BUILDING(); }
-astn parse_iteration_statement(parser p) { BUILDING(); }
-astn parse_jump_statement(parser p) {
+astn parse_statement_selection(parser p) { BUILDING(); }
+astn parse_statement_iteration(parser p) { BUILDING(); }
+astn parse_statement_jump(parser p) {
   assert(g_is_jump_statement_firstset(p));
   astn jump = ast_new(ast_jump_statement);
   switch (p->current_token) {
   case TOK_KW_GOTO:
     jump->jump_statement.type = TOK_KW_GOTO;
     parser_consume(p);
-    jump->jump_statement.expr = parse_ident(p);
+    jump->jump_statement.expr = parse_expr_ident(p);
     break;
   case TOK_KW_CONTINUE:
   case TOK_KW_BREAK:
@@ -78,28 +78,28 @@ astn parse_statement(parser p) {
   astn stmt = NULL;
   if (g_is_labeled_statement_firstset(p)) {
     // special case for the expression stats with ident
-    if (!(stmt = parse_labeled_statement(p))) {
+    if (!(stmt = parse_statement_labeled(p))) {
       log_debug("Failed to parse labeled statement,retrying to parse "
                 "expression statement");
-      stmt = parse_expression_statement(p);
+      stmt = parse_statement_expression(p);
     }
   } else if (g_is_compound_statement_firstset(p)) {
     parser_push_scope(p);
-    stmt = parse_compound_statement(p);
+    stmt = parse_statement_compound(p);
     parser_pop_scope(p);
   } else if (g_is_selection_statement_firstset(p)) {
-    stmt = parse_selection_statement(p);
+    stmt = parse_statement_selection(p);
   } else if (g_is_iteration_statement_firstset(p)) {
-    stmt = parse_iteration_statement(p);
+    stmt = parse_statement_iteration(p);
   } else if (g_is_jump_statement_firstset(p)) {
-    stmt = parse_jump_statement(p);
+    stmt = parse_statement_jump(p);
   } else {
-    stmt = parse_expression_statement(p);
+    stmt = parse_statement_expression(p);
   }
   return stmt;
 }
 
-astn parse_labeled_statement(parser p) {
+astn parse_statement_labeled(parser p) {
   assert(g_is_labeled_statement_firstset(p));
   // goto label has the same first set as normal expression statement,
   // we can use snapshot
@@ -109,8 +109,8 @@ astn parse_labeled_statement(parser p) {
   switch (p->current_token) {
   case TOK_IDENT: {
     struct parser backup;
-    parser_snapshot(&backup, p);
-    label = parse_ident(p);
+    parser_new_snapshot(&backup, p);
+    label = parse_expr_ident(p);
     if (p->current_token == ':') {
       parser_consume(p);
       parser_destory(&backup);
@@ -125,7 +125,7 @@ astn parse_labeled_statement(parser p) {
   }
   case TOK_KW_CASE: {
     parser_consume(p);
-    label = parse_constant_int_expr(p);
+    label = parse_expr_const_int(p);
     parser_consume_with(p, ':');
     scope_ref = p->switch_scope;
     break;

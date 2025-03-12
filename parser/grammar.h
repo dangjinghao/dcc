@@ -574,12 +574,6 @@ static inline bool g_is_empty_statement(astn statement) {
          statement->primary.type == TOK_EOF;
 }
 
-static inline astn ast_new_empty_statement() {
-  astn stmt = ast_new(ast_expr_primary);
-  stmt->primary.type = TOK_EOF;
-  return stmt;
-}
-
 static inline astn g_new_empty_statement() {
   astn n = ast_new(ast_expr_primary);
   n->primary.type = TOK_EOF;

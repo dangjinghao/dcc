@@ -15,7 +15,7 @@
 
 int process_trans_unit(struct lexer *lexer) {
   struct parser parser;
-  parser_from_lexer(&parser, lexer);
+  parser_new_from_lexer(&parser, lexer);
   astn u = parse_translation_unit(&parser);
   struct builder b;
   builder_new(&b, "test");

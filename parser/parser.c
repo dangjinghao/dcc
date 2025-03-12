@@ -12,7 +12,7 @@ int parser_consume(parser parser) {
   return parser->current_token = lexer_get_next_token(parser->lexer);
 }
 
-void parser_from_lexer(parser parser, struct lexer *lexer) {
+void parser_new_from_lexer(parser parser, struct lexer *lexer) {
   parser->lexer = calloc(1, sizeof(struct lexer));
   lexer_snapshot_new(parser->lexer, lexer);
   parser_consume(parser);
@@ -23,7 +23,7 @@ void parser_from_lexer(parser parser, struct lexer *lexer) {
   parser->uidcnt = 0;
 }
 
-void parser_snapshot(parser _new, parser _old) {
+void parser_new_snapshot(parser _new, parser _old) {
   *_new = *_old;
   _new->lexer = calloc(1, sizeof(struct lexer));
   lexer_snapshot_new(_new->lexer, _old->lexer);
@@ -71,7 +71,7 @@ int parser_consume_with(parser parser, int token) {
   return 0;
 }
 
-static struct ast_node __parser_scope_fence,
+static struct astn __parser_scope_fence,
     *__parser_scope_fence_ptr = &__parser_scope_fence;
 void parser_push_scope(parser parser) {
   log_trace("push scope at line %ld", parser->lexer->ln);
@@ -87,20 +87,20 @@ void parser_pop_scope(parser parser) {
   }
 }
 
-static inline astn __parser_cmp_astn_ident(astn data, sds ident) {
-  if (0 == sdscmp(ast_declaration_ident(data), ident)) {
+static inline astn parser_cmp_astn_ident(astn data, sds ident) {
+  if (0 == sdscmp(parse_declaration_get_ident(data), ident)) {
     return data;
   }
   return NULL;
 }
 
-astn parser_find_ident_in_all_scope_table(sds ident, slist tab) {
+astn parser_find_ident_in_all_scope_in(sds ident, slist tab) {
   astn data;
   slist_foreach(tab, data) {
     if (data == __parser_scope_fence_ptr) {
       continue;
     }
-    astn r = __parser_cmp_astn_ident(data, ident);
+    astn r = parser_cmp_astn_ident(data, ident);
     if (r) {
       return r;
     }
@@ -108,13 +108,13 @@ astn parser_find_ident_in_all_scope_table(sds ident, slist tab) {
   return NULL;
 }
 
-astn parser_find_ident_in_current_scope_table(sds ident, slist tab) {
+astn parser_find_ident_in_current_scope_in(sds ident, slist tab) {
   astn data;
   slist_foreach(tab, data) {
     if (data == __parser_scope_fence_ptr) {
       break;
     }
-    astn r = __parser_cmp_astn_ident(data, ident);
+    astn r = parser_cmp_astn_ident(data, ident);
     if (r) {
       return r;
     }
@@ -122,13 +122,14 @@ astn parser_find_ident_in_current_scope_table(sds ident, slist tab) {
   return NULL;
 }
 
-void parser_add_symbol_to_current_scope_table(astn n, slist tab) {
-  log_debug("add declaration %s to current scope", ast_declaration_ident(n));
+void parser_add_symbol_to_current_scope_in(astn n, slist tab) {
+  log_debug("add declaration %s to current scope",
+            parse_declaration_get_ident(n));
   slist_add_head(tab, n);
 }
 
 astn parser_get_typedef_by_type_name(parser parser, sds ident) {
-  astn d = parser_find_ident_in_all_scope_table(ident, &parser->idtab);
+  astn d = parser_find_ident_in_all_scope_in(ident, &parser->idtab);
   if (d && g_is_declaration_typedef(d)) {
     return d;
   }
@@ -146,7 +147,7 @@ bool parser_is_current_block_global(parser parser) {
  * @param parser 
  * @param n 
  */
-void parser_add_to_symtab(parser parser, astn n) {
+void parser_symtab_add(parser parser, astn n) {
   assert(n->type == ast_declaration);
   if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
     log_debug("add weak symbol to symtab: %s", n->declaration.ident);
@@ -158,7 +159,8 @@ void parser_add_to_symtab(parser parser, astn n) {
 }
 
 /**
- * @brief add declaration to the current scope table,
+ * @brief check whether the same name declaration existing, 
+ * then add declaration to the current scope table,
  * set the uid for the declaration
  * 
  * @param parser 
@@ -171,7 +173,7 @@ void parser_declare_new_symbol(parser parser, astn n) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
-  astn existing_symbol = parser_find_ident_in_current_scope_table(
+  astn existing_symbol = parser_find_ident_in_current_scope_in(
       n->declaration.ident, &parser->idtab);
   if (existing_symbol && decl_specs->ctype.storage == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
@@ -184,11 +186,11 @@ void parser_declare_new_symbol(parser parser, astn n) {
   }
 
   n->declaration.uid = parser_get_uid(parser);
-  parser_add_symbol_to_current_scope_table(n, &parser->idtab);
+  parser_add_symbol_to_current_scope_in(n, &parser->idtab);
   if (parser_is_current_block_global(parser) ||
       decl_specs->ctype.storage == TOK_KW_EXTERN) {
     // we need add the extern symbol which is defined in block scope to symtab
-    parser_add_to_symtab(parser, n);
+    parser_symtab_add(parser, n);
   }
 }
 
@@ -198,14 +200,14 @@ void parser_declare_new_enumerator(parser parser, astn n) {
     log_debug("this is an abstract enumerator, skipping");
     return;
   }
-  astn existing_sym = parser_find_ident_in_current_scope_table(
-      n->enumerator.ident, &parser->idtab);
+  astn existing_sym = parser_find_ident_in_current_scope_in(n->enumerator.ident,
+                                                            &parser->idtab);
   if (existing_sym) {
     compiler_error(parser->lexer, "redefined enumerator %s",
                    n->enumerator.ident);
   }
   n->enumerator.uid = parser_get_uid(parser);
-  parser_add_symbol_to_current_scope_table(n, &parser->idtab);
+  parser_add_symbol_to_current_scope_in(n, &parser->idtab);
 }
 /**
  * @brief declare a new struct/union/enum tag
@@ -219,7 +221,7 @@ void parser_declare_new_tag(parser parser, astn n) {
       log_debug("this is an abstract struct declarator, skipping declaration");
       return;
     }
-    astn existing_tag = parser_find_ident_in_current_scope_table(
+    astn existing_tag = parser_find_ident_in_current_scope_in(
         n->struct_union_declaration.ident, &parser->tagtab);
     if (existing_tag) {
       compiler_error(parser->lexer, "redefined  tag with identifier %s",
@@ -232,7 +234,7 @@ void parser_declare_new_tag(parser parser, astn n) {
       log_debug("this is an abstract enumeration, skipping declaration");
       return;
     }
-    astn existing_tag = parser_find_ident_in_current_scope_table(
+    astn existing_tag = parser_find_ident_in_current_scope_in(
         n->enumeration.ident, &parser->tagtab);
     if (existing_tag) {
       compiler_error(parser->lexer, "redefined tag with identifier %s",
@@ -241,7 +243,7 @@ void parser_declare_new_tag(parser parser, astn n) {
     n->enumeration.uid = parser_get_uid(parser);
   }
 
-  parser_add_symbol_to_current_scope_table(n, &parser->tagtab);
+  parser_add_symbol_to_current_scope_in(n, &parser->tagtab);
 }
 
 size_t parser_get_uid(parser parser) {
@@ -279,7 +281,7 @@ void parser_unfold_type_chain(parser parser, slist type_chain) {
  * @return true 
  * @return false 
  */
-static bool __parser_symtab_symbol_exist_until(slist symtab, astn until) {
+static bool parser_symtab_symbol_exist_until(slist symtab, astn until) {
   sds id = until->declaration.ident;
   astn n;
   slist_foreach(symtab, n) {
@@ -302,7 +304,7 @@ void parser_symtab_remove_weak_symbols(slist symtab) {
     if (g_get_declaration_specifier(n)->ctype.storage != TOK_KW_EXTERN) {
       continue;
     }
-    if (__parser_symtab_symbol_exist_until(symtab, n)) {
+    if (parser_symtab_symbol_exist_until(symtab, n)) {
       log_debug("remove weak symbol from symtab: %s", n->declaration.ident);
       slist_remove(symtab, n);
     }

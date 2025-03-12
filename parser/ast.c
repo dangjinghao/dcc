@@ -1,10 +1,8 @@
 #include "ast.h"
-#include "convert/convert.h"
-#include "log/log.h"
 #include "slist/slist.h"
 
 astn ast_new(enum ast_type type) {
-  struct ast_node *node = calloc(1, sizeof(struct ast_node));
+  struct astn *node = calloc(1, sizeof(struct astn));
   node->type = type;
   switch (type) {
   case ast_declaration:
@@ -316,21 +314,4 @@ void ast_free(astn node) {
     break;
   }
   free(node);
-}
-
-sds ast_declaration_ident(astn n) {
-  switch (n->type) {
-  case ast_declaration:
-    return n->declaration.ident;
-  case ast_struct_union_declaration:
-    return n->struct_union_declaration.ident;
-  case ast_enumeration:
-    return n->enumeration.ident;
-  case ast_enumerator:
-    return n->enumerator.ident;
-  default:
-    log_panic("unexpected ast declartion type: %s",
-              convert_repr_ast_type(n->type));
-  }
-  return NULL;
 }

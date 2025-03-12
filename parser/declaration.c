@@ -46,14 +46,12 @@ void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
     t->type = tok;
   } else if ((g_is_int_family_tok(prev_type) && g_is_int_family_tok(tok))) {
     // to support long int / short int
-    if (lexer_token_get_sizeof(tok) >
-        lexer_token_get_sizeof(prev_type)) {
+    if (lexer_token_get_sizeof(tok) > lexer_token_get_sizeof(prev_type)) {
       t->type = tok;
     }
   } else {
     log_panic("invalid type: current_tok: %s,prev_tok: %s",
-              convert_repr_token(tok),
-              convert_repr_token(prev_type));
+              convert_repr_token(tok), convert_repr_token(prev_type));
   }
 }
 
@@ -69,7 +67,7 @@ astn parse_struct_declarator(parser parser, astn decl_specs) {
   }
   if (parser->current_token == ':') {
     parser_consume_with(parser, ':');
-    n->declaration.extdata = parse_constant_int_expr(parser);
+    n->declaration.extdata = parse_expr_const_int(parser);
   }
   return n;
 }
@@ -113,7 +111,7 @@ astn parse_struct_or_union_specifier(parser parser) {
       compiler_error(parser->lexer,
                      "struct/union declaration without an identifier");
     }
-    astn ref = parser_find_ident_in_all_scope_table(
+    astn ref = parser_find_ident_in_all_scope_in(
         n->struct_union_declaration.ident, &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
@@ -133,7 +131,7 @@ astn parse_enumerator(parser parser, slist enumerators, long *enum_counter) {
   parser_consume(parser);
   if (parser->current_token == '=') {
     parser_consume(parser);
-    astn const_expr = parse_constant_int_expr(parser);
+    astn const_expr = parse_expr_const_int(parser);
     n->enumerator.value = parser_eval_const_int_expr(const_expr);
     *enum_counter = n->enumerator.value;
     ast_free(const_expr);
@@ -174,7 +172,7 @@ astn parse_enumeration(parser parser) {
       compiler_error(parser->lexer,
                      "enumeration declaration without an identifier");
     }
-    astn ref = parser_find_ident_in_all_scope_table(n->enumeration.ident,
+    astn ref = parser_find_ident_in_all_scope_in(n->enumeration.ident,
                                                     &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
@@ -273,7 +271,7 @@ astn parse_initializer(parser parser) {
     n->initializer.init = parse_initializer_list(parser);
     parser_consume_with(parser, '}');
   } else {
-    n->initializer.init = parse_assign_expr(parser);
+    n->initializer.init = parse_expr_assign(parser);
   }
 
   return n;
@@ -343,7 +341,7 @@ slist parse_parameter_type_list(parser p, astn astp) {
 slist parse_direct_declarator(parser parser, slist type_chain) {
   // assert(g_is_direct_declarator_firstset(parser));
   if (parser->current_token == TOK_IDENT) {
-    astn id = parse_ident(parser);
+    astn id = parse_expr_ident(parser);
     // promise the ident is the 1st element
     assert(slist_length(type_chain) == 0);
     slist_add_tail(type_chain, id);
@@ -360,7 +358,7 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
       astn content_type = ast_new(ast_expr_unary);
       content_type->unary.op = '[';
       if (parser->current_token != ']') {
-        content_type->unary.expr = parse_constant_int_expr(parser);
+        content_type->unary.expr = parse_expr_const_int(parser);
       }
       parser_consume_with(parser, ']');
       slist_add_tail(type_chain, content_type);
@@ -479,7 +477,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     }
 
     // function body
-    n->declaration.extdata = parse_compound_statement(parser);
+    n->declaration.extdata = parse_statement_compound(parser);
     parser->current_function_scope = NULL;
     parser_pop_scope(parser);
   }
@@ -549,4 +547,21 @@ slist parse_type_name(parser parser, slist type_chain) {
     compiler_error(parser->lexer, "<type-name> should not have an identifier.");
   }
   return type_chain;
+}
+
+sds parse_declaration_get_ident(astn n) {
+  switch (n->type) {
+  case ast_declaration:
+    return n->declaration.ident;
+  case ast_struct_union_declaration:
+    return n->struct_union_declaration.ident;
+  case ast_enumeration:
+    return n->enumeration.ident;
+  case ast_enumerator:
+    return n->enumerator.ident;
+  default:
+    log_panic("unexpected ast declartion type: %s",
+              convert_repr_ast_type(n->type));
+  }
+  return NULL;
 }

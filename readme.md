@@ -55,4 +55,19 @@ Now we just ignore the full functional codegen implementation of global variable
 
 - Pratt parser expression
 
-## scope and symbol table
+## API Organization method
+
+```makefile
+$(MODULE_NAME)_$(CLASSIFY)_$('is' if return bool or 'get'/'set' for getter/setter or 'new' for create new object or any other verb)_$(TARGET if necessary)
+```
+
+the file which has the same name as its parent directory is allowed to use only one time name.
+if there is a short name of $(MODULE_NAME)_$(CLASSIFY), e.g. the short name of `parser/grammar.h` is `g`, use this method
+
+```makefile
+$(SHORT_NAME)_$(same as above)
+```
+
+### Short Name Table
+
+`parser/grammar.h` ： `g`

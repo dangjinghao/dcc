@@ -37,28 +37,28 @@ enum type_qualifier {
   TYPE_QUAL_INLINE = 1 << 3,
 };
 
-typedef struct ast_node {
+typedef struct astn {
   enum ast_type type;
   union {
-    struct ast_node *ref;
+    struct astn *ref;
     sds ident;
     struct unary {
       int op;
       char postfix;
       // used for array subscript(expr type), function call(arguments), get member(by arrow or dot)(ident type)
-      struct ast_node *extdata;
-      struct ast_node *expr;
+      struct astn *extdata;
+      struct astn *expr;
     } unary;
     struct typecast {
       struct slist type_chain;
-      struct ast_node *expr;
+      struct astn *expr;
     } typecast;
     struct binop {
       int op;
-      struct ast_node *lhs, *rhs;
+      struct astn *lhs, *rhs;
     } binop;
     struct ternary {
-      struct ast_node *cond, *_t, *_f;
+      struct astn *cond, *_t, *_f;
     } ternary;
     struct primary {
       // tok_lit_*
@@ -71,21 +71,21 @@ typedef struct ast_node {
       int type;
       enum tok_type signint, storage;
       // used for struct, union, enum, holds a reference only, do not free it
-      struct ast_node *user_defined_type;
+      struct astn *user_defined_type;
     } ctype;
     struct labeled_statement {
       enum tok_type type;
-      struct ast_node *label_value;
-      struct ast_node *stmt;
+      struct astn *label_value;
+      struct astn *stmt;
       // used for case, default
-      struct ast_node *scope_ref;
+      struct astn *scope_ref;
     } labeled_statement;
     struct declaration {
       sds ident;
       // initializer/function body/struct declaration bitfield (expr)
-      struct ast_node *extdata;
+      struct astn *extdata;
       size_t uid;
-      struct ast_node *scope_ref;
+      struct astn *scope_ref;
       /* the logical type chain of the declaration,
        * it contains those node type:
        * ast_expr_unary is used for array declaration [<expr>],
@@ -131,18 +131,18 @@ typedef struct ast_node {
     } initializer_list;
     struct initializer {
       // expr or initializer_list
-      struct ast_node *init;
+      struct astn *init;
     } initializer;
     struct jump_statement {
       enum tok_type type;
-      struct ast_node *scope_ref;
-      struct ast_node *expr;
+      struct astn *scope_ref;
+      struct astn *expr;
     } jump_statement;
   };
 } *astn;
 
-struct ast_node *ast_new(enum ast_type type);
+astn ast_new(enum ast_type type);
 void ast_free(astn node);
 astn ast_copy(astn n);
-sds ast_declaration_ident(astn n);
+
 #endif

@@ -26,15 +26,15 @@ typedef struct parser {
   size_t uidcnt;
 } *parser;
 
-void parser_from_lexer(parser parser, struct lexer *lexer);
-void parser_snapshot(parser _new, parser _old);
+void parser_new_from_lexer(parser parser, struct lexer *lexer);
+void parser_new_snapshot(parser _new, parser _old);
 void parser_destory(parser parser);
 void parser_restore(parser target, parser snapshot);
 int parser_consume(parser parser);
 int parser_consume_with(parser parser, int token);
-void parser_add_symbol_to_current_scope_table(astn decl, slist tab);
-astn parser_find_ident_in_current_scope_table(sds ident, slist tab);
-astn parser_find_ident_in_all_scope_table(sds ident, slist tab);
+void parser_add_symbol_to_current_scope_in(astn decl, slist tab);
+astn parser_find_ident_in_current_scope_in(sds ident, slist tab);
+astn parser_find_ident_in_all_scope_in(sds ident, slist tab);
 void parser_pop_scope(parser parser);
 void parser_push_scope(parser parser);
 astn parser_get_typedef_by_type_name(parser parser, sds ident);
@@ -50,21 +50,22 @@ slist parser_reorder_strong_symbols(slist symtab);
 long parser_eval_const_int_expr(astn expr);
 
 sds parse_remove_type_chain_ident(slist type_chain);
-astn parse_unary(parser parser);
+astn parse_expr_unary(parser parser);
 astn parse_specifier_qualifiers(parser parser);
-astn parse_assign_expr(parser parser);
-astn __parse_assign_expr(parser parser, int ctx_prec);
+astn parse_expr_assign(parser parser);
+astn parse_expr_assign1(parser parser, int ctx_prec);
 astn parse_expression(parser parser);
-astn parse_ident(parser parser);
+astn parse_expr_ident(parser parser);
 astn parse_init_declarator(parser parser, astn decl_specs,
                            bool delay_alloc_uid);
 slist parse_declarator(parser parser, slist type_chain);
-astn parse_constant_int_expr(parser parser);
+astn parse_expr_const_int(parser parser);
 void parse_external_declaration(parser parser, slist block);
-astn parse_labeled_statement(parser p);
+astn parse_statement_labeled(parser p);
 astn parse_statement(parser p);
 astn parse_translation_unit(parser parser);
-astn parse_compound_statement(parser parser);
+astn parse_statement_compound(parser parser);
 slist parse_type_name(parser parser, slist type_chain);
 astn parse_initializer(parser parser);
+sds parse_declaration_get_ident(astn n);
 #endif
