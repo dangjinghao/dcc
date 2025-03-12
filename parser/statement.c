@@ -12,7 +12,7 @@ astn parse_expression_statement(parser p) {
   // move the empty statement check to the parse_statement
   astn expr;
   if (p->current_token == ';') {
-    expr = g_create_empty_statement();
+    expr = g_new_empty_statement();
   } else {
     expr = parse_expression(p);
   }

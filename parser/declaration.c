@@ -330,7 +330,7 @@ slist parse_parameter_type_list(parser p, astn astp) {
     } else if (p->current_token == TOK_SYM_VARARGS) {
       parser_consume(p);
 
-      slist_add_tail(params, g_create_varargs_param());
+      slist_add_tail(params, g_new_varargs_param());
       break;
     } else {
       compiler_error(p->lexer, "Unexpected token: %s",
@@ -371,7 +371,7 @@ slist parse_direct_declarator(parser parser, slist type_chain) {
         // int F(); in C language, it means F with any parameters
         // but this way had been deprecated in C23
         // we should rewrite to `int F(void)`
-        slist_add_tail(&parameters->parameters.list, g_create_void_param());
+        slist_add_tail(&parameters->parameters.list, g_new_void_param());
       } else {
         parse_parameter_type_list(parser, parameters);
       }

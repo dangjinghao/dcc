@@ -18,7 +18,7 @@ int process_trans_unit(struct lexer *lexer) {
   parser_from_lexer(&parser, lexer);
   astn u = parse_translation_unit(&parser);
   struct builder b;
-  builder_create(&b, "test");
+  builder_new(&b, "test");
   astn d;
   parser_symtab_remove_weak_symbols(&parser.symtab);
   parser_reorder_strong_symbols(&parser.symtab);

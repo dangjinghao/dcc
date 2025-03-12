@@ -8,7 +8,7 @@ typedef struct builder {
   LLVMContextRef context;
 } *builder;
 void builder_destroy(builder b);
-builder builder_create(builder b, char *module_name);
+builder builder_new(builder b, char *module_name);
 
 slist build_base_type_chain_by_lit(enum tok_type type);
 slist build_type_chain_expr_primary(astn n);

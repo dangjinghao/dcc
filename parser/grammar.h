@@ -580,7 +580,7 @@ static inline astn ast_new_empty_statement() {
   return stmt;
 }
 
-static inline astn g_create_empty_statement() {
+static inline astn g_new_empty_statement() {
   astn n = ast_new(ast_expr_primary);
   n->primary.type = TOK_EOF;
   return n;
@@ -591,7 +591,7 @@ static inline bool g_is_function_declaration(astn declaration) {
          !g_get_function_body(declaration);
 }
 
-static inline astn g_create_varargs_param() {
+static inline astn g_new_varargs_param() {
   astn n = ast_new(ast_declaration);
   astn ctype = ast_new(ast_ctype);
   ctype->ctype.type = TOK_SYM_VARARGS;
@@ -615,7 +615,7 @@ static inline bool g_is_function_varargs(astn n) {
   return false;
 }
 
-static inline astn g_create_void_param() {
+static inline astn g_new_void_param() {
   astn n = ast_new(ast_declaration);
   astn ctype = ast_new(ast_ctype);
   ctype->ctype.type = TOK_KW_VOID;
