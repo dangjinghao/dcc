@@ -16,7 +16,7 @@ typedef LLVMValueRef (*llvm_func_t)(LLVMBuilderRef, LLVMValueRef, LLVMValueRef,
  * 
  * @param b 
  * @param binop 
- * @param llvm_build_f [0]: int function, [1]: fp function
+ * @param llvm_build_f [0]: int  [1]: fp
  * @param f_names 
  * @return typed_value 
  */
@@ -38,24 +38,6 @@ typed_value build_expr_binop_template(builder b, astn binop,
         &exprs[0]->type_chain);
   }
   BUILDING();
-}
-
-typed_value build_expr_binop_plus(builder b, astn binop) {
-  llvm_func_t llvm_build_f[2] = {LLVMBuildAdd, LLVMBuildFAdd};
-  char *f_names[2] = {"iadd", "fadd"};
-  return build_expr_binop_template(b, binop, llvm_build_f, f_names);
-}
-
-typed_value build_expr_binop_sub(builder b, astn binop) {
-  llvm_func_t llvm_build_f[2] = {LLVMBuildSub, LLVMBuildFSub};
-  char *f_names[2] = {"isub", "fsub"};
-  return build_expr_binop_template(b, binop, llvm_build_f, f_names);
-}
-
-typed_value build_expr_binop_mul(builder b, astn binop) {
-  llvm_func_t llvm_build_f[2] = {LLVMBuildMul, LLVMBuildFMul};
-  char *f_names[2] = {"imul", "fmul"};
-  return build_expr_binop_template(b, binop, llvm_build_f, f_names);
 }
 
 typed_value build_expr_binop_div(builder b, astn binop) {
@@ -82,35 +64,94 @@ typed_value build_expr_binop_div(builder b, astn binop) {
   BUILDING();
 }
 
-typed_value build_expr_binop_mod(builder b, astn binop) {
+/**
+ * @brief Template for binary operations with different handling for signed/unsigned integers
+ * 
+ * @param b Builder context
+ * @param binop Binary operation AST node
+ * @param llvm_build_f [0]: signed int function, [1]: unsigned int function
+ * @param f_names Names for the operations
+ * @return typed_value Result of the operation
+ */
+typed_value build_expr_binop_su_template(builder b, astn binop,
+                                         llvm_func_t llvm_build_f[2],
+                                         char *f_names[2]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
-
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
-  // only int is allowed
+
+  // only int family is allowed
+  astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  if (!g_is_int_family_tok(base_type->ctype.type)) {
+    log_panic("%s or %s operation only allowed on int type", f_names[0],
+              f_names[1]);
+  }
+
+  if (base_type->ctype.signint == TOK_KW_SIGNED) {
+    return typed_value_new(
+        llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
+        &exprs[0]->type_chain);
+  }
+  // unsigned
+  return typed_value_new(
+      llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
+      &exprs[0]->type_chain);
+}
+
+typed_value build_expr_binop_bit_template(builder b, astn binop,
+                                          llvm_func_t llvm_build_f,
+                                          char *f_name) {
+  typed_value lhs = build_expression(b, binop->binop.lhs);
+  typed_value rhs = build_expression(b, binop->binop.rhs);
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+  // only int family is allowed
   astn lhs_base_type = slist_peek_head(&exprs[0]->type_chain);
   astn rhs_base_type = slist_peek_head(&exprs[1]->type_chain);
   if (!(g_is_int_family_tok(lhs_base_type->ctype.type) &&
         g_is_int_family_tok(rhs_base_type->ctype.type))) {
-    log_panic("mod operation only allowed on int type");
+    log_panic("%s operation is only allowed on int type", f_name);
   }
-  if (lhs_base_type->ctype.signint == TOK_KW_SIGNED) {
-    return typed_value_new(
-        LLVMBuildSRem(b->builder, exprs[0]->v, exprs[1]->v, "srem"),
-        &exprs[0]->type_chain);
-  }
-  // unsigned int
   return typed_value_new(
-      LLVMBuildURem(b->builder, exprs[0]->v, exprs[1]->v, "urem"),
+      llvm_build_f(b->builder, exprs[0]->v, exprs[1]->v, f_name),
       &exprs[0]->type_chain);
 }
 
-typed_value build_expr_binop_bit_and(builder b, astn binop) { BUILDING(); }
-
-typed_value build_expr_binop_bit_or(builder b, astn binop) { BUILDING(); }
-
-typed_value build_expr_binop_bit_xor(builder b, astn binop) { BUILDING(); }
+/**
+ * @brief 
+ * 
+ * @param b 
+ * @param binop 
+ * @param int_preds [0]: int predicate, [1]: unsigned int predicate
+ * @param fp_pred 
+ * @param pred_names [0]: int predicate name, [1]: unsigned int predicate name, [2]: fp predicate name
+ * @return typed_value 
+ */
+typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
+                                       char *pred_names[3]) {
+  typed_value lhs = build_expression(b, binop->binop.lhs);
+  typed_value rhs = build_expression(b, binop->binop.rhs);
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+  astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  if (g_is_int_family_tok(base_type->ctype.type)) {
+    if (base_type->ctype.signint == TOK_KW_SIGNED) {
+      return typed_value_new(LLVMBuildICmp(b->builder, preds[0], exprs[0]->v,
+                                           exprs[1]->v, pred_names[0]),
+                             &exprs[0]->type_chain);
+    } else {
+      return typed_value_new(LLVMBuildICmp(b->builder, preds[1], exprs[0]->v,
+                                           exprs[1]->v, pred_names[1]),
+                             &exprs[0]->type_chain);
+    }
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
+    return typed_value_new(LLVMBuildFCmp(b->builder, preds[2], exprs[0]->v,
+                                         exprs[1]->v, pred_names[2]),
+                           &exprs[0]->type_chain);
+  }
+  BUILDING();
+}
 
 /**
  * @brief the sub-branch of build_expression
@@ -126,40 +167,77 @@ typed_value build_expr_binop(builder b, astn n) {
     return build_expression(b, n->binop.rhs);
   }
   case '+': {
-    return build_expr_binop_plus(b, n);
+    return build_expr_binop_template(
+        b, n, (llvm_func_t[]){LLVMBuildAdd, LLVMBuildFAdd},
+        (char *[]){"add", "fadd"});
   }
   case '-': {
-    return build_expr_binop_sub(b, n);
+    return build_expr_binop_template(
+        b, n, (llvm_func_t[]){LLVMBuildSub, LLVMBuildFSub},
+        (char *[]){"sub", "fsub"});
   }
   case '*': {
-    return build_expr_binop_mul(b, n);
+    return build_expr_binop_template(
+        b, n, (llvm_func_t[]){LLVMBuildMul, LLVMBuildFMul},
+        (char *[]){"mul", "fmul"});
   }
   case '/': {
     return build_expr_binop_div(b, n);
   }
-  case '%': {
-    return build_expr_binop_mod(b, n);
+  case '<': {
+    return build_expr_binop_logic_cmp(
+        b, n, (int[]){LLVMIntSLT, LLVMIntULT, LLVMRealOLT},
+        (char *[]){"lt", "ult", "olt"});
+  }
+  case '>': {
+    return build_expr_binop_logic_cmp(
+        b, n, (int[]){LLVMIntSGT, LLVMIntUGT, LLVMRealOGT},
+        (char *[]){"gt", "ugt", "ogt"});
+  }
+  case TOK_SYM_LEQ: {
+    return build_expr_binop_logic_cmp(
+        b, n, (int[]){LLVMIntSLE, LLVMIntULE, LLVMRealOLE},
+        (char *[]){"le", "ule", "ole"});
+  }
+  case TOK_SYM_GEQ: {
+    return build_expr_binop_logic_cmp(
+        b, n, (int[]){LLVMIntSGE, LLVMIntUGE, LLVMRealOGE},
+        (char *[]){"ge", "uge", "oge"});
+  }
+  case TOK_SYM_NEQ: {
+    return build_expr_binop_logic_cmp(
+        b, n, (int[]){LLVMIntNE, LLVMIntNE, LLVMRealONE},
+        (char *[]){"ne", "ne", "one"});
+  }
+  case TOK_SYM_EQ: {
+    return build_expr_binop_logic_cmp(
+        b, n, (int[]){LLVMIntEQ, LLVMIntEQ, LLVMRealOEQ},
+        (char *[]){"eq", "eq", "oeq"});
   }
   case '&': {
-    return build_expr_binop_bit_and(b, n);
+    return build_expr_binop_bit_template(b, n, LLVMBuildAnd, "bitand");
   }
   case '|': {
-    return build_expr_binop_bit_or(b, n);
+    return build_expr_binop_bit_template(b, n, LLVMBuildOr, "bitor");
   }
   case '^': {
-    return build_expr_binop_bit_xor(b, n);
+    return build_expr_binop_bit_template(b, n, LLVMBuildXor, "bitxor");
   }
-
-  case TOK_SYM_LSHIFT:
-  case TOK_SYM_RSHIFT:
-  case TOK_SYM_LEQ:
-  case TOK_SYM_GEQ:
-  case TOK_SYM_NEQ:
-  case TOK_SYM_EQ:
+  case TOK_SYM_LSHIFT: {
+    return build_expr_binop_bit_template(b, n, LLVMBuildShl, "shl");
+  }
+  case '%': {
+    return build_expr_binop_su_template(
+        b, n, (llvm_func_t[]){LLVMBuildSRem, LLVMBuildURem},
+        (char *[]){"srem", "urem"});
+  }
+  case TOK_SYM_RSHIFT: {
+    return build_expr_binop_su_template(
+        b, n, (llvm_func_t[]){LLVMBuildAShr, LLVMBuildLShr},
+        (char *[]){"ashr", "lshr"});
+  }
   case TOK_SYM_LOGIC_AND:
   case TOK_SYM_LOGIC_OR:
-  case '<':
-  case '>':
     break;
   }
 

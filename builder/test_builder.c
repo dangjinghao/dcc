@@ -77,3 +77,5 @@ void tbc_rem() { tbc_entry("void F(){int v = 1;int p = v % 2;}"); }
 void tbc_urem() { tbc_entry("void F(){char v = 1;float p = 3ul % v;}"); }
 
 void tbc_fp_rem() { tbc_entry("void F(){float v = 1.0;float p = v % 2.0;}"); }
+
+void tbc_char_pos_promote() { tbc_entry("void F(){char v = 1;long p = +v;}"); }
