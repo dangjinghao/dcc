@@ -8,14 +8,14 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 /**
- * @brief We have to support the ptr type, so we need llvm_typed_value to store the ptr type chain
+ * @brief We have to support the ptr type, so we need typed_value to store the ptr type chain
  * 
  * @param b 
  * @param v 
  * @param type_chain 
- * @return llvm_typed_value 
+ * @return typed_value 
  */
-llvm_typed_value build_convert_type_to(builder b, llvm_typed_value v,
+typed_value build_convert_type_to(builder b, typed_value v,
                                        slist type_chain) {
   astn base_type = slist_peek_head(&v->type_chain);
   astn target_type = slist_peek_head(type_chain);
@@ -185,8 +185,8 @@ int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
   return 0; // Default case
 }
 
-llvm_typed_value *build_2_values_type_upper_cast(builder b,
-                                                 llvm_typed_value *values) {
+typed_value *build_2_values_type_upper_cast(builder b,
+                                                 typed_value *values) {
   slist lhs_type_chain = &values[0]->type_chain;
   slist rhs_type_chain = &values[1]->type_chain;
   astn lhs_ty = slist_peek_head(lhs_type_chain);

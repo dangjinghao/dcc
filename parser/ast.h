@@ -93,7 +93,7 @@ typedef struct ast_node {
        * ast_ctype
        */
       struct slist type_chain;
-      llvm_typed_value V;
+      typed_value V;
     } declaration;
     struct struct_union_declaration {
       sds ident;

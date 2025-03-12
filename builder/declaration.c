@@ -310,11 +310,11 @@ void build_declaration(builder b, astn n) {
   astn ptr = ast_new(ast_ctype);
   ptr->ctype.type = '*';
   slist_add_head(&ptr_type_chain, ptr);
-  n->declaration.V = llvm_typed_value_new(v, &ptr_type_chain);
+  n->declaration.V = typed_value_new(v, &ptr_type_chain);
 }
 
 LLVMTypeRef build_get_declaration_points_to_type(builder b,
-                                                 llvm_typed_value v) {
+                                                 typed_value v) {
   astn n1st = slist_peek_head(&v->type_chain);
   assert(n1st->type == ast_ctype && n1st->ctype.type == '*');
   astn n2nd = slist_get(&v->type_chain, 2)->data;
