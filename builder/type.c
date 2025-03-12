@@ -15,13 +15,12 @@
  * @param type_chain 
  * @return typed_value 
  */
-typed_value build_convert_type_to(builder b, typed_value v,
-                                       slist type_chain) {
+typed_value build_type_convert_to(builder b, typed_value v, slist type_chain) {
   astn base_type = slist_peek_head(&v->type_chain);
   astn target_type = slist_peek_head(type_chain);
   assert(base_type->type == ast_ctype);
   assert(target_type->type == ast_ctype);
-  if (base_type->ctype.type == target_type->ctype.type) {
+  if (build_type_compare_promote_level(base_type, target_type) == 0) {
     log_trace("no need to cast");
     return v;
   }
@@ -39,6 +38,7 @@ typed_value build_convert_type_to(builder b, typed_value v,
     v->v = LLVMBuildIntCast2(b->builder, v->v,
                              build_convert_base_type(b, target_type),
                              base_type->ctype.signint == TOK_KW_SIGNED, "cast");
+    log_trace("cast type in int family");
     v->type_chain = *type_chain;
     return v;
   }
@@ -185,7 +185,7 @@ int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
   return 0; // Default case
 }
 
-typed_value *build_2_values_type_upper_cast(builder b,
+typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values) {
   slist lhs_type_chain = &values[0]->type_chain;
   slist rhs_type_chain = &values[1]->type_chain;
@@ -197,10 +197,22 @@ typed_value *build_2_values_type_upper_cast(builder b,
   }
   if (cmp < 0) {
     log_trace("converting: lhs type < rhs type");
-    values[0] = build_convert_type_to(b, values[0], rhs_type_chain);
+    values[0] = build_type_convert_to(b, values[0], rhs_type_chain);
   } else {
     log_trace("converting: lhs type > rhs type");
-    values[1] = build_convert_type_to(b, values[1], lhs_type_chain);
+    values[1] = build_type_convert_to(b, values[1], lhs_type_chain);
   }
   return values;
+}
+
+slist build_type_chain_copy(slist type_chain) {
+  slist new_type_chain = calloc(1, sizeof(struct slist));
+  slist_copy(new_type_chain, type_chain);
+  return new_type_chain;
+}
+
+slist build_type_get_points_to_type_chian(builder b, slist type_chain) {
+  slist points_to_type_chain = build_type_chain_copy(type_chain);
+  slist_pop_head(points_to_type_chain);
+  return points_to_type_chain;
 }

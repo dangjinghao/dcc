@@ -69,3 +69,11 @@ void tbc_add() { tbc_entry("void F(){int a = 6.9f + 2;}"); }
 void tbc_arithmetic() { tbc_entry("void F(){int v = 2/1u;}"); }
 
 void tbc_not() { tbc_entry("void F(){int v = !!0;}"); }
+
+void tbc_load_var() { tbc_entry("void F(){int v = 1;int p = 3 * v + 2/1.5;}"); }
+
+void tbc_rem() { tbc_entry("void F(){int v = 1;int p = v % 2;}"); }
+
+void tbc_urem() { tbc_entry("void F(){char v = 1;float p = 3ul % v;}"); }
+
+void tbc_fp_rem() { tbc_entry("void F(){float v = 1.0;float p = v % 2.0;}"); }

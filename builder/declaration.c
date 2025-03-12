@@ -180,7 +180,7 @@ void build_alloca_variable_init(builder b, astn n, LLVMValueRef pv) {
               LLVMGetValueName2(pv, &(size_t){}));
     auto v = build_expression(b, init->initializer.init);
     log_trace("try to cast the initializer to the variable type");
-    build_convert_type_to(b, v, &n->declaration.type_chain);
+    build_type_convert_to(b, v, &n->declaration.type_chain);
     LLVMBuildStore(b->builder, v->v, pv);
   }
 }
@@ -305,18 +305,10 @@ void build_declaration(builder b, astn n) {
   }
   struct slist ptr_type_chain;
   slist_copy(&ptr_type_chain, &n->declaration.type_chain);
-  log_trace("add pointer type to llvm typed value: %s",
+  log_trace("add pointer type to typed value: %s",
             LLVMGetValueName2(v, &(size_t){}));
   astn ptr = ast_new(ast_ctype);
   ptr->ctype.type = '*';
   slist_add_head(&ptr_type_chain, ptr);
   n->declaration.V = typed_value_new(v, &ptr_type_chain);
-}
-
-LLVMTypeRef build_get_declaration_points_to_type(builder b,
-                                                 typed_value v) {
-  astn n1st = slist_peek_head(&v->type_chain);
-  assert(n1st->type == ast_ctype && n1st->ctype.type == '*');
-  astn n2nd = slist_get(&v->type_chain, 2)->data;
-  return build_convert_base_type(b, n2nd);
 }

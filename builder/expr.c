@@ -21,12 +21,12 @@ typedef LLVMValueRef (*llvm_func_t)(LLVMBuilderRef, LLVMValueRef, LLVMValueRef,
  * @return typed_value 
  */
 typed_value build_expr_binop_template(builder b, astn binop,
-                                           llvm_func_t llvm_build_f[2],
-                                           char *f_names[2]) {
+                                      llvm_func_t llvm_build_f[2],
+                                      char *f_names[2]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
   typed_value *exprs =
-      build_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   astn base_type = slist_peek_head(&exprs[0]->type_chain);
   if (g_is_int_family_tok(base_type->ctype.type)) {
     return typed_value_new(
@@ -62,7 +62,7 @@ typed_value build_expr_binop_div(builder b, astn binop) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
   typed_value *exprs =
-      build_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   astn base_type = slist_peek_head(&exprs[0]->type_chain);
   if (g_is_int_family_tok(base_type->ctype.type) &&
       base_type->ctype.signint == TOK_KW_SIGNED) {
@@ -81,6 +81,36 @@ typed_value build_expr_binop_div(builder b, astn binop) {
   }
   BUILDING();
 }
+
+typed_value build_expr_binop_mod(builder b, astn binop) {
+  typed_value lhs = build_expression(b, binop->binop.lhs);
+  typed_value rhs = build_expression(b, binop->binop.rhs);
+
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+  // only int is allowed
+  astn lhs_base_type = slist_peek_head(&exprs[0]->type_chain);
+  astn rhs_base_type = slist_peek_head(&exprs[1]->type_chain);
+  if (!(g_is_int_family_tok(lhs_base_type->ctype.type) &&
+        g_is_int_family_tok(rhs_base_type->ctype.type))) {
+    log_panic("mod operation only allowed on int type");
+  }
+  if (lhs_base_type->ctype.signint == TOK_KW_SIGNED) {
+    return typed_value_new(
+        LLVMBuildSRem(b->builder, exprs[0]->v, exprs[1]->v, "srem"),
+        &exprs[0]->type_chain);
+  }
+  // unsigned int
+  return typed_value_new(
+      LLVMBuildURem(b->builder, exprs[0]->v, exprs[1]->v, "urem"),
+      &exprs[0]->type_chain);
+}
+
+typed_value build_expr_binop_bit_and(builder b, astn binop) { BUILDING(); }
+
+typed_value build_expr_binop_bit_or(builder b, astn binop) { BUILDING(); }
+
+typed_value build_expr_binop_bit_xor(builder b, astn binop) { BUILDING(); }
 
 /**
  * @brief the sub-branch of build_expression
@@ -107,6 +137,30 @@ typed_value build_expr_binop(builder b, astn n) {
   case '/': {
     return build_expr_binop_div(b, n);
   }
+  case '%': {
+    return build_expr_binop_mod(b, n);
+  }
+  case '&': {
+    return build_expr_binop_bit_and(b, n);
+  }
+  case '|': {
+    return build_expr_binop_bit_or(b, n);
+  }
+  case '^': {
+    return build_expr_binop_bit_xor(b, n);
+  }
+
+  case TOK_SYM_LSHIFT:
+  case TOK_SYM_RSHIFT:
+  case TOK_SYM_LEQ:
+  case TOK_SYM_GEQ:
+  case TOK_SYM_NEQ:
+  case TOK_SYM_EQ:
+  case TOK_SYM_LOGIC_AND:
+  case TOK_SYM_LOGIC_OR:
+  case '<':
+  case '>':
+    break;
   }
 
   BUILDING();
@@ -123,7 +177,7 @@ typed_value build_expr_unary_pos(builder b, astn n) {
                                              slist_peek_head(int_type_chain));
   if (cmp == -1) {
     log_trace("+ unary operator type promotion: tiny int -> int");
-    typed_value v = build_convert_type_to(b, expr, int_type_chain);
+    typed_value v = build_type_convert_to(b, expr, int_type_chain);
     return v;
   }
   return expr;
@@ -157,10 +211,10 @@ typed_value build_expr_unary_neg(builder b, astn n) {
   astn base_type = slist_peek_head(&expr->type_chain);
   if (g_is_int_family_tok(base_type->ctype.type)) {
     return typed_value_new(LLVMBuildNeg(b->builder, expr->v, "neg"),
-                                &expr->type_chain);
+                           &expr->type_chain);
   } else if (g_is_fp_family_tok(base_type->ctype.type)) {
     return typed_value_new(LLVMBuildFNeg(b->builder, expr->v, "fneg"),
-                                &expr->type_chain);
+                           &expr->type_chain);
   }
   BUILDING();
 }
@@ -204,43 +258,65 @@ typed_value build_expr_primary(builder b, astn n) {
   switch (n->primary.type) {
   case TOK_LIT_INT: {
     return typed_value_new(LLVMConstInt(LLVMInt32TypeInContext(b->context),
-                                             n->primary.v._int, true),
-                                build_type_chain_expr_primary(n));
+                                        n->primary.v._int, true),
+                           build_type_chain_expr_primary(n));
   }
   case TOK_LIT_UINT: {
     return typed_value_new(LLVMConstInt(LLVMInt32TypeInContext(b->context),
-                                             n->primary.v._uint, false),
-                                build_type_chain_expr_primary(n));
+                                        n->primary.v._uint, false),
+                           build_type_chain_expr_primary(n));
   }
   case TOK_LIT_LONG: {
     return typed_value_new(LLVMConstInt(LLVMInt64TypeInContext(b->context),
-                                             n->primary.v._int, true),
-                                build_type_chain_expr_primary(n));
+                                        n->primary.v._int, true),
+                           build_type_chain_expr_primary(n));
   }
   case TOK_LIT_ULONG: {
     return typed_value_new(LLVMConstInt(LLVMInt64TypeInContext(b->context),
-                                             n->primary.v._int, false),
-                                build_type_chain_expr_primary(n));
+                                        n->primary.v._int, false),
+                           build_type_chain_expr_primary(n));
   }
   case TOK_LIT_FLOAT:
     return typed_value_new(
         LLVMConstReal(LLVMFloatTypeInContext(b->context), n->primary.v._float),
         build_type_chain_expr_primary(n));
   case TOK_LIT_DOUBLE:
-    return typed_value_new(
-        LLVMConstReal(LLVMDoubleTypeInContext(b->context),
-                      n->primary.v._double),
-        build_type_chain_expr_primary(n));
+    return typed_value_new(LLVMConstReal(LLVMDoubleTypeInContext(b->context),
+                                         n->primary.v._double),
+                           build_type_chain_expr_primary(n));
   case TOK_LIT_CHAR:
     return typed_value_new(LLVMConstInt(LLVMInt8TypeInContext(b->context),
-                                             n->primary.v._char, true),
-                                build_type_chain_expr_primary(n));
+                                        n->primary.v._char, true),
+                           build_type_chain_expr_primary(n));
   case TOK_LIT_STRING:
   default:
     BUILDING();
   }
 }
 
+typed_value build_load_declaration(builder b, astn n) {
+  assert(n->type == ast_declaration);
+  auto var = n->declaration.V;
+  if (!var) {
+    log_panic("declaration %s has no llvm value", n->declaration.ident);
+  }
+  slist points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &var->type_chain);
+  LLVMTypeRef points_to_type =
+      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
+  return typed_value_new(
+      LLVMBuildLoad2(b->builder, points_to_type, var->v, "load"),
+      points_to_type_chain);
+}
+
+typed_value build_expr_ref(builder b, astn n) {
+  switch (n->ref->type) {
+  case ast_declaration:
+    return build_load_declaration(b, n->ref);
+  default:
+    BUILDING();
+  }
+}
 typed_value build_expression(builder b, astn n) {
   switch (n->type) {
   case ast_expr_binop: {
@@ -251,6 +327,9 @@ typed_value build_expression(builder b, astn n) {
   }
   case ast_expr_primary: {
     return build_expr_primary(b, n);
+  }
+  case ast_ref: {
+    return build_expr_ref(b, n);
   }
   default:
   }
