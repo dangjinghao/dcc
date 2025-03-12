@@ -330,7 +330,7 @@ sds ast_declaration_ident(astn n) {
     return n->enumerator.ident;
   default:
     log_panic("unexpected ast declartion type: %s",
-              convert_ast_type_enum_to_repr(n->type));
+              convert_repr_ast_type(n->type));
   }
   return NULL;
 }

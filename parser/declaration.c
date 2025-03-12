@@ -46,14 +46,14 @@ void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
     t->type = tok;
   } else if ((g_is_int_family_tok(prev_type) && g_is_int_family_tok(tok))) {
     // to support long int / short int
-    if (convert_token_type_to_size(tok) >
-        convert_token_type_to_size(prev_type)) {
+    if (lexer_token_get_sizeof(tok) >
+        lexer_token_get_sizeof(prev_type)) {
       t->type = tok;
     }
   } else {
     log_panic("invalid type: current_tok: %s,prev_tok: %s",
-              convert_token_type_enum_to_repr(tok),
-              convert_token_type_enum_to_repr(prev_type));
+              convert_repr_token(tok),
+              convert_repr_token(prev_type));
   }
 }
 
@@ -195,7 +195,7 @@ astn parse_declaration_specifiers(parser parser) {
   while (g_is_declaration_specifier_firstset(parser)) {
     if (g_is_type_qualifier_firstset(parser)) {
       parse_set_type_qualifier(
-          tn, convert_token_type_to_qualifier(parser->current_token));
+          tn, convert_cast_token_to_qualifier(parser->current_token));
       parser_consume(parser);
     } else if (g_is_storage_class_specifier_firstset(parser)) {
       if (tn->storage != TOK_UNKNOWN) {
@@ -295,7 +295,7 @@ slist parse_pointers(parser parser, slist pointers) {
     p->ctype.type = '*';
     while (g_is_type_qualifier_firstset(parser)) {
       parse_set_type_qualifier(
-          &p->ctype, convert_token_type_to_qualifier(parser->current_token));
+          &p->ctype, convert_cast_token_to_qualifier(parser->current_token));
       parser_consume(parser);
     }
     slist_add_head(pointers, p);
@@ -334,7 +334,7 @@ slist parse_parameter_type_list(parser p, astn astp) {
       break;
     } else {
       compiler_error(p->lexer, "Unexpected token: %s",
-                     convert_token_type_enum_to_repr(p->current_token));
+                     convert_repr_token(p->current_token));
     }
   }
   return params;

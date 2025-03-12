@@ -1,6 +1,7 @@
 #ifndef LEXER_TOKEN_H
 #define LEXER_TOKEN_H
 
+#include <stddef.h>
 enum tok_type {
   TOK_EOF = -1,
   TOK_UNKNOWN = 0,
@@ -85,9 +86,9 @@ struct lexer_token_table_entry {
 extern struct lexer_token_table_entry lexer_token_kw_table[],
     lexer_token_multi_char_sym_table[];
 enum tok_type
-lexer_token_get_token_type_in(char *str, struct lexer_token_table_entry *table);
+lexer_token_get_token_in(char *str, struct lexer_token_table_entry *table);
 char *lexer_token_get_str_in(enum tok_type type,
                              struct lexer_token_table_entry *table);
 char *lexer_token_get_str(int type);
-
+size_t lexer_token_get_sizeof(enum tok_type t);
 #endif

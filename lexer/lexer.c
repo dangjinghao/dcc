@@ -134,7 +134,7 @@ int lexer_get_next_ident(struct lexer *lexer) {
     lexer_consume(lexer);
   }
   enum tok_type kw_type =
-      lexer_token_get_token_type_in(ident, lexer_token_kw_table);
+      lexer_token_get_token_in(ident, lexer_token_kw_table);
   if (kw_type != TOK_UNKNOWN) {
     sdsfree(ident);
     return kw_type;
@@ -278,7 +278,7 @@ int lexer_get_next_char(struct lexer *lexer) {
     if (c == '\\') {
       // hack method
       char *endptr = lexer->src;
-      buf[idx] = convert_decode_char(lexer->src + lexer->pos + 1, &endptr);
+      buf[idx] = convert_repr_decode_char(lexer->src + lexer->pos + 1, &endptr);
       // update the lexer position
       lexer->pos = endptr - lexer->src - 1;
     } else {
@@ -293,7 +293,7 @@ int lexer_get_next_char(struct lexer *lexer) {
   if (idx == 0) {
     compiler_error(lexer, "Empty character constant");
   } else if (buf[0] == '\\') {
-    buf[0] = convert_decode_char(buf + 1, NULL);
+    buf[0] = convert_repr_decode_char(buf + 1, NULL);
   } else if (idx > 1) {
     compiler_error(lexer, "Multi-character constant starts without '\\':%s",
                    buf);
@@ -310,7 +310,7 @@ int lexer_get_next_string(struct lexer *lexer) {
     if (c == '\\') {
       // hack method
       char *endptr = lexer->src;
-      c = convert_decode_char(lexer->src + lexer->pos + 1, &endptr);
+      c = convert_repr_decode_char(lexer->src + lexer->pos + 1, &endptr);
       // update the lexer position
       lexer->pos = endptr - lexer->src - 1;
     }

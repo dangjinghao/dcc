@@ -65,7 +65,7 @@ struct lexer_token_table_entry lexer_token_multi_char_sym_table[] = {
 };
 
 enum tok_type
-lexer_token_get_token_type_in(char *str,
+lexer_token_get_token_in(char *str,
                               struct lexer_token_table_entry *table) {
   while (table->str) {
     if (strcmp(str, table->str) == 0) {
@@ -93,7 +93,7 @@ char *lexer_token_get_str_in(enum tok_type type,
       }
       table++;
     }
-    return convert_token_type_enum_to_repr(type);
+    return convert_repr_token(type);
   } else {
     while (table->str) {
       if (type == table->type) {
@@ -115,4 +115,25 @@ char *lexer_token_get_str(int type) {
     return buf;
   }
   return lexer_token_get_str_in(type, NULL);
+}
+
+size_t lexer_token_get_sizeof(enum tok_type t) {
+  switch (t) {
+  case TOK_KW_INT:
+    return sizeof(int);
+  case TOK_KW_VOID:
+  case TOK_KW_CHAR:
+    return sizeof(char);
+  case TOK_KW_FLOAT:
+    return sizeof(float);
+  case TOK_KW_DOUBLE:
+    return sizeof(double);
+  case TOK_KW_LONG:
+    return sizeof(long);
+  case TOK_KW_SHORT:
+    return sizeof(short);
+  default:
+    log_panic("unsupported type: %s", convert_repr_token(t));
+  }
+  return 0;
 }

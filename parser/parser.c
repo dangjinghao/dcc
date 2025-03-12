@@ -438,7 +438,7 @@ long parser_eval_const_int_expr(astn expr) {
   default:
     log_panic(
         "unexpected ast node type when checking constant int expression: %s",
-        convert_ast_type_enum_to_repr(expr->type));
+        convert_repr_ast_type(expr->type));
   }
   return false;
 }
@@ -491,7 +491,7 @@ bool parser_check_constant_int_expr(astn expr) {
   default:
     log_panic(
         "unexpected ast node type when checking constant int expression: %s",
-        convert_ast_type_enum_to_repr(expr->type));
+        convert_repr_ast_type(expr->type));
   }
   return false;
 }

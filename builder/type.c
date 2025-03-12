@@ -98,8 +98,8 @@ llvm_typed_value build_convert_type_to(builder b, llvm_typed_value v,
 #undef CONVERT_CASE
 
   log_panic("Invalid type cast:%s -> %s",
-            convert_token_type_enum_to_repr(base_type->ctype.type),
-            convert_token_type_enum_to_repr(target_type->ctype.type));
+            convert_repr_token(base_type->ctype.type),
+            convert_repr_token(target_type->ctype.type));
   return v;
 }
 /**
