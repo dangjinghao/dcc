@@ -19,10 +19,9 @@ int process_trans_unit(struct lexer *lexer) {
   astn u = parse_translation_unit(&parser);
   struct builder b;
   builder_new(&b, "test");
+  slist symtab = parser_gen_symtab(&parser);
   astn d;
-  parser_symtab_remove_weak_symbols(&parser.symtab);
-  parser_reorder_strong_symbols(&parser.symtab);
-  slist_foreach(&parser.symtab, d) { build_declaration(&b, d); }
+  slist_foreach(symtab, d) { build_declaration(&b, d); }
   LLVMVerifyModule(b.module, LLVMAbortProcessAction, NULL);
   char *ir = LLVMPrintModuleToString(b.module);
   puts(ir);

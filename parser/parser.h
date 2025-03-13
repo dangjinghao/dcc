@@ -45,9 +45,8 @@ void parser_declare_new_enumerator(parser parser, astn n);
 bool parser_check_constant_int_expr(astn expr);
 size_t parser_get_uid(parser parser);
 void parser_unfold_type_chain(parser parser, slist type_chain);
-void parser_symtab_remove_weak_symbols(slist symtab);
-slist parser_reorder_strong_symbols(slist symtab);
 long parser_eval_const_int_expr(astn expr);
+slist parser_gen_symtab(parser parser);
 
 sds parse_remove_type_chain_ident(slist type_chain);
 astn parse_expr_unary(parser parser);
@@ -68,4 +67,9 @@ astn parse_statement_compound(parser parser);
 slist parse_type_name(parser parser, slist type_chain);
 astn parse_initializer(parser parser);
 sds parse_declaration_get_ident(astn n);
+
+slist parser_symtab_reorder_strong_symbols(slist symtab);
+void parser_symtab_remove_weak_symbols(slist symtab);
+void parser_symtab_add(parser parser, astn n);
+
 #endif
