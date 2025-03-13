@@ -79,3 +79,7 @@ void tbc_urem() { tbc_entry("void F(){char v = 1;float p = 3ul % v;}"); }
 void tbc_fp_rem() { tbc_entry("void F(){float v = 1.0;float p = v % 2.0;}"); }
 
 void tbc_char_pos_promote() { tbc_entry("void F(){char v = 1;long p = +v;}"); }
+
+void tbc_extern_in_func() { tbc_entry("extern int v;void F(){extern int v;}"); }
+
+void tbc_assign() { tbc_entry("void F(){int v = 1;int v2 = v = 2;v = ~v2;}"); }

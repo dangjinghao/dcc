@@ -153,6 +153,24 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
   BUILDING();
 }
 
+typed_value build_expr_binop_assign(builder b, astn binop) {
+  typed_value lhs = build_lvalue_exprssion(b, binop->binop.lhs);
+  typed_value rhs = build_expression(b, binop->binop.rhs);
+  // get lhs points type
+  slist points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &lhs->type_chain);
+  LLVMTypeRef points_to_type =
+      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
+  // cast rhs to lhs type
+  typed_value rhs_casted = build_type_convert_to(b, rhs, points_to_type_chain);
+  // store rhs to lhs
+  LLVMBuildStore(b->builder, rhs_casted->v, lhs->v);
+  // load lhs to return
+  return typed_value_new(
+      LLVMBuildLoad2(b->builder, points_to_type, lhs->v, "loadlval"),
+      points_to_type_chain);
+}
+
 /**
  * @brief the sub-branch of build_expression
  * 
@@ -236,11 +254,14 @@ typed_value build_expr_binop(builder b, astn n) {
         b, n, (llvm_func_t[]){LLVMBuildAShr, LLVMBuildLShr},
         (char *[]){"ashr", "lshr"});
   }
+  case '=': {
+    return build_expr_binop_assign(b, n);
+  }
   case TOK_SYM_LOGIC_AND:
   case TOK_SYM_LOGIC_OR:
+  case '?':
     break;
   }
-
   BUILDING();
 }
 
@@ -297,6 +318,17 @@ typed_value build_expr_unary_neg(builder b, astn n) {
   BUILDING();
 }
 
+typed_value build_expr_unary_bit_not(builder b, astn n) {
+  typed_value expr = build_expression(b, n);
+  // bit not
+  astn base_type = slist_peek_head(&expr->type_chain);
+  if (!g_is_int_family_tok(base_type->ctype.type)) {
+    log_error("bit not operation is only allowed on int type");
+  }
+  return typed_value_new(LLVMBuildNot(b->builder, expr->v, "bitnot"),
+                         &expr->type_chain);
+}
+
 typed_value build_expr_unary(builder b, astn n) {
   if (!n->unary.postfix) {
     // suffix
@@ -310,10 +342,12 @@ typed_value build_expr_unary(builder b, astn n) {
     case '!': {
       return build_expr_unary_not(b, n->unary.expr);
     }
+    case '~': {
+      return build_expr_unary_bit_not(b, n->unary.expr);
+    }
     case TOK_SYM_SELF_INC:
     case TOK_SYM_SELF_DEC:
     case TOK_KW_SIZEOF:
-    case '~':
     case '*':
     case '&':
       break;
@@ -367,8 +401,9 @@ typed_value build_expr_primary(builder b, astn n) {
                                         n->primary.v._char, true),
                            build_type_chain_expr_primary(n));
   case TOK_LIT_STRING:
-  default:
     BUILDING();
+  default:
+    log_panic("Unexpected literal token");
   }
 }
 
@@ -412,4 +447,16 @@ typed_value build_expression(builder b, astn n) {
   default:
   }
   BUILDING();
+}
+
+typed_value build_lvalue_exprssion(builder b, astn n) {
+  switch (n->type) {
+  case ast_ref: {
+    assert(n->ref->type == ast_declaration);
+    assert(n->ref->declaration.V);
+    return n->ref->declaration.V;
+  }
+  default:
+    BUILDING();
+  }
 }

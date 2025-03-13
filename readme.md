@@ -34,10 +34,14 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] enum
 - [x] parser_check_constant_int_expr
 - [x] parser_eval_const_int_expr
+- [x] re-orginize all api
 - [ ] expr
-  - [ ] struct get member
+  - [ ] ternary
   - [ ] unary/binop/logic-cmp variable test
-- [ ] re-orginize all api
+  - [ ] function call
+  - [ ] struct get member
+- [ ] return statement
+- [ ] if-else statement
 - [ ] string reference table in builder
 - [ ] {} initializer
 - [ ] sizeof constant expression

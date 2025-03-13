@@ -3,9 +3,11 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
+#include "macro/macro.h"
 #include "parser.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include "token.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -173,7 +175,7 @@ astn parse_enumeration(parser parser) {
                      "enumeration declaration without an identifier");
     }
     astn ref = parser_find_ident_in_all_scope_in(n->enumeration.ident,
-                                                    &parser->tagtab);
+                                                 &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
                      n->enumeration.ident);
@@ -234,6 +236,11 @@ astn parse_declaration_specifiers(parser parser) {
     }
   }
   if (tn->type == TOK_UNKNOWN) {
+
+    if (tn->storage == TOK_KW_AUTO) {
+      // c23 auto type derivation reserved keywords
+      BUILDING();
+    }
     log_trace("set default type to int");
     tn->type = TOK_KW_INT;
   }

@@ -139,8 +139,10 @@ slist build_base_type_chain_by_lit(enum tok_type type) {
     base_type->ctype.type = TOK_KW_CHAR;
     break;
   case TOK_LIT_STRING:
-  default:
     BUILDING();
+    break;
+  default:
+    log_panic("Unexpected literal token");
     break;
   }
   slist_add_tail(type_chain, base_type);

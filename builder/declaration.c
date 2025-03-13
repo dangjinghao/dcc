@@ -252,7 +252,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     if (stmt->type == ast_declaration) {
       build_declaration(b, stmt);
     } else {
-      BUILDING();
+      build_expression(b, stmt);
     }
   }
   astn func_return_base_type = g_get_function_return_base_type(n);
