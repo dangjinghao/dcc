@@ -4,7 +4,9 @@
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
+#include "parser.h"
 #include "slist/slist.h"
+#include "token.h"
 #include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
@@ -409,7 +411,7 @@ typed_value build_expr_primary(builder b, astn n) {
 
 typed_value build_load_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
-  auto var = n->declaration.V;
+  auto var = build_declaration(b, n);
   if (!var) {
     log_panic("declaration %s has no llvm value", n->declaration.ident);
   }
@@ -430,6 +432,28 @@ typed_value build_expr_ref(builder b, astn n) {
     BUILDING();
   }
 }
+
+/**
+ * @brief relocate the extern declaration, 
+ * 
+ * @param b 
+ * @param n 
+ * @return typed_value 
+ */
+typed_value build_relocate_declaration(builder b, astn n) {
+  assert(n->type == ast_declaration);
+  astn decl_specs = g_get_declaration_specifier(n);
+  if (decl_specs->ctype.storage == TOK_KW_EXTERN) {
+    // relocate extern declaration
+    astn exist = parser_symtab_find(b->symtab, parse_declaration_get_ident(n));
+    assert(exist);
+    n = exist;
+    log_trace("relocate extern declaration %s", n->declaration.ident);
+  }
+
+  return build_declaration(b, n);
+}
+
 typed_value build_expression(builder b, astn n) {
   switch (n->type) {
   case ast_expr_binop: {
@@ -453,8 +477,7 @@ typed_value build_lvalue_exprssion(builder b, astn n) {
   switch (n->type) {
   case ast_ref: {
     assert(n->ref->type == ast_declaration);
-    assert(n->ref->declaration.V);
-    return n->ref->declaration.V;
+    return build_relocate_declaration(b, n->ref);
   }
   default:
     BUILDING();

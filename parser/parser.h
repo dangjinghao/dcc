@@ -71,5 +71,5 @@ sds parse_declaration_get_ident(astn n);
 slist parser_symtab_reorder_strong_symbols(slist symtab);
 void parser_symtab_remove_weak_symbols(slist symtab);
 void parser_symtab_add(parser parser, astn n);
-
+astn parser_symtab_find(slist symtab, sds id);
 #endif

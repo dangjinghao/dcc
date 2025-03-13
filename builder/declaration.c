@@ -266,13 +266,17 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
 
 /**
  * @brief build a declaration which maybe a function declaration/definition, variable declaration
- * 
+ * If the V is not NULL, it means the declaration has been built, just return 
  * @param b builder 
  * @param n a declaration that should not be typedef storage class
- * @return LLVMValueRef 
+ * @return typed_value  
  */
-void build_declaration(builder b, astn n) {
+typed_value build_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
+  if (n->declaration.V) {
+    log_trace("declaration %s has been built", n->declaration.ident);
+    return n->declaration.V;
+  }
   astn decl_specs = g_get_declaration_specifier(n);
   assert(decl_specs->ctype.storage != TOK_KW_TYPEDEF);
   LLVMValueRef v;
@@ -310,5 +314,16 @@ void build_declaration(builder b, astn n) {
   astn ptr = ast_new(ast_ctype);
   ptr->ctype.type = '*';
   slist_add_head(&ptr_type_chain, ptr);
-  n->declaration.V = typed_value_new(v, &ptr_type_chain);
+  return n->declaration.V = typed_value_new(v, &ptr_type_chain);
+}
+
+void build_trans_unit(builder b, slist symtab) {
+  astn n;
+  slist_foreach(symtab, n) {
+    if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_TYPEDEF) {
+      log_trace("skip the typedef declaration: %s", n->declaration.ident);
+      continue;
+    }
+    build_declaration(b, n);
+  }
 }

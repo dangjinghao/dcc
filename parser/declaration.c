@@ -236,7 +236,6 @@ astn parse_declaration_specifiers(parser parser) {
     }
   }
   if (tn->type == TOK_UNKNOWN) {
-
     if (tn->storage == TOK_KW_AUTO) {
       // c23 auto type derivation reserved keywords
       BUILDING();

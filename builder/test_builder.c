@@ -18,10 +18,9 @@ int process_trans_unit(struct lexer *lexer) {
   parser_new_from_lexer(&parser, lexer);
   astn u = parse_translation_unit(&parser);
   struct builder b;
-  builder_new(&b, "test");
+  builder_new(&b, "test", &parser.symtab);
   slist symtab = parser_gen_symtab(&parser);
-  astn d;
-  slist_foreach(symtab, d) { build_declaration(&b, d); }
+  build_trans_unit(&b, symtab);
   LLVMVerifyModule(b.module, LLVMAbortProcessAction, NULL);
   char *ir = LLVMPrintModuleToString(b.module);
   puts(ir);
@@ -79,6 +78,10 @@ void tbc_fp_rem() { tbc_entry("void F(){float v = 1.0;float p = v % 2.0;}"); }
 
 void tbc_char_pos_promote() { tbc_entry("void F(){char v = 1;long p = +v;}"); }
 
-void tbc_extern_in_func() { tbc_entry("extern int v;void F(){extern int v;}"); }
+void tbc_extern_in_func() { tbc_entry("extern int v;void F2(){v = 1;}"); }
 
 void tbc_assign() { tbc_entry("void F(){int v = 1;int v2 = v = 2;v = ~v2;}"); }
+
+void tbc_multi_extern(){
+  tbc_entry("extern int A;int A; extern int A; int F(){int B = A; A = 2;}");
+}

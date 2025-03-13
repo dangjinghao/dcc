@@ -79,3 +79,13 @@ void parser_symtab_remove_weak_symbols(slist symtab) {
     }
   }
 }
+
+astn parser_symtab_find(slist symtab, sds id) {
+  astn n;
+  slist_foreach(symtab, n) {
+    if (sdscmp(n->declaration.ident, id) == 0) {
+      return n;
+    }
+  }
+  return NULL;
+}

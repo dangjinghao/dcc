@@ -124,6 +124,12 @@ void tpc_typedef3() {
                        "const IP **v, v1;static volatile const int ****v2;");
 }
 
+void tpc_typedef_complex() {
+  tpc_entry_trans_unit(
+      "typedef struct stu{ int id; char* name;} stu_t;typedef stu_t**spp; "
+      "typedef struct stuwrap{stu_t s; spp p;} sw_t; sw_t sw;");
+}
+
 void tpc_extern_subscope() {
   tpc_entry_trans_unit(
       "int F(){{extern F2(); F2();}} int F2(){return 0;} int F2();");
