@@ -331,33 +331,108 @@ typed_value build_expr_unary_bit_not(builder b, astn n) {
                          &expr->type_chain);
 }
 
+typed_value build_expr_unary_deref(builder b, astn n) {
+  // deref
+  typed_value expr = build_expression(b, n);
+  slist points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &expr->type_chain);
+  LLVMTypeRef points_to_type =
+      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
+  return typed_value_new(
+      LLVMBuildLoad2(b->builder, points_to_type, expr->v, "deref"),
+      points_to_type_chain);
+}
+
+/**
+ * @brief Self increment/decrement operation which supports both prefix and postfix
+ * 
+ * @param b 
+ * @param n 
+ * @param t 
+ * @param postfix 
+ * @return typed_value 
+ */
+typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
+                                      bool postfix) {
+  typed_value expr = build_lvalue_exprssion(b, n);
+  // Get the value pointed to
+  slist points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &expr->type_chain);
+  LLVMTypeRef points_to_type =
+      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
+
+  // Load current value
+  LLVMValueRef old =
+      LLVMBuildLoad2(b->builder, points_to_type, expr->v, "incload");
+
+  // Create the constant for incrementing (1)
+  LLVMValueRef one;
+  astn base_type = slist_peek_head(points_to_type_chain);
+  if (g_is_int_family_tok(base_type->ctype.type)) {
+    one = LLVMConstInt(points_to_type, 1, false);
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
+    one = LLVMConstReal(points_to_type, 1.0);
+  } else {
+    log_panic("Self increment only works on numeric types");
+  }
+
+  LLVMValueRef updated;
+  if (t == TOK_SYM_SELF_INC) {
+    // Calculate the new value with increment
+    if (g_is_int_family_tok(base_type->ctype.type)) {
+      updated = LLVMBuildAdd(b->builder, old, one, "inc1");
+    } else {
+      updated = LLVMBuildFAdd(b->builder, old, one, "finc1");
+    }
+  } else {
+    assert(t == TOK_SYM_SELF_DEC);
+    // Calculate the new value with decrement
+    if (g_is_int_family_tok(base_type->ctype.type)) {
+      updated = LLVMBuildSub(b->builder, old, one, "dec1");
+    } else {
+      updated = LLVMBuildFSub(b->builder, old, one, "fdec1");
+    }
+  }
+  // Store the new value
+  LLVMBuildStore(b->builder, updated, expr->v);
+
+  // For postfix, return the original value; for prefix, return the incremented value
+  if (postfix) {
+    return typed_value_new(old, points_to_type_chain);
+  } else {
+    return typed_value_new(updated, points_to_type_chain);
+  }
+}
+
 typed_value build_expr_unary(builder b, astn n) {
   if (!n->unary.postfix) {
     // suffix
     switch (n->unary.op) {
-    case '+': {
+    case '+':
       return build_expr_unary_pos(b, n->unary.expr);
-    }
-    case '-': {
+    case '-':
       return build_expr_unary_neg(b, n->unary.expr);
-    }
-    case '!': {
+    case '!':
       return build_expr_unary_not(b, n->unary.expr);
-    }
-    case '~': {
+    case '~':
       return build_expr_unary_bit_not(b, n->unary.expr);
-    }
+    case '*':
+      return build_expr_unary_deref(b, n->unary.expr);
+    case '&':
+      return build_lvalue_exprssion(b, n->unary.expr);
     case TOK_SYM_SELF_INC:
     case TOK_SYM_SELF_DEC:
+      return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
+                                       n->unary.postfix);
     case TOK_KW_SIZEOF:
-    case '*':
-    case '&':
       break;
     }
   } else {
     switch (n->unary.op) {
     case TOK_SYM_SELF_INC:
     case TOK_SYM_SELF_DEC:
+      return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
+                                       n->unary.postfix);
     case TOK_SYM_ARROW:
     case '[':
     case '(':

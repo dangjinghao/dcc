@@ -132,7 +132,8 @@ sds build_symbol_name(astn n) {
                           n->declaration.uid);
     } else {
       // those variables in function scope would drop their name
-      return sdscatprintf(sdsempty(), VAR_FMT, n->declaration.uid);
+      return sdscatprintf(sdsempty(), VAR_FMT, n->declaration.ident,
+                          n->declaration.uid);
     }
   } else {
     // global scope

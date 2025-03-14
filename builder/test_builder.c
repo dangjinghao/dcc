@@ -82,6 +82,14 @@ void tbc_extern_in_func() { tbc_entry("extern int v;void F2(){v = 1;}"); }
 
 void tbc_assign() { tbc_entry("void F(){int v = 1;int v2 = v = 2;v = ~v2;}"); }
 
-void tbc_multi_extern(){
+void tbc_multi_extern() {
   tbc_entry("extern int A;int A; extern int A; int F(){int B = A; A = 2;}");
+}
+
+void tbc_ptr_assign() {
+  tbc_entry("void F(){int v = 1;int* p = &v;int** p2 = &p;int nv = **p2;}");
+}
+
+void tbc_self_inc() {
+  tbc_entry("void F(){int v = 1;v++;int v2 = v--;int v0 = --v;}");
 }

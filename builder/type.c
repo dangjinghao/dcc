@@ -215,6 +215,7 @@ slist build_type_chain_copy(slist type_chain) {
 
 slist build_type_get_points_to_type_chian(builder b, slist type_chain) {
   slist points_to_type_chain = build_type_chain_copy(type_chain);
-  slist_pop_head(points_to_type_chain);
+  astn ptr = slist_pop_head(points_to_type_chain);
+  assert(ptr->ctype.type == '*');
   return points_to_type_chain;
 }
