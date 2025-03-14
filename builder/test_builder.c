@@ -93,3 +93,25 @@ void tbc_ptr_assign() {
 void tbc_self_inc() {
   tbc_entry("void F(){int v = 1;v++;int v2 = v--;int v0 = --v;}");
 }
+
+void tbc_deref_ptr_assign() {
+  tbc_entry("void F(){int v = 1;int* p = &v;*(p + 1) = 2;}");
+}
+
+void tbc_combine_assign() {
+  tbc_entry("void F(){int v = 1;char v2 = 3; v2 = v = v2+v;}");
+}
+
+void tbc_ptr_cmp() {
+  tbc_entry("void F(){int* p,* p2; p >= p2; p <= p2; p == p2; p != p2; p > p2; "
+            "p < p2;}");
+}
+
+void tbc_ptr_int() {
+  tbc_entry(
+      "void F(){char* p,*p2;char v = 1;v + p; p - v; long v2 = 2;p2 = p + v2; p2 - p;}");
+}
+
+void tbc_signed() {
+  tbc_entry("void F(){int v = 1;unsigned int v2 = 2;int v3 = v + v2;}");
+}

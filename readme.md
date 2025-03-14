@@ -36,10 +36,11 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] parser_eval_const_int_expr
 - [x] re-orginize all api
 - [ ] expr
+  - [x] unary/binop/logic-cmp variable test
   - [ ] ternary
-  - [ ] unary/binop/logic-cmp variable test
   - [ ] function call
   - [ ] struct get member
+  - [ ] array
 - [ ] return statement
 - [ ] if-else statement
 - [ ] string reference table in builder

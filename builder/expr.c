@@ -13,6 +13,101 @@
 
 typedef LLVMValueRef (*llvm_func_t)(LLVMBuilderRef, LLVMValueRef, LLVMValueRef,
                                     const char *);
+
+bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs) {
+  astn lhs_base_type = slist_peek_head(&lhs->type_chain);
+  astn rhs_base_type = slist_peek_head(&rhs->type_chain);
+  if (lhs_base_type->ctype.type == '*' || rhs_base_type->ctype.type == '*') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @brief Only support: ptr +/- int, ptr - ptr, int + ptr,
+ * 
+ * @param b 
+ * @param binop 
+ * @return typed_value 
+ */
+typed_value build_expr_binop_ptr(builder b, astn binop, typed_value lhs,
+                                 typed_value rhs) {
+  if (binop->binop.op != '+' && binop->binop.op != '-') {
+    goto FAIL;
+  }
+  astn lhs_base_type = slist_peek_head(&lhs->type_chain);
+  astn rhs_base_type = slist_peek_head(&rhs->type_chain);
+  if (lhs_base_type->ctype.type == '*' && rhs_base_type->ctype.type == '*' &&
+      binop->binop.op == '-') {
+    // ptr - ptr
+    // convert to int
+    LLVMValueRef lhs_int =
+        LLVMBuildPtrToInt(b->builder, lhs->v, LLVMInt64Type(), "lhs_ptrtoint");
+    LLVMValueRef rhs_int =
+        LLVMBuildPtrToInt(b->builder, rhs->v, LLVMInt64Type(), "rhs_ptrtoint");
+    // sub
+    LLVMValueRef sub = LLVMBuildSub(b->builder, lhs_int, rhs_int, "ptrsub");
+    // sdiv
+    slist item_type_chain =
+        build_type_get_points_to_type_chian(b, &lhs->type_chain);
+    astn item_base_type = slist_peek_head(item_type_chain);
+    LLVMValueRef size =
+        LLVMConstInt(LLVMInt64Type(),
+                     lexer_token_get_sizeof(item_base_type->ctype.type), false);
+    LLVMValueRef result =
+        LLVMBuildSDiv(b->builder, sub, size, "ptr_item_size_sdiv");
+    return typed_value_new(result, item_type_chain);
+  } else if ((g_is_int_family_tok(lhs_base_type->ctype.type) ||
+              g_is_int_family_tok(rhs_base_type->ctype.type)) &&
+             binop->binop.op == '+') {
+    // int + ptr or ptr + int
+    typed_value ptr;
+    typed_value index;
+    if (g_is_int_family_tok(lhs_base_type->ctype.type)) {
+      // int + ptr
+      ptr = rhs;
+      index = lhs;
+    } else {
+      // ptr + int
+      ptr = lhs;
+      index = rhs;
+    }
+
+    slist item_type_chain =
+        build_type_get_points_to_type_chian(b, &ptr->type_chain);
+    LLVMTypeRef item_type =
+        build_convert_base_type(b, slist_peek_head(item_type_chain));
+    // cast index to i64 if it is not
+    slist tmp_long_type_chain = build_base_type_chain_by_lit(TOK_LIT_LONG);
+    index = build_type_convert_to(b, index, tmp_long_type_chain);
+
+    LLVMValueRef result = LLVMBuildGEP2(b->builder, item_type, ptr->v,
+                                        &index->v, 1, "ptr_plus_int");
+    return typed_value_new(result, &ptr->type_chain);
+  } else if (lhs_base_type->ctype.type == '*' &&
+             g_is_int_family_tok(rhs_base_type->ctype.type) &&
+             binop->binop.op == '-') {
+    // ptr - int
+    // use getelementptr
+    slist item_type_chain =
+        build_type_get_points_to_type_chian(b, &lhs->type_chain);
+    LLVMTypeRef item_type =
+        build_convert_base_type(b, slist_peek_head(item_type_chain));
+    typed_value idx = rhs;
+    slist tmp_long_type_chain = build_base_type_chain_by_lit(TOK_LIT_LONG);
+    idx = build_type_convert_to(b, idx, tmp_long_type_chain);
+    idx->v = LLVMBuildNeg(b->builder, rhs->v, "neg");
+    LLVMValueRef result = LLVMBuildGEP2(b->builder, item_type, lhs->v, &idx->v,
+                                        1, "ptr_minus_int");
+    return typed_value_new(result, &lhs->type_chain);
+  }
+  // unexpected expression format
+FAIL:
+  log_panic("Only support expression operation like: <ptr-type> +/- <int>, "
+            "<ptr-type> - <ptr-type> and "
+            "<int> + <ptr-type>");
+}
+
 /**
  * @brief 
  * 
@@ -27,6 +122,10 @@ typed_value build_expr_binop_template(builder b, astn binop,
                                       char *f_names[2]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
+    log_trace("ptr operation detected in binop expression");
+    return build_expr_binop_ptr(b, binop, lhs, rhs);
+  }
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   astn base_type = slist_peek_head(&exprs[0]->type_chain);
@@ -147,6 +246,10 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
                                            exprs[1]->v, pred_names[1]),
                              &exprs[0]->type_chain);
     }
+  } else if (base_type->ctype.type == '*') {
+    return typed_value_new(LLVMBuildICmp(b->builder, preds[1], exprs[0]->v,
+                                         exprs[1]->v, pred_names[0]),
+                           &exprs[0]->type_chain);
   } else if (g_is_fp_family_tok(base_type->ctype.type)) {
     return typed_value_new(LLVMBuildFCmp(b->builder, preds[2], exprs[0]->v,
                                          exprs[1]->v, pred_names[2]),
@@ -272,13 +375,13 @@ typed_value build_expr_unary_pos(builder b, astn n) {
   // tiny int -> int
   astn expr_base_type = slist_peek_head(&expr->type_chain);
   // create a temporary int type and its corresponsed type chain
-  slist int_type_chain = build_base_type_chain_by_lit(TOK_LIT_INT);
+  slist tmp_type_chain = build_base_type_chain_by_lit(TOK_LIT_INT);
 
   int cmp = build_type_compare_promote_level(expr_base_type,
-                                             slist_peek_head(int_type_chain));
+                                             slist_peek_head(tmp_type_chain));
   if (cmp == -1) {
     log_trace("+ unary operator type promotion: tiny int -> int");
-    typed_value v = build_type_convert_to(b, expr, int_type_chain);
+    typed_value v = build_type_convert_to(b, expr, tmp_type_chain);
     return v;
   }
   return expr;
@@ -433,9 +536,9 @@ typed_value build_expr_unary(builder b, astn n) {
     case TOK_SYM_SELF_DEC:
       return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
                                        n->unary.postfix);
-    case TOK_SYM_ARROW:
-    case '[':
     case '(':
+    case '[':
+    case TOK_SYM_ARROW:
     case '.':
       break;
     }
@@ -554,7 +657,18 @@ typed_value build_lvalue_exprssion(builder b, astn n) {
     assert(n->ref->type == ast_declaration);
     return build_relocate_declaration(b, n->ref);
   }
-  default:
-    BUILDING();
+  case ast_expr_unary: {
+    switch (n->unary.op) {
+    case '*':
+      return build_expression(b, n->unary.expr);
+    case '[':
+    case TOK_SYM_ARROW:
+    case '.':
+      BUILDING();
+    }
+    break;
   }
+  default:
+  }
+  log_panic("lvalue expression expected");
 }
