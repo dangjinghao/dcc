@@ -109,6 +109,8 @@ astn parse_statement_jump(parser p) {
   case TOK_KW_CONTINUE:
   case TOK_KW_BREAK:
     // TODO: special case for break in switch
+    // currently it's a wrong implementation
+    BUILDING();
     jump->jump_statement.type = p->current_token;
     parser_consume(p);
     jump->jump_statement.scope_ref = p->interruptable_scope;

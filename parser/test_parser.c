@@ -234,8 +234,12 @@ void tpc_do_while() {
   tpc_entry_trans_unit("void F(int a){do { a = a + 1; } while(a < 10);}");
 }
 
-void tpc_while(){
+void tpc_while() {
   tpc_entry_trans_unit("void F(int a){while(a < 10) a = a + 1;}");
+}
+
+void tpc_multi_func_ret() {
+  tpc_entry_trans_unit("int F(){return 1;}int F2(){return 2;}");
 }
 
 [[gnu::constructor]] void init() {

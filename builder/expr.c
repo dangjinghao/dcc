@@ -692,6 +692,12 @@ typed_value build_relocate_declaration(builder b, astn n) {
   return build_declaration(b, n);
 }
 
+typed_value build_expr_typecast(builder b, astn n) {
+  slist type_chain = &n->typecast.type_chain;
+  typed_value v = build_expression(b, n->typecast.expr);
+  return build_type_convert_to(b, v, type_chain);
+}
+
 typed_value build_expression(builder b, astn n) {
   switch (n->type) {
   case ast_expr_binop: {
@@ -709,7 +715,9 @@ typed_value build_expression(builder b, astn n) {
   case ast_expr_ternary: {
     return build_expr_ternary(b, n);
   }
-  case ast_expr_typecast:
+  case ast_expr_typecast: {
+    return build_expr_typecast(b, n);
+  }
   default:
   }
   BUILDING();
