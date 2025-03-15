@@ -279,6 +279,64 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
       points_to_type_chain);
 }
 
+typed_value build_expr_ternary(builder b, astn ternary) {
+  assert(ternary->type == ast_expr_ternary);
+  typed_value cond = build_expression(b, ternary->ternary.cond);
+  astn cond_base_type = slist_peek_head(&cond->type_chain);
+  auto v0 = LLVMConstInt(build_convert_base_type(b, cond_base_type), 0, false);
+  LLVMValueRef cmp = LLVMBuildICmp(b->builder, LLVMIntNE, cond->v, v0, "cond");
+  LLVMBasicBlockRef true_block =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "ternary_true");
+  LLVMBasicBlockRef false_block =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "ternary_false");
+  LLVMBasicBlockRef merge_block =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "ternary_merge");
+  LLVMBuildCondBr(b->builder, cmp, true_block, false_block);
+  // true block
+  LLVMPositionBuilderAtEnd(b->builder, true_block);
+  typed_value true_expr = build_expression(b, ternary->ternary._t);
+  // update true block which maybe updated by sub-expression
+  true_block = LLVMGetInsertBlock(b->builder);
+  // false block
+  LLVMPositionBuilderAtEnd(b->builder, false_block);
+  typed_value false_expr = build_expression(b, ternary->ternary._f);
+  // update false block which maybe updated by sub-expression
+  false_block = LLVMGetInsertBlock(b->builder);
+
+  // type cast
+  slist true_type_chain = &true_expr->type_chain;
+  slist false_type_chain = &false_expr->type_chain;
+  astn true_ty = slist_peek_head(true_type_chain);
+  astn false_ty = slist_peek_head(false_type_chain);
+  int promt_cmp = build_type_compare_promote_level(true_ty, false_ty);
+  if (promt_cmp == 0) {
+    log_trace("no need to cast in ternary special case");
+  } else if (promt_cmp < 0) {
+    log_trace("casting false expr in ternary in ternary special case");
+    LLVMPositionBuilderAtEnd(b->builder, false_block);
+    false_expr = build_type_convert_to(b, false_expr, true_type_chain);
+  } else {
+    log_trace("casting true expr in ternary in ternary special case");
+    LLVMPositionBuilderAtEnd(b->builder, true_block);
+    true_expr = build_type_convert_to(b, true_expr, false_type_chain);
+  }
+  // add br to all branchs
+  LLVMPositionBuilderAtEnd(b->builder, true_block);
+  LLVMBuildBr(b->builder, merge_block);
+  LLVMPositionBuilderAtEnd(b->builder, false_block);
+  LLVMBuildBr(b->builder, merge_block);
+
+  // merge block, phi
+  LLVMPositionBuilderAtEnd(b->builder, merge_block);
+  LLVMValueRef phi = LLVMBuildPhi(
+      b->builder,
+      build_convert_base_type(b, slist_peek_head(&true_expr->type_chain)),
+      "ternary_phi");
+  LLVMAddIncoming(phi, (LLVMValueRef[]){true_expr->v, false_expr->v},
+                  (LLVMBasicBlockRef[]){true_block, false_block}, 2);
+  return typed_value_new(phi, &true_expr->type_chain);
+}
+
 /**
  * @brief the sub-branch of build_expression
  * 
@@ -367,7 +425,6 @@ typed_value build_expr_binop(builder b, astn n) {
   }
   case TOK_SYM_LOGIC_AND:
   case TOK_SYM_LOGIC_OR:
-  case '?':
     break;
   }
   BUILDING();
@@ -649,6 +706,10 @@ typed_value build_expression(builder b, astn n) {
   case ast_ref: {
     return build_expr_ref(b, n);
   }
+  case ast_expr_ternary: {
+    return build_expr_ternary(b, n);
+  }
+  case ast_expr_typecast:
   default:
   }
   BUILDING();

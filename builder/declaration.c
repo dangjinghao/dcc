@@ -286,6 +286,7 @@ typed_value build_declaration(builder b, astn n) {
     // function declaration or definition
     v = build_function_prototype(b, n);
     if (g_is_function_definition(n)) {
+      b->fn = v;
       build_function_body(b, n, v);
     }
   } else if (g_is_declaration_in_function_scope(n) &&

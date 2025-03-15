@@ -108,10 +108,21 @@ void tbc_ptr_cmp() {
 }
 
 void tbc_ptr_int() {
-  tbc_entry(
-      "void F(){char* p,*p2;char v = 1;v + p; p - v; long v2 = 2;p2 = p + v2; p2 - p;}");
+  tbc_entry("void F(){char* p,*p2;char v = 1;v + p; p - v; long v2 = 2;p2 = p "
+            "+ v2; p2 - p;}");
 }
 
 void tbc_signed() {
   tbc_entry("void F(){int v = 1;unsigned int v2 = 2;int v3 = v + v2;}");
+}
+
+void tbc_func_arg() { tbc_entry("void F(int a,char b,short* c){*c = a + b;}"); }
+
+void tbc_func_void() { tbc_entry("void F(){}"); }
+
+void tbc_func_va() { tbc_entry("void F(int a,...){a = 1;}"); }
+
+void tbc_ternary_type_cast() {
+  tbc_entry(
+      "void F(){int v = 1;char v2 = 2; long v3 = v ? v>v2 ? v : v2 >= 2 : 2;}");
 }
