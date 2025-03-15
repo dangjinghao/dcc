@@ -236,26 +236,29 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  LLVMValueRef result;
   if (g_is_int_family_tok(base_type->ctype.type)) {
     if (base_type->ctype.signint == TOK_KW_SIGNED) {
-      return typed_value_new(LLVMBuildICmp(b->builder, preds[0], exprs[0]->v,
-                                           exprs[1]->v, pred_names[0]),
-                             &exprs[0]->type_chain);
+      result = LLVMBuildICmp(b->builder, preds[0], exprs[0]->v, exprs[1]->v,
+                             pred_names[0]);
     } else {
-      return typed_value_new(LLVMBuildICmp(b->builder, preds[1], exprs[0]->v,
-                                           exprs[1]->v, pred_names[1]),
-                             &exprs[0]->type_chain);
+      result = LLVMBuildICmp(b->builder, preds[1], exprs[0]->v, exprs[1]->v,
+                             pred_names[1]);
     }
   } else if (base_type->ctype.type == '*') {
-    return typed_value_new(LLVMBuildICmp(b->builder, preds[1], exprs[0]->v,
-                                         exprs[1]->v, pred_names[0]),
-                           &exprs[0]->type_chain);
+    result = LLVMBuildICmp(b->builder, preds[1], exprs[0]->v, exprs[1]->v,
+                           pred_names[0]);
   } else if (g_is_fp_family_tok(base_type->ctype.type)) {
-    return typed_value_new(LLVMBuildFCmp(b->builder, preds[2], exprs[0]->v,
-                                         exprs[1]->v, pred_names[2]),
-                           &exprs[0]->type_chain);
+    result = LLVMBuildFCmp(b->builder, preds[2], exprs[0]->v, exprs[1]->v,
+                           pred_names[2]);
+  } else {
+    BUILDING();
   }
-  BUILDING();
+  // convert i1 to i8
+  return typed_value_new(LLVMBuildZExt(b->builder, result,
+                                       LLVMInt8TypeInContext(b->context),
+                                       "zext_logic_cmp"),
+                         build_base_type_chain_by_lit(TOK_LIT_CHAR));
 }
 
 typed_value build_expr_binop_assign(builder b, astn binop) {
