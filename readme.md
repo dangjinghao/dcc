@@ -35,6 +35,7 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] parser_check_constant_int_expr
 - [x] parser_eval_const_int_expr
 - [x] re-orginize all api
+- [ ] build goto
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary

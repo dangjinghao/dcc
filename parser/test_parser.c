@@ -223,6 +223,21 @@ void tpc_redef_enum_enum() {
 
 void tpc_unsigned() { tpc_entry_trans_unit("void F(){int v = 2/1u;}"); }
 
+void tpc_empty_for() { tpc_entry_trans_unit("void F(int a){for(;;)a = 1;}"); }
+
+void tpc_full_for() {
+  tpc_entry_trans_unit(
+      "void F(int a){for(int i = 0, a = 0; i < 10; i++) a =  + 1;}");
+}
+
+void tpc_do_while() {
+  tpc_entry_trans_unit("void F(int a){do { a = a + 1; } while(a < 10);}");
+}
+
+void tpc_while(){
+  tpc_entry_trans_unit("void F(int a){while(a < 10) a = a + 1;}");
+}
+
 [[gnu::constructor]] void init() {
   log_color_enable(true);
   log_set_level(LOG_LEVEL_DEBUG);

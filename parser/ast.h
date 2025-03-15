@@ -27,6 +27,7 @@ enum ast_type {
   ast_jump_statement,
   ast_enumeration,
   ast_enumerator,
+  ast_iteration,
 };
 
 enum type_qualifier {
@@ -138,6 +139,11 @@ typedef struct astn {
       struct astn *scope_ref;
       struct astn *expr;
     } jump_statement;
+    struct iteration {
+      enum tok_type type;
+      struct astn *body;
+      struct astn *init, *cond, *inc;
+    } iteration;
   };
 } *astn;
 

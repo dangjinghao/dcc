@@ -42,7 +42,61 @@ astn parse_statement_compound(parser parser) {
   return block;
 }
 astn parse_statement_selection(parser p) { BUILDING(); }
-astn parse_statement_iteration(parser p) { BUILDING(); }
+
+astn parse_statement_iteration(parser p) {
+  assert(g_is_iteration_statement_firstset(p));
+  astn iter = ast_new(ast_iteration);
+  iter->iteration.type = p->current_token;
+  parser_consume(p);
+  astn prev_scope = p->interruptable_scope;
+  p->interruptable_scope = iter;
+  switch (iter->iteration.type) {
+  case TOK_KW_WHILE: {
+    parser_consume_with(p, '(');
+    iter->iteration.cond = parse_expression(p);
+    parser_consume_with(p, ')');
+    iter->iteration.body = parse_statement(p);
+    break;
+  }
+  case TOK_KW_DO: {
+    iter->iteration.body = parse_statement(p);
+    parser_consume_with(p, TOK_KW_WHILE);
+    parser_consume_with(p, '(');
+    iter->iteration.cond = parse_expression(p);
+    parser_consume_with(p, ')');
+    parser_consume_with(p, ';');
+    break;
+  }
+  case TOK_KW_FOR: {
+    parser_consume_with(p, '(');
+    parser_push_scope(p);
+    if (g_is_declaration_firstset(p)) {
+      astn decl = ast_new(ast_block);
+      parse_external_declaration(p, &decl->block.list);
+      iter->iteration.init = decl;
+    } else {
+      // statement_expression supports empty statement, so it will be used in the init and cond
+      iter->iteration.init = parse_statement_expression(p);
+    }
+    // ';' is consumed by the parse_statement_expression or declaration
+    iter->iteration.cond = parse_statement_expression(p);
+    if (p->current_token != ')') {
+      iter->iteration.inc = parse_expression(p);
+    } else {
+      iter->iteration.inc = g_new_empty_statement();
+    }
+    parser_consume_with(p, ')');
+    iter->iteration.body = parse_statement(p);
+    parser_pop_scope(p);
+    break;
+  }
+  default:
+    break;
+  }
+  p->interruptable_scope = prev_scope;
+  return iter;
+}
+
 astn parse_statement_jump(parser p) {
   assert(g_is_jump_statement_firstset(p));
   astn jump = ast_new(ast_jump_statement);
@@ -54,6 +108,7 @@ astn parse_statement_jump(parser p) {
     break;
   case TOK_KW_CONTINUE:
   case TOK_KW_BREAK:
+    // TODO: special case for break in switch
     jump->jump_statement.type = p->current_token;
     parser_consume(p);
     jump->jump_statement.scope_ref = p->interruptable_scope;

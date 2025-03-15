@@ -408,7 +408,7 @@ static inline bool g_is_selection_statement_firstset(parser parser) {
  * @grammar
  * <iteration-statement> ::= while ( <expression> ) <statement>
  *                         | do <statement> while ( <expression> ) ;
- *                         | for ( {<expression>}? ; {<expression>}? ; {<expression>}? ) <statement>
+ *                         | for ( {<declaration> | <statement-expression>} <statement-expression> {<expression>}? ) <statement>
  */
 static inline bool g_is_iteration_statement_firstset(parser parser) {
   return parser->current_token == TOK_KW_WHILE ||

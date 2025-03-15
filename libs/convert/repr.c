@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "convert.h"
+#include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
@@ -115,49 +116,44 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
   if (!n) {
     return buf;
   }
-
+  if (g_is_empty_statement(n)) {
+    buf = sdscatprintf(buf, "{\"name\":\"<empty-statement>\"}");
+    return buf;
+  }
   switch (n->type) {
   case ast_expr_primary:
     switch (n->primary.type) {
     case TOK_LIT_INT:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-int> %ld\"}",
-                       convert_repr_ast_type(n->type), n->primary.v._int);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-int> %ld\"}",
+                         convert_repr_ast_type(n->type), n->primary.v._int);
       break;
     case TOK_LIT_UINT:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-uint> %lu\"}",
-                       convert_repr_ast_type(n->type), n->primary.v._uint);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-uint> %lu\"}",
+                         convert_repr_ast_type(n->type), n->primary.v._uint);
       break;
     case TOK_LIT_LONG:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-long> %ld\"}",
-                       convert_repr_ast_type(n->type), n->primary.v._int);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-long> %ld\"}",
+                         convert_repr_ast_type(n->type), n->primary.v._int);
       break;
     case TOK_LIT_ULONG:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-ulong> %lu\"}",
-                       convert_repr_ast_type(n->type), n->primary.v._uint);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-ulong> %lu\"}",
+                         convert_repr_ast_type(n->type), n->primary.v._uint);
       break;
     case TOK_LIT_FLOAT:
       buf = sdscatprintf(buf, "{\"name\":\"<%s-float> %f\"}",
-                         convert_repr_ast_type(n->type),
-                         n->primary.v._float);
+                         convert_repr_ast_type(n->type), n->primary.v._float);
       break;
     case TOK_LIT_DOUBLE:
       buf = sdscatprintf(buf, "{\"name\":\"<%s-double> %f\"}",
-                         convert_repr_ast_type(n->type),
-                         n->primary.v._double);
+                         convert_repr_ast_type(n->type), n->primary.v._double);
       break;
     case TOK_LIT_CHAR:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-char> %c\"}",
-                       convert_repr_ast_type(n->type), n->primary.v._char);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-char> %c\"}",
+                         convert_repr_ast_type(n->type), n->primary.v._char);
       break;
     case TOK_LIT_STRING:
-      buf =
-          sdscatprintf(buf, "{\"name\":\"<%s-string> %s\"}",
-                       convert_repr_ast_type(n->type), n->primary.v._str);
+      buf = sdscatprintf(buf, "{\"name\":\"<%s-string> %s\"}",
+                         convert_repr_ast_type(n->type), n->primary.v._str);
       break;
     default:
       log_panic("this primary type is not supported");
@@ -492,6 +488,33 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
     buf = sdscat(buf, "]}");
     break;
   }
+  case ast_iteration: {
+    buf = sdscatprintf(buf, "{\"name\":\"iteration\",\"children\":[");
+    buf = sdscatprintf(buf, "{\"name\":\"<type> %s\"},",
+                       convert_repr_token(n->iteration.type));
+    buf = convert_repr_jsonify_ast(n->iteration.init, buf, shallow);
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, ",");
+    buf = convert_repr_jsonify_ast(n->iteration.cond, buf, shallow);
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, ",");
+    buf = convert_repr_jsonify_ast(n->iteration.inc, buf, shallow);
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, ",");
+    buf = convert_repr_jsonify_ast(n->iteration.body, buf, shallow);
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, "]}");
+
+    break;
+  }
   }
   return buf;
 }
@@ -598,6 +621,7 @@ char *convert_repr_ast_type(enum ast_type t) {
     STRCASE(ast_jump_statement);
     STRCASE(ast_enumeration);
     STRCASE(ast_enumerator);
+    STRCASE(ast_iteration);
   }
   return NULL;
 }

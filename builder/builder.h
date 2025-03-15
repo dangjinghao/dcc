@@ -8,7 +8,7 @@ typedef struct builder {
   LLVMContextRef context;
   slist symtab;
   // current function
-  LLVMValueRef fn; 
+  LLVMValueRef fn;
 } *builder;
 void builder_destroy(builder b);
 builder builder_new(builder b, char *module_name, slist symtab);

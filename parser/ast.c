@@ -187,6 +187,14 @@ astn ast_copy(astn n) {
     new->enumerator.uid = n->enumerator.uid;
     break;
   }
+  case ast_iteration: {
+    new->iteration.type = n->iteration.type;
+    new->iteration.body = ast_copy(n->iteration.body);
+    new->iteration.init = ast_copy(n->iteration.init);
+    new->iteration.cond = ast_copy(n->iteration.cond);
+    new->iteration.inc = ast_copy(n->iteration.inc);
+    break;
+  }
   }
   return new;
 }
@@ -311,6 +319,12 @@ void ast_free(astn node) {
   }
   case ast_enumerator:
     sdsfree(node->enumerator.ident);
+    break;
+  case ast_iteration:
+    ast_free(node->iteration.body);
+    ast_free(node->iteration.init);
+    ast_free(node->iteration.cond);
+    ast_free(node->iteration.inc);
     break;
   }
   free(node);
