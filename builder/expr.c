@@ -312,13 +312,13 @@ typed_value build_expr_ternary(builder b, astn ternary) {
   if (promt_cmp == 0) {
     log_trace("no need to cast in ternary special case");
   } else if (promt_cmp < 0) {
-    log_trace("casting false expr in ternary in ternary special case");
-    LLVMPositionBuilderAtEnd(b->builder, false_block);
-    false_expr = build_type_convert_to(b, false_expr, true_type_chain);
-  } else {
     log_trace("casting true expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, true_block);
     true_expr = build_type_convert_to(b, true_expr, false_type_chain);
+  } else {
+    log_trace("casting false expr in ternary in ternary special case");
+    LLVMPositionBuilderAtEnd(b->builder, false_block);
+    false_expr = build_type_convert_to(b, false_expr, true_type_chain);
   }
   // add br to all branchs
   LLVMPositionBuilderAtEnd(b->builder, true_block);
