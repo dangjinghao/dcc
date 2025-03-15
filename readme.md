@@ -37,24 +37,21 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] re-orginize all api
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
-  - [ ] ternary
+  - [x] ternary
   - [ ] function call
   - [ ] struct get member
   - [ ] array
+- [ ] update switch case
 - [ ] return statement
 - [ ] if-else statement
 - [ ] string reference table in builder
 - [ ] {} initializer
 - [ ] sizeof constant expression
 - [ ] multi-dim array
+- [ ] node meta data
 - [ ] union
 - [ ] attribute
-- use llvm c api instead of my llvm scaffold in codegen stage
-  - expr
-  - ternary expr support
-  - return
-  - funcion calling
-  - struct
+- [ ] c99
 
 ## expression parser
 

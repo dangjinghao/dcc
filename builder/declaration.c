@@ -246,6 +246,40 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
   astn body = g_get_function_body(n);
   assert(body->type == ast_block);
   auto entry_block = LLVMAppendBasicBlockInContext(b->context, v, "entry");
+  // Create alloca variables for function parameters
+  LLVMPositionBuilderAtEnd(b->builder, entry_block);
+  astn params = g_get_function_params(n);
+  if (params && !g_is_function_void_param(n)) {
+    astn param_decl;
+    size_t param_idx = 0;
+    slist_foreach(&params->parameters.list, param_decl) {
+      if (g_is_varargs_param(param_decl)) {
+        // Skip varargs parameter
+        break;
+      }
+
+      // Create an alloca for this parameter
+      sds param_name = build_symbol_name(param_decl);
+      LLVMTypeRef param_type = build_variable_declaration_type(b, param_decl);
+      LLVMValueRef alloca = LLVMBuildAlloca(b->builder, param_type, param_name);
+
+      // Store the parameter value into the alloca
+      LLVMValueRef param = LLVMGetParam(v, param_idx);
+      LLVMBuildStore(b->builder, param, alloca);
+
+      // Save the alloca as the parameter's value
+      assert(param_decl->declaration.V == NULL);
+      struct slist ptr_type_chain;
+      slist_copy(&ptr_type_chain, &param_decl->declaration.type_chain);
+      astn ptr = ast_new(ast_ctype);
+      ptr->ctype.type = '*';
+      slist_add_head(&ptr_type_chain, ptr);
+      param_decl->declaration.V = typed_value_new(alloca, &ptr_type_chain);
+
+      sdsfree(param_name);
+      param_idx++;
+    }
+  }
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
 
   astn stmt;

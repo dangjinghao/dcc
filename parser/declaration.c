@@ -471,8 +471,8 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     astn p;
     slist_foreach(&ps->parameters.list, p) {
       sds id = p->declaration.ident;
-      if (g_is_void_param(p)) {
-        continue;
+      if (g_is_void_param(p) || g_is_varargs_param(p)) {
+        break;
       }
       if (!id) {
         compiler_error(parser->lexer,

@@ -123,6 +123,6 @@ void tbc_func_void() { tbc_entry("void F(){}"); }
 void tbc_func_va() { tbc_entry("void F(int a,...){a = 1;}"); }
 
 void tbc_ternary_type_cast() {
-  tbc_entry(
-      "void F(){int v = 1;char v2 = 2; long v3 = v ? v>v2 ? v : v2 >= 2 : 2;}");
+  tbc_entry("void F(int v,char v2,long v3){   v3 = v ? v>v2 ? v3 - 2? v3 : v : "
+            "v2 >= 2 : 2;}");
 }
