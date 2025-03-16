@@ -36,7 +36,8 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] parser_eval_const_int_expr
 - [x] re-orginize all api
 - [x] build typecast
-- [ ] build jump statement: goto and return
+- [x] build jump statement: goto and return
+- [ ] unary expression array index
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary

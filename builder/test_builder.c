@@ -21,10 +21,16 @@ int process_trans_unit(struct lexer *lexer) {
   builder_new(&b, "test", &parser.symtab);
   slist symtab = parser_gen_symtab(&parser);
   build_trans_unit(&b, symtab);
-  LLVMVerifyModule(b.module, LLVMAbortProcessAction, NULL);
+
   char *ir = LLVMPrintModuleToString(b.module);
   puts(ir);
   LLVMDisposeMessage(ir);
+
+  char *msg = NULL;
+  if (LLVMVerifyModule(b.module, LLVMReturnStatusAction, &msg)) {
+    log_error("ir code verification failed: %s", msg);
+  }
+  LLVMDisposeMessage(msg);
   builder_destroy(&b);
   parser_destory(&parser);
   ast_free(u);
@@ -138,3 +144,22 @@ void tbc_void_return() { tbc_entry("void F(){return;}"); }
 void tbc_void_wrong_return() { tbc_entry("void F(){return 1;}"); }
 
 void tbc_cast_return() { tbc_entry("char F(unsigned long x){return 1 + x;}"); }
+
+void tbc_goto_label() {
+  tbc_entry("int F(int v){L1: v = 1;v = 2;L2: v = 3; L3: v = 4; return v; L4: "
+            "v = v + 1;}");
+}
+
+void tbc_goto() {
+  tbc_entry("int F(int v){goto L2;v = v * 2;v = 1;L1: v = 2;return v;L2: v "
+            "= 3;goto L3;v = 4;L3: v = 4;v = v + 1;goto L1;}");
+}
+
+void tbc_goto_wrong() {
+  tbc_entry("int F(int v){v = v * 2;goto L2; L3: return v;}");
+}
+
+void tbc_multi_func(){
+  tbc_entry("int F1(int v){return v;}int F2(int v){return v + 2 > v ? v : 2;} int "
+            "F3(int v){return v * 3;}");
+}

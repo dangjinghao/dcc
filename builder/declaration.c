@@ -322,7 +322,8 @@ typed_value build_declaration(builder b, astn n) {
       LLVMValueRef prev_function = b->fn;
       b->fn = v;
       build_function_body(b, n, v);
-      builder_free_label_list(b);
+      builder_check_label_list_undefined(b);
+      builder_label_list_free(b);
       b->fn = prev_function;
     }
   } else if (g_is_declaration_in_function_scope(n) &&
