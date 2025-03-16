@@ -15,7 +15,7 @@ enum ast_type {
   ast_declaration,
   ast_ctype,
   ast_ident,
-  ast_labeled_statement,
+  ast_statement_labeled,
   ast_ref,
   ast_struct_union_declaration,
   ast_parameters,
@@ -24,10 +24,10 @@ enum ast_type {
   ast_trans_unit,
   ast_initializer,
   ast_initializer_list,
-  ast_jump_statement,
+  ast_statement_jump,
   ast_enumeration,
   ast_enumerator,
-  ast_iteration,
+  ast_statement_iteration,
 };
 
 enum type_qualifier {

@@ -358,7 +358,7 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
     }
     buf = sdscat(buf, "]}");
     break;
-  case ast_labeled_statement:
+  case ast_statement_labeled:
     buf = sdscatprintf(buf, "{\"name\":\"%s: \",\"children\":[",
                        convert_repr_token(n->labeled_statement.type));
 
@@ -429,7 +429,7 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
 
     break;
   }
-  case ast_jump_statement: {
+  case ast_statement_jump: {
     buf = sdscat(buf, "{\"name\":\"jump_statement\",\"children\":[");
     switch (n->jump_statement.type) {
     case TOK_KW_GOTO:
@@ -488,7 +488,7 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
     buf = sdscat(buf, "]}");
     break;
   }
-  case ast_iteration: {
+  case ast_statement_iteration: {
     buf = sdscatprintf(buf, "{\"name\":\"iteration\",\"children\":[");
     buf = sdscatprintf(buf, "{\"name\":\"<type> %s\"},",
                        convert_repr_token(n->iteration.type));
@@ -608,7 +608,7 @@ char *convert_repr_ast_type(enum ast_type t) {
     STRCASE(ast_expr_unary);
     STRCASE(ast_ident);
     STRCASE(ast_ctype);
-    STRCASE(ast_labeled_statement);
+    STRCASE(ast_statement_labeled);
     STRCASE(ast_expr_typecast);
     STRCASE(ast_struct_union_declaration);
     STRCASE(ast_ref);
@@ -618,10 +618,10 @@ char *convert_repr_ast_type(enum ast_type t) {
     STRCASE(ast_trans_unit);
     STRCASE(ast_initializer);
     STRCASE(ast_initializer_list);
-    STRCASE(ast_jump_statement);
+    STRCASE(ast_statement_jump);
     STRCASE(ast_enumeration);
     STRCASE(ast_enumerator);
-    STRCASE(ast_iteration);
+    STRCASE(ast_statement_iteration);
   }
   return NULL;
 }

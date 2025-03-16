@@ -45,7 +45,7 @@ astn parse_statement_selection(parser p) { BUILDING(); }
 
 astn parse_statement_iteration(parser p) {
   assert(g_is_iteration_statement_firstset(p));
-  astn iter = ast_new(ast_iteration);
+  astn iter = ast_new(ast_statement_iteration);
   iter->iteration.type = p->current_token;
   parser_consume(p);
   astn prev_scope = p->interruptable_scope;
@@ -99,11 +99,12 @@ astn parse_statement_iteration(parser p) {
 
 astn parse_statement_jump(parser p) {
   assert(g_is_jump_statement_firstset(p));
-  astn jump = ast_new(ast_jump_statement);
-  switch (p->current_token) {
+  astn jump = ast_new(ast_statement_jump);
+  jump->jump_statement.type = p->current_token;
+  parser_consume(p);
+
+  switch (jump->jump_statement.type) {
   case TOK_KW_GOTO:
-    jump->jump_statement.type = TOK_KW_GOTO;
-    parser_consume(p);
     jump->jump_statement.expr = parse_expr_ident(p);
     break;
   case TOK_KW_CONTINUE:
@@ -111,20 +112,19 @@ astn parse_statement_jump(parser p) {
     // TODO: special case for break in switch
     // currently it's a wrong implementation
     BUILDING();
-    jump->jump_statement.type = p->current_token;
-    parser_consume(p);
     jump->jump_statement.scope_ref = p->interruptable_scope;
     assert(jump->jump_statement.scope_ref);
     break;
   case TOK_KW_RETURN:
-    jump->jump_statement.type = TOK_KW_RETURN;
-    parser_consume(p);
-    if (g_is_expression_firstset(p)) {
+    if (p->current_token == ';') {
+      jump->jump_statement.expr = g_new_empty_statement();
+    } else {
       jump->jump_statement.expr = parse_expression(p);
     }
     jump->jump_statement.scope_ref = p->current_function_scope;
     assert(jump->jump_statement.scope_ref);
     break;
+  default:
   }
   parser_consume_with(p, ';');
   return jump;
@@ -195,7 +195,7 @@ astn parse_statement_labeled(parser p) {
   }
   }
   astn stmt = parse_statement(p);
-  astn ls = ast_new(ast_labeled_statement);
+  astn ls = ast_new(ast_statement_labeled);
   ls->labeled_statement.type = label_type;
   ls->labeled_statement.label_value = label;
   ls->labeled_statement.stmt = stmt;

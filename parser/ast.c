@@ -88,7 +88,7 @@ astn ast_copy(astn n) {
     new->ctype.storage = n->ctype.storage;
     new->ctype.user_defined_type = ast_copy(n->ctype.user_defined_type);
     break;
-  case ast_labeled_statement:
+  case ast_statement_labeled:
     new->labeled_statement.type = n->labeled_statement.type;
     new->labeled_statement.label_value =
         ast_copy(n->labeled_statement.label_value);
@@ -164,7 +164,7 @@ astn ast_copy(astn n) {
     }
     break;
   }
-  case ast_jump_statement: {
+  case ast_statement_jump: {
     new->jump_statement.type = n->jump_statement.type;
     new->jump_statement.expr = ast_copy(n->jump_statement.expr);
     new->jump_statement.scope_ref = n->jump_statement.scope_ref;
@@ -187,7 +187,7 @@ astn ast_copy(astn n) {
     new->enumerator.uid = n->enumerator.uid;
     break;
   }
-  case ast_iteration: {
+  case ast_statement_iteration: {
     new->iteration.type = n->iteration.type;
     new->iteration.body = ast_copy(n->iteration.body);
     new->iteration.init = ast_copy(n->iteration.init);
@@ -246,7 +246,7 @@ void ast_free(astn node) {
     ast_free(node->ctype.user_defined_type);
     break;
   }
-  case ast_labeled_statement: {
+  case ast_statement_labeled: {
     ast_free(node->labeled_statement.stmt);
     if (node->labeled_statement.label_value)
       ast_free(node->labeled_statement.label_value);
@@ -306,7 +306,7 @@ void ast_free(astn node) {
     slist_free(&node->initializer_list.list);
     break;
   }
-  case ast_jump_statement: {
+  case ast_statement_jump: {
     ast_free(node->jump_statement.expr);
     break;
   }
@@ -320,7 +320,7 @@ void ast_free(astn node) {
   case ast_enumerator:
     sdsfree(node->enumerator.ident);
     break;
-  case ast_iteration:
+  case ast_statement_iteration:
     ast_free(node->iteration.body);
     ast_free(node->iteration.init);
     ast_free(node->iteration.cond);

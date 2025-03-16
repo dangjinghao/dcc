@@ -130,3 +130,19 @@ void tbc_ternary_type_cast() {
   tbc_entry("void F(int v,char v2,long v3){   v3 = v ? v>v2 ? v3 - 2? v3 : v : "
             "v2 >= 2 : 2;}");
 }
+
+void tbc_return(){
+  tbc_entry("long F(char c, short s){return c + s;}");
+}
+
+void tbc_void_return(){
+  tbc_entry("void F(){return;}");
+}
+
+void tbc_void_wrong_return(){
+  tbc_entry("void F(){return 1;}");
+}
+
+void tbc_cast_return(){
+  tbc_entry("char F(unsigned long x){return 1 + x;}");
+}

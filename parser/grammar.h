@@ -642,12 +642,15 @@ static inline astn g_get_declaration_base_type(astn declaration) {
   assert(declaration->type == ast_declaration);
   return slist_peek_head(&declaration->declaration.type_chain);
 }
+
 static inline astn g_get_function_return_base_type(astn n) {
   assert(g_get_function_params(n));
   return slist_get(&n->declaration.type_chain, 2)->data;
 }
+
 static inline bool g_is_declaration_in_function_scope(astn n) {
   assert(n->type == ast_declaration);
   return n->declaration.scope_ref != NULL;
 }
+
 #endif

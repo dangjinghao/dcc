@@ -281,22 +281,22 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     }
   }
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
-
-  astn stmt;
-  slist_foreach(&body->block.list, stmt) {
-    if (stmt->type == ast_declaration) {
-      build_declaration(b, stmt);
-    } else {
-      build_expression(b, stmt);
-    }
-  }
+  build_block(b, body);
   astn func_return_base_type = g_get_function_return_base_type(n);
-  auto default_type = build_convert_base_type(b, func_return_base_type);
+  if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(b->builder))) {
+    // the last statement is terminator
+    log_debug("the last statement is terminator, skip the default return");
+    return;
+  }
+  LLVMPositionBuilderAtEnd(b->builder, entry_block);
+  log_debug("add default return statement");
   if (func_return_base_type->ctype.type == TOK_KW_VOID) {
     LLVMBuildRetVoid(b->builder);
     return;
+  } else {
+    auto default_type = build_convert_base_type(b, func_return_base_type);
+    LLVMBuildRet(b->builder, LLVMConstNull(default_type));
   }
-  LLVMBuildRet(b->builder, LLVMConstNull(default_type));
 }
 
 /**

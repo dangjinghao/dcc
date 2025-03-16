@@ -26,8 +26,11 @@ LLVMTypeRef build_variable_declaration_type(builder b, astn n);
 typed_value build_expression(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);
 slist build_type_get_points_to_type_chian(builder b, slist type_chain);
+slist build_function_return_type_chain(builder b, astn n);
 typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values);
+void build_statement(builder b, astn n);
+void build_block(builder b, astn blk);
 extern const char *STATIC_VAR_FMT;
 extern const char *STRUCT_FMT;
 extern const char *VAR_FMT;

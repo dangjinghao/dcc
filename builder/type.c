@@ -1,3 +1,4 @@
+#include "ast.h"
 #include "builder.h"
 #include "convert/convert.h"
 #include "grammar.h"
@@ -218,4 +219,12 @@ slist build_type_get_points_to_type_chian(builder b, slist type_chain) {
   astn ptr = slist_pop_head(points_to_type_chain);
   assert(ptr->ctype.type == '*');
   return points_to_type_chain;
+}
+
+slist build_function_return_type_chain(builder b, astn n) {
+  assert(n->type == ast_declaration);
+  slist return_type_chain = build_type_chain_copy(&n->declaration.type_chain);
+  astn params = slist_pop_head(return_type_chain);
+  assert(params->type == ast_parameters);
+  return return_type_chain;
 }
