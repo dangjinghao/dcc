@@ -244,7 +244,6 @@ LLVMValueRef build_function_prototype(builder b, astn n) {
 
 void build_function_body(builder b, astn n, LLVMValueRef v) {
   astn body = g_get_function_body(n);
-  assert(body->type == ast_block);
   auto entry_block = LLVMAppendBasicBlockInContext(b->context, v, "entry");
   // Create alloca variables for function parameters
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
@@ -288,7 +287,6 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     log_debug("the last statement is terminator, skip the default return");
     return;
   }
-  LLVMPositionBuilderAtEnd(b->builder, entry_block);
   log_debug("add default return statement");
   if (func_return_base_type->ctype.type == TOK_KW_VOID) {
     LLVMBuildRetVoid(b->builder);
@@ -320,8 +318,12 @@ typed_value build_declaration(builder b, astn n) {
     // function declaration or definition
     v = build_function_prototype(b, n);
     if (g_is_function_definition(n)) {
+      // it may be used in defining a new function in a function scope
+      LLVMValueRef prev_function = b->fn;
       b->fn = v;
       build_function_body(b, n, v);
+      builder_free_label_list(b);
+      b->fn = prev_function;
     }
   } else if (g_is_declaration_in_function_scope(n) &&
              decl_specs->ctype.storage != TOK_KW_EXTERN) {
