@@ -596,8 +596,18 @@ typed_value build_expr_unary(builder b, astn n) {
     case TOK_SYM_SELF_DEC:
       return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
                                        n->unary.postfix);
+    case '[': {
+      // build arr[idx] -> *( arr + idx)
+      astn arr = n->unary.expr;
+      astn idx = n->unary.extdata;
+      // create binop
+      astn binop = ast_new(ast_expr_binop);
+      binop->binop.op = '+';
+      binop->binop.lhs = arr;
+      binop->binop.rhs = idx;
+      return build_expr_unary_deref(b, binop);
+    }
     case '(':
-    case '[':
     case TOK_SYM_ARROW:
     case '.':
       break;
@@ -733,7 +743,17 @@ typed_value build_lvalue_exprssion(builder b, astn n) {
     switch (n->unary.op) {
     case '*':
       return build_expression(b, n->unary.expr);
-    case '[':
+    case '[': {
+      // build lval arr[idx] -> *( arr + idx)
+      astn arr = n->unary.expr;
+      astn idx = n->unary.extdata;
+      // create binop
+      astn binop = ast_new(ast_expr_binop);
+      binop->binop.op = '+';
+      binop->binop.lhs = arr;
+      binop->binop.rhs = idx;
+      return build_expr_binop(b, binop);
+    }
     case TOK_SYM_ARROW:
     case '.':
       BUILDING();

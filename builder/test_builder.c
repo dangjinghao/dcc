@@ -159,7 +159,19 @@ void tbc_goto_wrong() {
   tbc_entry("int F(int v){v = v * 2;goto L2; L3: return v;}");
 }
 
-void tbc_multi_func(){
-  tbc_entry("int F1(int v){return v;}int F2(int v){return v + 2 > v ? v : 2;} int "
-            "F3(int v){return v * 3;}");
+void tbc_multi_func() {
+  tbc_entry(
+      "int F1(int v){return v;}int F2(int v){return v + 2 > v ? v : 2;} int "
+      "F3(int v){return v * 3;}");
 }
+
+void tbc_arr_deref_assign() {
+  tbc_entry(
+      "int F(int *arr,int idx) {arr[idx] = idx;*(arr + 1 + idx) = idx + 1;}");
+}
+void tbc_arr_deref() {
+  tbc_entry(
+      "int F(int *arr,int idx) {return arr[idx + 1] + *(arr + idx + 2);}");
+}
+
+void tbc_arr_sc() { tbc_entry("int F(int *arr,int idx) {return idx[arr];}"); }

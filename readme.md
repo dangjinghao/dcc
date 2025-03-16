@@ -37,10 +37,10 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] re-orginize all api
 - [x] build typecast
 - [x] build jump statement: goto and return
-- [ ] unary expression array index
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary
+  - [x] unary expression array index
   - [ ] function call
   - [ ] struct get member
   - [ ] array
