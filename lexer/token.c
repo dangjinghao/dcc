@@ -64,9 +64,8 @@ struct lexer_token_table_entry lexer_token_multi_char_sym_table[] = {
     {NULL, TOK_UNKNOWN},
 };
 
-enum tok_type
-lexer_token_get_token_in(char *str,
-                              struct lexer_token_table_entry *table) {
+enum tok_type lexer_token_get_token_in(char *str,
+                                       struct lexer_token_table_entry *table) {
   while (table->str) {
     if (strcmp(str, table->str) == 0) {
       return table->type;

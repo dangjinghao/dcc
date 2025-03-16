@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #define SLIST_MALLOC malloc
 #define SLIST_FREE free
-#define SLIST_ASSIGN_INIT { NULL, NULL }
+#define SLIST_ASSIGN_INIT {NULL, NULL}
 typedef struct slist {
   struct slist *next;
   /* points to the last node (tail) in the head node */
@@ -209,6 +209,5 @@ static inline bool slist_exists(slist list, void *data) {
   }
   return false;
 }
-
 
 #endif

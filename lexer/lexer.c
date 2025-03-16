@@ -133,8 +133,7 @@ int lexer_get_next_ident(struct lexer *lexer) {
     ident = sdscatlen(ident, &c, 1);
     lexer_consume(lexer);
   }
-  enum tok_type kw_type =
-      lexer_token_get_token_in(ident, lexer_token_kw_table);
+  enum tok_type kw_type = lexer_token_get_token_in(ident, lexer_token_kw_table);
   if (kw_type != TOK_UNKNOWN) {
     sdsfree(ident);
     return kw_type;

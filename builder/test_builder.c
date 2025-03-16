@@ -131,18 +131,10 @@ void tbc_ternary_type_cast() {
             "v2 >= 2 : 2;}");
 }
 
-void tbc_return(){
-  tbc_entry("long F(char c, short s){return c + s;}");
-}
+void tbc_return() { tbc_entry("long F(char c, short s){return c + s;}"); }
 
-void tbc_void_return(){
-  tbc_entry("void F(){return;}");
-}
+void tbc_void_return() { tbc_entry("void F(){return;}"); }
 
-void tbc_void_wrong_return(){
-  tbc_entry("void F(){return 1;}");
-}
+void tbc_void_wrong_return() { tbc_entry("void F(){return 1;}"); }
 
-void tbc_cast_return(){
-  tbc_entry("char F(unsigned long x){return 1 + x;}");
-}
+void tbc_cast_return() { tbc_entry("char F(unsigned long x){return 1 + x;}"); }

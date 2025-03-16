@@ -210,18 +210,18 @@ struct parse_expr_infix_parselet {
 
 static astn
 parse_expr_binop_normal_handle(astn left, parser parser,
-                                 struct parse_expr_infix_parselet *self) {
+                               struct parse_expr_infix_parselet *self) {
   astn n = ast_new(ast_expr_binop);
   n->binop.op = self->token;
   n->binop.lhs = left;
   n->binop.rhs = parse_expr_assign1(parser, self->right_assoc ? self->prec - 1
-                                                               : self->prec);
+                                                              : self->prec);
   return n;
 }
 
 static astn
 parse_expr_binop_ternary_handle(astn left, parser parser,
-                                  struct parse_expr_infix_parselet *self) {
+                                struct parse_expr_infix_parselet *self) {
   astn n = ast_new(ast_expr_ternary);
   n->ternary.cond = left;
   n->ternary._t = parse_expr_assign(parser);

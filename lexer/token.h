@@ -85,8 +85,8 @@ struct lexer_token_table_entry {
 };
 extern struct lexer_token_table_entry lexer_token_kw_table[],
     lexer_token_multi_char_sym_table[];
-enum tok_type
-lexer_token_get_token_in(char *str, struct lexer_token_table_entry *table);
+enum tok_type lexer_token_get_token_in(char *str,
+                                       struct lexer_token_table_entry *table);
 char *lexer_token_get_str_in(enum tok_type type,
                              struct lexer_token_table_entry *table);
 char *lexer_token_get_str(int type);

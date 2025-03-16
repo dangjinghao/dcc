@@ -1,6 +1,6 @@
 ColumnLimit: 80
 
 IndentWidth: 2
-CommentPragmas: ''
+CommentPragmas: ""
 ReflowComments: false
 UseTab: Never
