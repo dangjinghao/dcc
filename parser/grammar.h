@@ -643,7 +643,7 @@ static inline astn g_get_declaration_base_type(astn declaration) {
   return slist_peek_head(&declaration->declaration.type_chain);
 }
 
-static inline astn g_get_function_return_base_type(astn n) {
+static inline astn g_get_declaration_function_return_base_type(astn n) {
   assert(g_get_function_params(n));
   return slist_get(&n->declaration.type_chain, 2)->data;
 }

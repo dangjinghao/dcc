@@ -107,7 +107,7 @@ LLVMTypeRef build_variable_declaration_type(builder b, astn n) {
   assert(n->type == ast_declaration);
   astn _t = g_get_declaration_base_type(n);
   if (_t->type == ast_parameters) {
-    _t = g_get_function_return_base_type(n);
+    _t = g_get_declaration_function_return_base_type(n);
   } else if (_t->type == ast_expr_unary) {
     BUILDING();
   }
@@ -281,7 +281,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
   }
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
   build_block(b, body);
-  astn func_return_base_type = g_get_function_return_base_type(n);
+  astn func_return_base_type = g_get_declaration_function_return_base_type(n);
   if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(b->builder))) {
     // the last statement is terminator
     log_debug("the last statement is terminator, skip the default return");
@@ -317,15 +317,6 @@ typed_value build_declaration(builder b, astn n) {
   if (g_get_function_params(n)) {
     // function declaration or definition
     v = build_function_prototype(b, n);
-    if (g_is_function_definition(n)) {
-      // it may be used in defining a new function in a function scope
-      LLVMValueRef prev_function = b->fn;
-      b->fn = v;
-      build_function_body(b, n, v);
-      builder_check_label_list_undefined(b);
-      builder_label_list_free(b);
-      b->fn = prev_function;
-    }
   } else if (g_is_declaration_in_function_scope(n) &&
              decl_specs->ctype.storage != TOK_KW_EXTERN) {
     // variable in function
@@ -353,7 +344,18 @@ typed_value build_declaration(builder b, astn n) {
   astn ptr = ast_new(ast_ctype);
   ptr->ctype.type = '*';
   slist_add_head(&ptr_type_chain, ptr);
-  return n->declaration.V = typed_value_new(v, &ptr_type_chain);
+  n->declaration.V = typed_value_new(v, &ptr_type_chain);
+  // we should build the function body after add it to n.declaration.V
+  if (g_is_function_definition(n)) {
+    // it may be used in defining a new function in a function scope
+    LLVMValueRef prev_function = b->fn;
+    b->fn = v;
+    build_function_body(b, n, v);
+    builder_check_label_list_undefined(b);
+    builder_label_list_free(b);
+    b->fn = prev_function;
+  }
+  return n->declaration.V;
 }
 
 void build_trans_unit(builder b, slist symtab) {

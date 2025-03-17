@@ -43,7 +43,7 @@ void builder_check_label_list_undefined(builder b) {
   slist_foreach(&b->labels, label) {
     if (!label->defined) {
       log_panic("label %s is undefined in function %s", label->name,
-                LLVMGetValueName(b->fn));
+                LLVMGetValueName2(b->fn, &(size_t){}));
     }
   }
 }

@@ -175,3 +175,5 @@ void tbc_arr_deref() {
 }
 
 void tbc_arr_sc() { tbc_entry("int F(int *arr,int idx) {return idx[arr];}"); }
+
+void tbc_ref_func() { tbc_entry("void F(){void *p = F;}"); }

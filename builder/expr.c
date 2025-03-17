@@ -270,7 +270,8 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
   LLVMTypeRef points_to_type =
       build_convert_base_type(b, slist_peek_head(points_to_type_chain));
   // cast rhs to lhs type
-  typed_value rhs_casted = build_type_convert_to(b, rhs, points_to_type_chain);
+  typed_value rhs_casted =
+      build_type_convert_to(b, rhs, points_to_type_chain);
   // store rhs to lhs
   LLVMBuildStore(b->builder, rhs_casted->v, lhs->v);
   // load lhs to return
@@ -314,11 +315,13 @@ typed_value build_expr_ternary(builder b, astn ternary) {
   } else if (promt_cmp < 0) {
     log_trace("casting true expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, true_block);
-    true_expr = build_type_convert_to(b, true_expr, false_type_chain);
+    true_expr =
+        build_type_convert_to(b, true_expr, false_type_chain);
   } else {
     log_trace("casting false expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, false_block);
-    false_expr = build_type_convert_to(b, false_expr, true_type_chain);
+    false_expr =
+        build_type_convert_to(b, false_expr, true_type_chain);
   }
   // add br to all branchs
   LLVMPositionBuilderAtEnd(b->builder, true_block);
@@ -567,6 +570,8 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
   }
 }
 
+typed_value build_expr_unary_func_call(builder b, astn n) { BUILDING(); }
+
 typed_value build_expr_unary(builder b, astn n) {
   if (!n->unary.postfix) {
     // suffix
@@ -607,7 +612,9 @@ typed_value build_expr_unary(builder b, astn n) {
       binop->binop.rhs = idx;
       return build_expr_unary_deref(b, binop);
     }
-    case '(':
+    case '(': {
+      return build_expr_unary_func_call(b, n);
+    }
     case TOK_SYM_ARROW:
     case '.':
       break;
@@ -660,13 +667,15 @@ typed_value build_expr_primary(builder b, astn n) {
 typed_value build_load_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   auto var = build_declaration(b, n);
-  if (!var) {
-    log_panic("declaration %s has no llvm value", n->declaration.ident);
-  }
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &var->type_chain);
-  LLVMTypeRef points_to_type =
-      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
+  astn points_to_base_type = slist_peek_head(points_to_type_chain);
+  if (points_to_base_type->type == ast_parameters) {
+    // try to load function declaration
+    // the function symbol itself is a pointer
+    return typed_value_new(var->v, &var->type_chain);
+  }
+  LLVMTypeRef points_to_type = build_convert_base_type(b, points_to_base_type);
   return typed_value_new(
       LLVMBuildLoad2(b->builder, points_to_type, var->v, "load"),
       points_to_type_chain);

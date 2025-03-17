@@ -22,9 +22,11 @@ typed_value build_type_convert_to(builder b, typed_value v, slist type_chain) {
   assert(base_type->type == ast_ctype);
   assert(target_type->type == ast_ctype);
   if (build_type_compare_promote_level(base_type, target_type) == 0) {
-    log_trace("no need to cast");
+    log_trace("no need to cast, copy type chain to process ptr type cast");
+    v->type_chain = *type_chain;
     return v;
   }
+
 #define CONVERT_CASE(from, to, BF)                                             \
   if (base_type->ctype.type == from && target_type->ctype.type == to) {        \
     log_trace("cast " #from " to " #to);                                       \
@@ -103,6 +105,7 @@ typed_value build_type_convert_to(builder b, typed_value v, slist type_chain) {
             convert_repr_token(target_type->ctype.type));
   return v;
 }
+
 /**
  * @brief 
  * 
