@@ -1,6 +1,7 @@
 #ifndef BUILDER_H
 #define BUILDER_H
 #include "ast.h"
+#include "dynarray/dynarray.h"
 #include <llvm-c/Types.h>
 typedef struct builder {
   LLVMBuilderRef builder;
@@ -30,9 +31,11 @@ slist build_type_chain_expr_primary(astn n);
 typed_value build_type_convert_to(builder b, typed_value v, slist type_chain);
 int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type);
 
+dynarray build_function_parameters_type(builder b, astn params, dynarray arr);
 void build_trans_unit(builder b, slist symtab);
 typed_value build_lvalue_exprssion(builder b, astn n);
 typed_value build_declaration(builder b, astn n);
+LLVMTypeRef build_function_llvm_type_by_ast(builder b, astn n);
 LLVMTypeRef build_convert_base_type(builder b, astn n);
 LLVMTypeRef build_variable_declaration_type(builder b, astn n);
 typed_value build_expression(builder b, astn n);

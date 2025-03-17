@@ -176,4 +176,14 @@ void tbc_arr_deref() {
 
 void tbc_arr_sc() { tbc_entry("int F(int *arr,int idx) {return idx[arr];}"); }
 
-void tbc_ref_func() { tbc_entry("void F(){void *p = F;}"); }
+void tbc_ref_func() { tbc_entry("void F(int a, void*p){ p = F;}"); }
+
+void tbc_func_call() {
+  tbc_entry("int add(int a, short b, double c){ return a + b + c;}"
+            "int F(){int (*call)(int a, short b, double c) = add;char a = 1,b "
+            "= 2; unsigned int c = 3; return call(a,b,c) * add(1,2,3);}");
+}
+
+void tbc_func_uncallable() {
+  tbc_entry("int F(){int a = 1; return a ? F():a;}");
+}

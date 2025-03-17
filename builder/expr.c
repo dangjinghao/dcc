@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "builder.h"
+#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
@@ -270,8 +271,7 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
   LLVMTypeRef points_to_type =
       build_convert_base_type(b, slist_peek_head(points_to_type_chain));
   // cast rhs to lhs type
-  typed_value rhs_casted =
-      build_type_convert_to(b, rhs, points_to_type_chain);
+  typed_value rhs_casted = build_type_convert_to(b, rhs, points_to_type_chain);
   // store rhs to lhs
   LLVMBuildStore(b->builder, rhs_casted->v, lhs->v);
   // load lhs to return
@@ -315,13 +315,11 @@ typed_value build_expr_ternary(builder b, astn ternary) {
   } else if (promt_cmp < 0) {
     log_trace("casting true expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, true_block);
-    true_expr =
-        build_type_convert_to(b, true_expr, false_type_chain);
+    true_expr = build_type_convert_to(b, true_expr, false_type_chain);
   } else {
     log_trace("casting false expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, false_block);
-    false_expr =
-        build_type_convert_to(b, false_expr, true_type_chain);
+    false_expr = build_type_convert_to(b, false_expr, true_type_chain);
   }
   // add br to all branchs
   LLVMPositionBuilderAtEnd(b->builder, true_block);
@@ -570,7 +568,55 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
   }
 }
 
-typed_value build_expr_unary_func_call(builder b, astn n) { BUILDING(); }
+typed_value build_expr_unary_func_call(builder b, astn n) {
+  // function call
+  typed_value func_expr = build_expression(b, n->unary.expr);
+  // we could not use n and it's series API because the expr may be a temporary value
+  slist func_return_type_chain = build_type_chain_copy(&func_expr->type_chain);
+  astn func_base_type = slist_pop_head(func_return_type_chain);
+  astn func_params = slist_pop_head(func_return_type_chain);
+  if (func_base_type->ctype.type != '*' ||
+      func_params->type != ast_parameters) {
+    log_panic("this expression is not callable");
+  }
+  LLVMTypeRef ret_type =
+      build_convert_base_type(b, slist_peek_head(func_return_type_chain));
+  astn first_param = slist_peek_head(&func_params->parameters.list);
+  astn last_param = slist_peek_tail(&func_params->parameters.list);
+  LLVMTypeRef func_type;
+  if (g_is_void_param(first_param)) {
+    func_type = LLVMFunctionType(ret_type, NULL, 0, 0);
+  } else {
+    bool is_va = false;
+    if (g_is_varargs_param(last_param)) {
+      is_va = true;
+    }
+    struct dynarray params_type;
+    dynarray_default(&params_type, sizeof(LLVMTypeRef));
+    build_function_parameters_type(b, func_params, &params_type);
+    func_type =
+        LLVMFunctionType(ret_type, params_type.data, params_type.used, is_va);
+    dynarray_free(&params_type);
+  }
+  // create args list
+  size_t arg_idx = 1;
+  struct dynarray args;
+  dynarray_default(&args, sizeof(LLVMValueRef));
+  astn arg;
+  slist_foreach(&n->unary.extdata->arguments.list, arg) {
+    astn corresponsed_param =
+        slist_get(&func_params->parameters.list, arg_idx)->data;
+    typed_value arg_expr = build_expression(b, arg);
+    typed_value arg_casted = build_type_convert_to(
+        b, arg_expr, &corresponsed_param->declaration.type_chain);
+    dynarray_add(&args, &arg_casted->v);
+    arg_idx += 1;
+  }
+  LLVMValueRef call = LLVMBuildCall2(b->builder, func_type, func_expr->v,
+                                     args.data, args.used, "call_result");
+  dynarray_free(&args);
+  return typed_value_new(call, func_return_type_chain);
+}
 
 typed_value build_expr_unary(builder b, astn n) {
   if (!n->unary.postfix) {

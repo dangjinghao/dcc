@@ -210,6 +210,27 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
   }
   return arr;
 }
+
+LLVMTypeRef build_function_llvm_type_by_ast(builder b, astn n) {
+  LLVMTypeRef func;
+  LLVMTypeRef ret_type = build_variable_declaration_type(b, n);
+  if (g_is_function_void_param(n)) {
+    func = LLVMFunctionType(ret_type, NULL, 0, 0);
+  } else {
+    bool is_va = false;
+    if (g_is_function_varargs(n)) {
+      is_va = true;
+    }
+    struct dynarray params_type;
+    dynarray_default(&params_type, sizeof(LLVMTypeRef));
+    build_function_parameters_type(b, g_get_function_params(n), &params_type);
+    func =
+        LLVMFunctionType(ret_type, params_type.data, params_type.used, is_va);
+    dynarray_free(&params_type);
+  }
+  return func;
+}
+
 /**
  * @brief reused in function declaration and definition 
  * because the process of LLVM function definition and declaration have the prefix same process
@@ -221,23 +242,8 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
 LLVMValueRef build_function_prototype(builder b, astn n) {
   assert(g_get_function_params(n));
   sds func_name = build_symbol_name(n);
-  LLVMTypeRef ret_type = build_variable_declaration_type(b, n);
-  LLVMValueRef v;
-  if (g_is_function_void_param(n)) {
-    auto func = LLVMFunctionType(ret_type, NULL, 0, 0);
-    v = LLVMAddFunction(b->module, func_name, func);
-  } else {
-    bool is_va = false;
-    if (g_is_function_varargs(n)) {
-      is_va = true;
-    }
-    struct dynarray params;
-    dynarray_default(&params, sizeof(astn));
-    build_function_parameters_type(b, g_get_function_params(n), &params);
-    auto func = LLVMFunctionType(ret_type, params.data, params.used, is_va);
-    v = LLVMAddFunction(b->module, func_name, func);
-    dynarray_free(&params);
-  }
+  LLVMTypeRef func = build_function_llvm_type_by_ast(b, n);
+  LLVMValueRef v = LLVMAddFunction(b->module, func_name, func);
   sdsfree(func_name);
   return v;
 }

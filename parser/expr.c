@@ -92,15 +92,14 @@ static astn parse_expr_unary_advanced_postfix_if_need(parser parser,
     break;
   }
   case '(': {
-    if (parser->current_token == ')') {
-      parser_consume(parser);
-      return unary;
-    }
+    // create the argument list whatever it is empty or not to promise the same operation
     astn args = ast_new(ast_arguments);
-    slist_add_tail(&args->arguments.list, parse_expr_assign(parser));
-    while (parser->current_token == ',') {
-      parser_consume(parser);
+    if (parser->current_token != ')') {
       slist_add_tail(&args->arguments.list, parse_expr_assign(parser));
+      while (parser->current_token == ',') {
+        parser_consume(parser);
+        slist_add_tail(&args->arguments.list, parse_expr_assign(parser));
+      }
     }
     unary->unary.extdata = args;
     parser_consume_with(parser, ')');

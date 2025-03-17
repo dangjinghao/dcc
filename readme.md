@@ -38,12 +38,15 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] build typecast
 - [x] build jump statement: goto and return
 - [x] return statement
+- [ ] logic operation
 - [ ] if-else statement
+- [ ] iteration statement
+- [ ] reorganize builder API again
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary
   - [x] unary expression array index
-  - [ ] function call
+  - [x] function call
   - [ ] struct get member
   - [ ] array
 - [ ] update switch case
