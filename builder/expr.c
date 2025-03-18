@@ -277,8 +277,55 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
 }
 
 typed_value build_expr_binop_assign(builder b, astn binop) {
-  typed_value lhs = build_lvalue_exprssion(b, binop->binop.lhs);
-  typed_value rhs = build_expression(b, binop->binop.rhs);
+  typed_value lhs, rhs;
+  if (binop->binop.op != '=') {
+    // build extracted ast
+    astn assign_ast = ast_new(ast_expr_binop);
+    switch (binop->binop.op) {
+    case TOK_SYM_SELF_ADD:
+      assign_ast->binop.op = '+';
+      break;
+    case TOK_SYM_SELF_SUB:
+      assign_ast->binop.op = '-';
+      break;
+    case TOK_SYM_SELF_MUL:
+      assign_ast->binop.op = '*';
+      break;
+    case TOK_SYM_SELF_DIV:
+      assign_ast->binop.op = '/';
+      break;
+    case TOK_SYM_SELF_MOD:
+      assign_ast->binop.op = '%';
+      break;
+    case TOK_SYM_SELF_LSHIFT:
+      assign_ast->binop.op = TOK_SYM_LSHIFT;
+      break;
+    case TOK_SYM_SELF_RSHIFT:
+      assign_ast->binop.op = TOK_SYM_RSHIFT;
+      break;
+    case TOK_SYM_SELF_BIT_AND:
+      assign_ast->binop.op = '&';
+      break;
+    case TOK_SYM_SELF_BIT_OR:
+      assign_ast->binop.op = '|';
+      break;
+    case TOK_SYM_SELF_BIT_XOR:
+      assign_ast->binop.op = '^';
+      break;
+    default:
+      log_panic("Unsupported self assign operation: %s",
+                convert_repr_ast_type(binop->binop.op));
+    }
+    assign_ast->binop.lhs = binop->binop.lhs;
+    assign_ast->binop.rhs = binop->binop.rhs;
+    lhs = build_lvalue_exprssion(b, assign_ast->binop.lhs);
+    rhs = build_expr_binop(b, assign_ast);
+    assign_ast->binop.lhs = assign_ast->binop.rhs = NULL;
+    ast_free(assign_ast);
+  } else {
+    lhs = build_lvalue_exprssion(b, binop->binop.lhs);
+    rhs = build_expression(b, binop->binop.rhs);
+  }
   // get lhs points type
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &lhs->type_chain);
@@ -462,6 +509,16 @@ typed_value build_expr_binop(builder b, astn n) {
         b, n, (llvm_func_t[]){LLVMBuildAShr, LLVMBuildLShr},
         (char *[]){"ashr", "lshr"});
   }
+  case TOK_SYM_SELF_BIT_AND:
+  case TOK_SYM_SELF_BIT_OR:
+  case TOK_SYM_SELF_BIT_XOR:
+  case TOK_SYM_SELF_DIV:
+  case TOK_SYM_SELF_LSHIFT:
+  case TOK_SYM_SELF_MOD:
+  case TOK_SYM_SELF_MUL:
+  case TOK_SYM_SELF_RSHIFT:
+  case TOK_SYM_SELF_ADD:
+  case TOK_SYM_SELF_SUB:
   case '=': {
     return build_expr_binop_assign(b, n);
   }

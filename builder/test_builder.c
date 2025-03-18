@@ -119,7 +119,8 @@ void tbc_ptr_int() {
 }
 
 void tbc_signed() {
-  tbc_entry("void F(){int v = 1;unsigned int v2 = 2;int v3 = v + v2;}");
+  tbc_entry("void F(){int v = 1;unsigned int v2 = 2;int v3 = v + v2; v2 /= 4.;v2 /= 2; "
+            "v2 %=3;}");
 }
 
 void tbc_func_arg() { tbc_entry("void F(int a,char b,short* c){*c = a + b;}"); }
@@ -203,6 +204,15 @@ void tbc_ptr_logic() {
   tbc_entry("void F(){short* p; p > 1; p < p + 1; p == p; p <= p + 1;}");
 }
 
-void tbc_ptr_assign2(){
+void tbc_ptr_assign2() {
   tbc_entry("void F(){int**p;p[1] = 1; *(p+2) = 2; p = 3;}");
+}
+
+void tbc_self_assign() {
+  tbc_entry("void F(){int v = 1;v = v + 2;v += 3;v -= 4;v *= 5;v /= 6;v %= "
+            "7;v &= 8;v |= 9;v ^= 10;v <<= 11;v >>= 12;}");
+}
+
+void tbc_ptr_self_assign() {
+  tbc_entry("void F(){int* v = 0;v = v + 2;v += 3;v -= 4;}");
 }

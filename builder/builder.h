@@ -33,12 +33,15 @@ int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type);
 
 dynarray build_function_parameters_type(builder b, astn params, dynarray arr);
 void build_trans_unit(builder b, slist symtab);
+
 typed_value build_lvalue_exprssion(builder b, astn n);
+typed_value build_expr_binop(builder b, astn n);
+typed_value build_expression(builder b, astn n);
+
 typed_value build_declaration(builder b, astn n);
 LLVMTypeRef build_function_llvm_type_by_ast(builder b, astn n);
 LLVMTypeRef build_convert_base_type(builder b, astn n);
 LLVMTypeRef build_variable_declaration_type(builder b, astn n);
-typed_value build_expression(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);
 slist build_type_get_points_to_type_chian(builder b, slist type_chain);
 slist build_function_return_type_chain(builder b, astn n);

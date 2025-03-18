@@ -39,7 +39,7 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] build jump statement: goto and return
 - [x] return statement
 - [x] ptr test
-- [ ] binop self assign
+- [x] binop self assign
 - [ ] logic operation
 - [ ] if-else statement
 - [ ] iteration statement
@@ -55,7 +55,6 @@ Now we just ignore the full functional codegen implementation of global variable
 - [ ] string reference table in builder
 - [ ] {} initializer
 - [ ] sizeof constant expression
-- [ ] multi-dim array
 - [ ] node meta data
 - [ ] union
 - [ ] attribute
