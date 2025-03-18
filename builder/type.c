@@ -1,11 +1,11 @@
 #include "ast.h"
 #include "builder.h"
-#include "convert/convert.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
 #include "slist/slist.h"
+#include "token.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 /**
@@ -21,19 +21,14 @@ typed_value build_type_convert_to(builder b, typed_value v, slist type_chain) {
   astn target_type = slist_peek_head(type_chain);
   assert(base_type->type == ast_ctype);
   assert(target_type->type == ast_ctype);
-  if (build_type_compare_promote_level(base_type, target_type) == 0) {
-    log_trace("no need to cast, copy type chain to process ptr type cast");
-    v->type_chain = *type_chain;
-    return v;
-  }
 
 #define CONVERT_CASE(from, to, BF)                                             \
   if (base_type->ctype.type == from && target_type->ctype.type == to) {        \
     log_trace("cast " #from " to " #to);                                       \
     v->v = (BF)(b->builder, v->v, build_convert_base_type(b, target_type),     \
                 "cast");                                                       \
-    v->type_chain = *type_chain;                                               \
-    return v;                                                                  \
+    auto nv = typed_value_new(v->v, type_chain);                               \
+    return nv;                                                                 \
   }
   // int -> int
   if (g_is_int_family_tok(base_type->ctype.type) &&
@@ -42,9 +37,20 @@ typed_value build_type_convert_to(builder b, typed_value v, slist type_chain) {
                              build_convert_base_type(b, target_type),
                              base_type->ctype.signint == TOK_KW_SIGNED, "cast");
     log_trace("cast type in int family");
-    v->type_chain = *type_chain;
-    return v;
+    auto nv = typed_value_new(v->v, type_chain);
+    return nv;
   }
+  // ptr -> int
+  CONVERT_CASE('*', TOK_KW_CHAR, LLVMBuildPtrToInt);
+  CONVERT_CASE('*', TOK_KW_SHORT, LLVMBuildPtrToInt);
+  CONVERT_CASE('*', TOK_KW_INT, LLVMBuildPtrToInt);
+  CONVERT_CASE('*', TOK_KW_LONG, LLVMBuildPtrToInt);
+  // int -> ptr
+  CONVERT_CASE(TOK_KW_CHAR, '*', LLVMBuildIntToPtr);
+  CONVERT_CASE(TOK_KW_SHORT, '*', LLVMBuildIntToPtr);
+  CONVERT_CASE(TOK_KW_INT, '*', LLVMBuildIntToPtr);
+  CONVERT_CASE(TOK_KW_LONG, '*', LLVMBuildIntToPtr);
+
   // fp -> fp
   CONVERT_CASE(TOK_KW_FLOAT, TOK_KW_DOUBLE, LLVMBuildFPCast);
   CONVERT_CASE(TOK_KW_DOUBLE, TOK_KW_FLOAT, LLVMBuildFPCast);
@@ -100,9 +106,10 @@ typed_value build_type_convert_to(builder b, typed_value v, slist type_chain) {
 
 #undef CONVERT_CASE
 
-  log_panic("Invalid type cast:%s -> %s",
-            convert_repr_token(base_type->ctype.type),
-            convert_repr_token(target_type->ctype.type));
+  log_trace("no need to cast, but we still copy type chain to process ptr "
+            "type cast");
+  v = typed_value_new(v->v, type_chain);
+
   return v;
 }
 
@@ -160,10 +167,9 @@ slist build_type_chain_expr_primary(astn n) {
 
 /**
  * @brief char,unsigned char,short,unsigned short,int,unsigned int,long,unsigned long,float,double
- * 
  * @param lhs 
  * @param rhs 
- * @return int -1: lhs < rhs, 0: lhs == rhs, 1: lhs > rhs 
+ * @return int -1: lhs < rhs, 0: lhs == rhs, 1: lhs > rhs
  */
 int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
   assert(lhs_base_type->type == ast_ctype);
@@ -173,6 +179,12 @@ int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
       [TOK_KW_INT - __TOK_KW_START] = 2,   [TOK_KW_LONG - __TOK_KW_START] = 3,
       [TOK_KW_FLOAT - __TOK_KW_START] = 4, [TOK_KW_DOUBLE - __TOK_KW_START] = 5,
   };
+  if (lhs_base_type->ctype.type == '*' && rhs_base_type->ctype.type == '*') {
+    return 0;
+  }
+  assert(g_is_numeric_tok(lhs_base_type->ctype.type));
+  assert(g_is_numeric_tok(rhs_base_type->ctype.type));
+
   int lhs_level =
       type_promote_level[lhs_base_type->ctype.type - __TOK_KW_START];
   int rhs_level =
@@ -190,23 +202,32 @@ int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
   }
   return 0; // Default case
 }
-
+/**
+ * @brief Special case: cast ptr to unsigned long
+ * 
+ * @param b 
+ * @param values 
+ * @return typed_value* 
+ */
 typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values) {
   slist lhs_type_chain = &values[0]->type_chain;
   slist rhs_type_chain = &values[1]->type_chain;
   astn lhs_ty = slist_peek_head(lhs_type_chain);
   astn rhs_ty = slist_peek_head(rhs_type_chain);
+
   int cmp = build_type_compare_promote_level(lhs_ty, rhs_ty);
   if (cmp == 0) {
     return values;
   }
-  if (cmp < 0) {
+  if (cmp == -1) {
     log_trace("converting: lhs type < rhs type");
     values[0] = build_type_convert_to(b, values[0], rhs_type_chain);
-  } else {
+  } else if (cmp == 1) {
     log_trace("converting: lhs type > rhs type");
     values[1] = build_type_convert_to(b, values[1], lhs_type_chain);
+  } else {
+    log_panic("Invalid type cast");
   }
   return values;
 }

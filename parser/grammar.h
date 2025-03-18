@@ -251,6 +251,10 @@ static inline bool g_is_fp_family_tok(enum tok_type tok) {
   return tok == TOK_KW_FLOAT || tok == TOK_KW_DOUBLE;
 }
 
+static inline bool g_is_numeric_tok(enum tok_type tok) {
+  return g_is_int_family_tok(tok) || g_is_fp_family_tok(tok);
+}
+
 /**
  * @grammar
  * <init-declarator> ::= <declarator>

@@ -181,7 +181,7 @@ void build_alloca_variable_init(builder b, astn n, LLVMValueRef pv) {
               LLVMGetValueName2(pv, &(size_t){}));
     auto v = build_expression(b, init->initializer.init);
     log_trace("try to cast the initializer to the variable type");
-    build_type_convert_to(b, v, &n->declaration.type_chain);
+    v = build_type_convert_to(b, v, &n->declaration.type_chain);
     LLVMBuildStore(b->builder, v->v, pv);
   }
 }

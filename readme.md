@@ -38,6 +38,8 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] build typecast
 - [x] build jump statement: goto and return
 - [x] return statement
+- [x] ptr test
+- [ ] binop self assign
 - [ ] logic operation
 - [ ] if-else statement
 - [ ] iteration statement
