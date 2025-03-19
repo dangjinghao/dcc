@@ -246,12 +246,12 @@ void tbc_do_done_now() {
             "sum;}");
 }
 
-void tbc_while(){
+void tbc_while() {
   tbc_entry("int F(){int sum = 0,i = 0;while(i <= 100){sum += i;i++;}return "
             "sum;}");
 }
 
-void tbc_while_done_now(){
+void tbc_while_done_now() {
   tbc_entry("int F(){int sum = 4,i = 1;while(i <= 0){sum += i;i++;}return "
             "sum;}");
 }
@@ -263,4 +263,9 @@ void tbc_for_done_now() {
 
 void tbc_always() {
   tbc_entry("void F(){void p(int);int i,j;for(i = 0,j = 1;;i+=j)p(i);}");
+}
+
+void tbc_continue() {
+  tbc_entry(
+      "int F(){int sum = 0;for(int i = 0;i <= 100;i++){sum +=i;continue;break;sum +=i;}return sum;}");
 }

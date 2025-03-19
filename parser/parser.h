@@ -20,7 +20,7 @@ typedef struct parser {
   astn break_scope;
   // for case and break in switch statement
   astn switch_scope;
-  // for return statement
+  // do not modify the value for some ugly depenencies
   astn function_scope;
   // for unique id declaration
   size_t uidcnt;

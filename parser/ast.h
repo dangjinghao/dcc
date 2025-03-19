@@ -143,6 +143,7 @@ typedef struct astn {
       enum tok_type type;
       struct astn *body;
       struct astn *init, *cond, *inc;
+      LLVMBasicBlockRef break_block, continue_block;
     } iteration;
   };
 } *astn;
