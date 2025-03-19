@@ -40,7 +40,7 @@ Now we just ignore the full functional codegen implementation of global variable
 - [x] return statement
 - [x] ptr test
 - [x] binop self assign
-- [ ] logic operation
+- [x] logic operation
 - [ ] if-else statement
 - [ ] iteration statement
 - [ ] reorganize builder API again

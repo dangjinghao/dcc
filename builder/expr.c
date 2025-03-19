@@ -426,6 +426,40 @@ typed_value build_expr_ternary(builder b, astn ternary) {
   return typed_value_new(phi, &true_expr->type_chain);
 }
 
+typed_value build_expr_binop_logic_short_circuit(builder b, astn binop,
+                                                 bool is_and) {
+  typed_value lhs = build_expression(b, binop->binop.lhs);
+  LLVMValueRef lhs_check = build_value_ne0(b, lhs);
+  LLVMBasicBlockRef start_block = LLVMGetInsertBlock(b->builder);
+  LLVMBasicBlockRef next_block = LLVMAppendBasicBlockInContext(
+      b->context, b->fn, is_and ? "and_next" : "or_next");
+  LLVMBasicBlockRef merge_block = LLVMAppendBasicBlockInContext(
+      b->context, b->fn, is_and ? "and_merge" : "or_merge");
+
+  if (is_and) {
+    LLVMBuildCondBr(b->builder, lhs_check, next_block, merge_block);
+  } else {
+    LLVMBuildCondBr(b->builder, lhs_check, merge_block, next_block);
+  }
+
+  LLVMPositionBuilderAtEnd(b->builder, next_block);
+  typed_value rhs = build_expression(b, binop->binop.rhs);
+  LLVMValueRef rhs_check = build_value_ne0(b, rhs);
+  next_block = LLVMGetInsertBlock(b->builder);
+  LLVMBuildBr(b->builder, merge_block);
+
+  LLVMPositionBuilderAtEnd(b->builder, merge_block);
+  LLVMValueRef phi = LLVMBuildPhi(b->builder, LLVMInt1TypeInContext(b->context),
+                                  is_and ? "logic_and_phi" : "logic_or_phi");
+  LLVMAddIncoming(phi, (LLVMValueRef[]){lhs_check, rhs_check},
+                  (LLVMBasicBlockRef[]){start_block, next_block}, 2);
+
+  LLVMValueRef ext =
+      LLVMBuildZExt(b->builder, phi, LLVMInt8TypeInContext(b->context),
+                    is_and ? "zext_and" : "zext_or");
+  return typed_value_new(ext, build_base_type_chain_by_lit(TOK_LIT_CHAR));
+}
+
 /**
  * @brief the sub-branch of build_expression
  * 
@@ -522,9 +556,12 @@ typed_value build_expr_binop(builder b, astn n) {
   case '=': {
     return build_expr_binop_assign(b, n);
   }
-  case TOK_SYM_LOGIC_AND:
-  case TOK_SYM_LOGIC_OR:
-    break;
+  case TOK_SYM_LOGIC_AND: {
+    return build_expr_binop_logic_short_circuit(b, n, true);
+  }
+  case TOK_SYM_LOGIC_OR: {
+    return build_expr_binop_logic_short_circuit(b, n, false);
+  }
   }
   BUILDING();
 }
