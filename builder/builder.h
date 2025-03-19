@@ -8,7 +8,7 @@ typedef struct builder {
   LLVMModuleRef module;
   LLVMContextRef context;
   slist symtab;
-  // current function
+  // current function, used for append basic block only
   LLVMValueRef fn;
   // goto label
   struct slist labels;

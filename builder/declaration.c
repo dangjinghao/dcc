@@ -123,7 +123,8 @@ LLVMTypeRef build_variable_declaration_type(builder b, astn n) {
 sds build_symbol_name(astn n) {
   assert(n->type == ast_declaration);
   astn decl_specs = g_get_declaration_specifier(n);
-  if (g_is_declaration_in_function_scope(n)) {
+  if (g_is_declaration_in_function_scope(n) && !g_is_function_declaration(n)) {
+    // !g_is_function_declaration(n) to avoid the function declaration in function scope
     if (decl_specs->ctype.storage == TOK_KW_STATIC) {
       // static function variable
       assert(n->declaration.scope_ref->type == ast_declaration);

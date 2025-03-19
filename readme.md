@@ -22,6 +22,8 @@ the parser processing flow is top to down, so when processing the body of functi
 
 Now we just ignore the full functional codegen implementation of global variable initializer. Take more care of runtime codegen (e.g. code in function) until we complete it.
 
+We should dependence less LLVM library features.
+
 ## TODO LIST
 
 - [x] use slist instead of dynarray for performance
