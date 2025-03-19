@@ -24,6 +24,8 @@ Now we just ignore the full functional codegen implementation of global variable
 
 We should dependence less LLVM library features.
 
+DONOT USE i1 directly, cast it to i8.
+
 ## TODO LIST
 
 - [x] use slist instead of dynarray for performance
@@ -43,8 +45,9 @@ We should dependence less LLVM library features.
 - [x] ptr test
 - [x] binop self assign
 - [x] logic operation
+- [x] iteration statement
+- [ ] break/continue in iteration statement
 - [ ] if-else statement
-- [ ] iteration statement
 - [ ] reorganize builder API again
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test

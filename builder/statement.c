@@ -116,21 +116,101 @@ void build_statement_labeled(builder b, astn n) {
   }
 }
 
+void build_statement_iteration_while(builder b, astn n) {
+  assert(n->type == ast_statement_iteration);
+  assert(n->iteration.type == TOK_KW_WHILE);
+  LLVMBasicBlockRef cond =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "while_cond");
+  LLVMBasicBlockRef body =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "while_body");
+  LLVMBasicBlockRef after =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "while_after");
+  LLVMBuildBr(b->builder, cond);
+  LLVMPositionBuilderAtEnd(b->builder, cond);
+  typed_value cond_val = build_expression(b, n->iteration.cond);
+  LLVMValueRef cond_test = build_value_ne0(b, cond_val);
+  LLVMBuildCondBr(b->builder, cond_test, body, after);
+  LLVMPositionBuilderAtEnd(b->builder, body);
+  build_statement(b, n->iteration.body);
+  LLVMBuildBr(b->builder, cond);
+  LLVMPositionBuilderAtEnd(b->builder, after);
+}
+
+void build_statement_iteration_do(builder b, astn n) {
+  assert(n->type == ast_statement_iteration);
+  assert(n->iteration.type == TOK_KW_DO);
+  LLVMBasicBlockRef body =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "do_body");
+  LLVMBasicBlockRef after =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "do_after");
+  LLVMBuildBr(b->builder, body);
+  LLVMPositionBuilderAtEnd(b->builder, body);
+  build_statement(b, n->iteration.body);
+  typed_value cond_val = build_expression(b, n->iteration.cond);
+  LLVMValueRef cond_test = build_value_ne0(b, cond_val);
+  LLVMBuildCondBr(b->builder, cond_test, body, after);
+  LLVMPositionBuilderAtEnd(b->builder, after);
+}
+
+void build_statement_iteration_for(builder b, astn n) {
+  assert(n->type == ast_statement_iteration);
+  assert(n->iteration.type == TOK_KW_FOR);
+  LLVMBasicBlockRef init =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "for_init");
+  LLVMBasicBlockRef cond =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "for_cond");
+  LLVMBasicBlockRef inc =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "for_inc");
+  LLVMBasicBlockRef body =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "for_body");
+  LLVMBasicBlockRef after =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "for_after");
+  // just for readability
+  LLVMBuildBr(b->builder, init);
+  LLVMPositionBuilderAtEnd(b->builder, init);
+  build_statement(b, n->iteration.init);
+  LLVMBuildBr(b->builder, cond);
+  LLVMPositionBuilderAtEnd(b->builder, cond);
+  if (!g_is_empty_statement(n->iteration.cond)) {
+    typed_value cond_val = build_expression(b, n->iteration.cond);
+    LLVMValueRef cond_test = build_value_ne0(b, cond_val);
+    LLVMBuildCondBr(b->builder, cond_test, body, after);
+  } else {
+    LLVMBuildBr(b->builder, body);
+  }
+  LLVMPositionBuilderAtEnd(b->builder, body);
+  build_statement(b, n->iteration.body);
+  // just for readability
+  LLVMBuildBr(b->builder, inc);
+  LLVMPositionBuilderAtEnd(b->builder, inc);
+  build_statement(b, n->iteration.inc);
+  LLVMBuildBr(b->builder, cond);
+  LLVMPositionBuilderAtEnd(b->builder, after);
+}
+
 void build_statement_iteration(builder b, astn n) {
   assert(n->type == ast_statement_iteration);
   switch (n->iteration.type) {
   case TOK_KW_WHILE:
-    BUILDING();
+    build_statement_iteration_while(b, n);
+    return;
   case TOK_KW_DO:
-    BUILDING();
+    build_statement_iteration_do(b, n);
+    return;
   case TOK_KW_FOR:
-    BUILDING();
+    build_statement_iteration_for(b, n);
+    return;
   default:
     break;
   }
 }
 
 void build_statement(builder b, astn n) {
+  if (g_is_empty_statement(n)) {
+    // do nothing
+    log_trace("got an empty statement, do nothing");
+    return;
+  }
   switch (n->type) {
   case ast_statement_jump:
     build_statement_jump(b, n);

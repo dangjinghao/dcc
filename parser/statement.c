@@ -78,7 +78,7 @@ astn parse_statement_iteration(parser p) {
       // statement_expression supports empty statement, so it will be used in the init and cond
       iter->iteration.init = parse_statement_expression(p);
     }
-    // ';' is consumed by the parse_statement_expression or declaration
+    // ';' is consumed by the parse_statement_expression
     iter->iteration.cond = parse_statement_expression(p);
     if (p->current_token != ')') {
       iter->iteration.inc = parse_expression(p);

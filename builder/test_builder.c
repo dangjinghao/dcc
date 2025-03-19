@@ -223,6 +223,44 @@ void tbc_logic() {
             "v3) && (v4 || v5);}");
 }
 
-void tbc_void_func_call(){
-  tbc_entry("void F(){{{void f();f();}}}");
+void tbc_void_func_call() { tbc_entry("void F(){{{void f();f();}}}"); }
+
+void tbc_sum5050() {
+  tbc_entry(
+      "int F(){int sum = 0;for(int i = 0;i <= 100.; i++){sum += i;}return "
+      "sum;}");
+}
+
+void tbc_for_noinc_init() {
+  tbc_entry("int F(){int sum = 0,i = 0;for(;i <= 100;){sum += i;i++;}return "
+            "sum;}");
+}
+
+void tbc_do() {
+  tbc_entry("int F(){int sum = 0,i = 0;do{sum += i;i++;}while(i <= 100);return "
+            "sum;}");
+}
+
+void tbc_do_done_now() {
+  tbc_entry("int F(){int sum = 0,i = 1;do{sum += i;i++;}while(i <= 0);return "
+            "sum;}");
+}
+
+void tbc_while(){
+  tbc_entry("int F(){int sum = 0,i = 0;while(i <= 100){sum += i;i++;}return "
+            "sum;}");
+}
+
+void tbc_while_done_now(){
+  tbc_entry("int F(){int sum = 4,i = 1;while(i <= 0){sum += i;i++;}return "
+            "sum;}");
+}
+
+void tbc_for_done_now() {
+  tbc_entry(
+      "int F(){int sum = 0;for(int i = 0;i <= -1;i++){sum += i;}return sum;}");
+}
+
+void tbc_always() {
+  tbc_entry("void F(){void p(int);int i,j;for(i = 0,j = 1;;i+=j)p(i);}");
 }
