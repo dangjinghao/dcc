@@ -48,8 +48,8 @@ astn parse_statement_iteration(parser p) {
   astn iter = ast_new(ast_statement_iteration);
   iter->iteration.type = p->current_token;
   parser_consume(p);
-  astn prev_scope = p->interruptable_scope;
-  p->interruptable_scope = iter;
+  astn prev_scope = p->break_scope;
+  p->break_scope = iter;
   switch (iter->iteration.type) {
   case TOK_KW_WHILE: {
     parser_consume_with(p, '(');
@@ -93,7 +93,7 @@ astn parse_statement_iteration(parser p) {
   default:
     break;
   }
-  p->interruptable_scope = prev_scope;
+  p->break_scope = prev_scope;
   return iter;
 }
 
@@ -106,13 +106,15 @@ astn parse_statement_jump(parser p) {
   switch (jump->jump_statement.type) {
   case TOK_KW_GOTO:
     jump->jump_statement.expr = parse_expr_ident(p);
+    // it would not be used in the current implementation
+    jump->jump_statement.scope_ref = NULL;
     break;
   case TOK_KW_CONTINUE:
   case TOK_KW_BREAK:
     // TODO: special case for break in switch
     // currently it's a wrong implementation
     BUILDING();
-    jump->jump_statement.scope_ref = p->interruptable_scope;
+    jump->jump_statement.scope_ref = p->break_scope;
     assert(jump->jump_statement.scope_ref);
     break;
   case TOK_KW_RETURN:
@@ -121,7 +123,7 @@ astn parse_statement_jump(parser p) {
     } else {
       jump->jump_statement.expr = parse_expression(p);
     }
-    jump->jump_statement.scope_ref = p->current_function_scope;
+    jump->jump_statement.scope_ref = p->function_scope;
     assert(jump->jump_statement.scope_ref);
     break;
   default:

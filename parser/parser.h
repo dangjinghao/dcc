@@ -17,11 +17,11 @@ typedef struct parser {
   // strong symbol with same ident will be found first, just like 'cover' the weak symbol
   struct slist symtab;
   // for break, continue, set the value when in the scope of if, for, while, do-while
-  astn interruptable_scope;
-  // for switch statement
+  astn break_scope;
+  // for case and break in switch statement
   astn switch_scope;
   // for return statement
-  astn current_function_scope;
+  astn function_scope;
   // for unique id declaration
   size_t uidcnt;
 } *parser;

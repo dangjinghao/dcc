@@ -765,8 +765,11 @@ typed_value build_expr_unary_func_call(builder b, astn n) {
     dynarray_add(&args, &arg_casted->v);
     arg_idx += 1;
   }
-  LLVMValueRef call = LLVMBuildCall2(b->builder, func_type, func_expr->v,
-                                     args.data, args.used, "call_result");
+  astn func_return_base_type = slist_peek_head(func_return_type_chain);
+  LLVMValueRef call = LLVMBuildCall2(
+      b->builder, func_type, func_expr->v, args.data, args.used,
+      func_return_base_type->ctype.type != TOK_KW_VOID ? "call_result" : "");
+
   dynarray_free(&args);
   return typed_value_new(call, func_return_type_chain);
 }

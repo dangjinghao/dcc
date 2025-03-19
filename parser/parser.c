@@ -19,8 +19,8 @@ void parser_new_from_lexer(parser parser, struct lexer *lexer) {
   slist_init(&parser->idtab);
   slist_init(&parser->tagtab);
   slist_init(&parser->symtab);
-  parser->switch_scope = parser->interruptable_scope =
-      parser->current_function_scope = NULL;
+  parser->switch_scope = parser->break_scope =
+      parser->function_scope = NULL;
   parser->uidcnt = 0;
 }
 
@@ -139,7 +139,7 @@ astn parser_get_typedef_by_type_name(parser parser, sds ident) {
 
 bool parser_is_current_block_global(parser parser) {
   // find NULL in the idtab
-  return parser->current_function_scope == NULL;
+  return parser->function_scope == NULL;
 }
 
 /**

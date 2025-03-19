@@ -40,6 +40,8 @@ void build_statement_jump_goto(builder b, astn n) {
   }
   LLVMBuildBr(b->builder, l->block);
   // after goto
+  // we would not use the `n->jump_statement.scope_ref`
+  // just keep the symmetries between goto and label
   LLVMBasicBlockRef after_goto =
       LLVMAppendBasicBlockInContext(b->context, b->fn, "after_goto");
   LLVMPositionBuilderAtEnd(b->builder, after_goto);
@@ -114,6 +116,20 @@ void build_statement_labeled(builder b, astn n) {
   }
 }
 
+void build_statement_iteration(builder b, astn n) {
+  assert(n->type == ast_statement_iteration);
+  switch (n->iteration.type) {
+  case TOK_KW_WHILE:
+    BUILDING();
+  case TOK_KW_DO:
+    BUILDING();
+  case TOK_KW_FOR:
+    BUILDING();
+  default:
+    break;
+  }
+}
+
 void build_statement(builder b, astn n) {
   switch (n->type) {
   case ast_statement_jump:
@@ -126,7 +142,8 @@ void build_statement(builder b, astn n) {
     build_statement_labeled(b, n);
     return;
   case ast_statement_iteration:
-    BUILDING();
+    build_statement_iteration(b, n);
+    return;
   default:
     build_expression(b, n);
     break;

@@ -444,7 +444,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
   if (!delay_alloc_id) {
     // this symbol declaration would be delayed to the function definition process
     // and it should only be used in the function parameter parse process
-    n->declaration.scope_ref = parser->current_function_scope;
+    n->declaration.scope_ref = parser->function_scope;
     parser_declare_new_symbol(parser, n);
   }
   if (parser->current_token == '=') {
@@ -461,7 +461,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
                      "function definition is not allowed in non-global scope");
     }
     parser_push_scope(parser);
-    parser->current_function_scope = n;
+    parser->function_scope = n;
     // add params to the scope
     astn ps = g_get_function_params(n);
     if (!ps) {
@@ -478,13 +478,13 @@ astn parse_init_declarator(parser parser, astn decl_specs,
         compiler_error(parser->lexer,
                        "there is a function parameter without an identifier");
       }
-      p->declaration.scope_ref = parser->current_function_scope;
+      p->declaration.scope_ref = parser->function_scope;
       parser_declare_new_symbol(parser, p);
     }
 
     // function body
     n->declaration.extdata = parse_statement_compound(parser);
-    parser->current_function_scope = NULL;
+    parser->function_scope = NULL;
     parser_pop_scope(parser);
   }
   return n;

@@ -222,3 +222,7 @@ void tbc_logic() {
   tbc_entry("void F(){int v = 1,v2 = 2,v3 = 3,v4=4,v5=5;int r = ((v && v2) || "
             "v3) && (v4 || v5);}");
 }
+
+void tbc_void_func_call(){
+  tbc_entry("void F(){{{void f();f();}}}");
+}
