@@ -265,7 +265,9 @@ void tbc_always() {
   tbc_entry("void F(){void p(int);int i,j;for(i = 0,j = 1;;i+=j)p(i);}");
 }
 
-void tbc_continue() {
-  tbc_entry(
-      "int F(){int sum = 0;for(int i = 0;i <= 100;i++){sum +=i;continue;break;sum +=i;}return sum;}");
+void tbc_continue_break() {
+  tbc_entry("int F(){int sum = 0;for(int i = 0;i <= 100;i++){sum "
+            "+=i;continue;break;sum +=i;}return sum;}");
 }
+
+void tbc_empty_label() { tbc_entry("int F(){int a; L1:a = 1; L2: }"); }

@@ -28,6 +28,7 @@ enum ast_type {
   ast_enumeration,
   ast_enumerator,
   ast_statement_iteration,
+  ast_statement_if,
 };
 
 enum type_qualifier {
@@ -145,6 +146,11 @@ typedef struct astn {
       struct astn *init, *cond, *inc;
       LLVMBasicBlockRef break_block, continue_block;
     } iteration;
+    struct _if {
+      struct astn *cond;
+      struct astn *_t;
+      struct astn *_f;
+    } _if;
   };
 } *astn;
 

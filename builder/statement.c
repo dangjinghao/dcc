@@ -15,14 +15,15 @@ void build_statement_jump_return(builder b, astn n) {
   assert(func->type == ast_declaration);
   slist func_type_chain = build_function_return_type_chain(b, func);
   astn func_return_type = slist_peek_head(func_type_chain);
-  if (g_is_empty_statement(n->jump_statement.expr) &&
+  if ((!n->jump_statement.expr) &&
       func_return_type->ctype.type != TOK_KW_VOID) {
     log_panic("return statement with no value in non-void function");
-  } else if (g_is_empty_statement(n->jump_statement.expr) &&
+  } else if ((!n->jump_statement.expr) &&
              func_return_type->ctype.type == TOK_KW_VOID) {
     LLVMBuildRetVoid(b->builder);
     return;
   }
+  // n->jump_statement.expr exists
   typed_value ret_val = build_expression(b, n->jump_statement.expr);
   log_trace("try to cast return value to function return type");
   typed_value ret_val_casted =
@@ -33,6 +34,7 @@ void build_statement_jump_return(builder b, astn n) {
 void build_statement_jump_goto(builder b, astn n) {
   assert(n->type == ast_statement_jump);
   assert(n->jump_statement.type == TOK_KW_GOTO);
+  assert(n->jump_statement.expr);
   assert(n->jump_statement.expr->type == ast_ident);
   label l = builder_label_find(b, n->jump_statement.expr->ident);
   if (!l) {
@@ -212,10 +214,12 @@ void build_statement_iteration_for(builder b, astn n) {
   n->iteration.continue_block = inc;
   LLVMBuildBr(b->builder, init);
   LLVMPositionBuilderAtEnd(b->builder, init);
-  build_statement(b, n->iteration.init);
+  if (n->iteration.init) {
+    build_statement(b, n->iteration.init);
+  }
   LLVMBuildBr(b->builder, cond);
   LLVMPositionBuilderAtEnd(b->builder, cond);
-  if (!g_is_empty_statement(n->iteration.cond)) {
+  if (n->iteration.cond) {
     typed_value cond_val = build_expression(b, n->iteration.cond);
     LLVMValueRef cond_test = build_value_ne0(b, cond_val);
     LLVMBuildCondBr(b->builder, cond_test, body, after);
@@ -227,7 +231,9 @@ void build_statement_iteration_for(builder b, astn n) {
   // just for readability
   LLVMBuildBr(b->builder, inc);
   LLVMPositionBuilderAtEnd(b->builder, inc);
-  build_statement(b, n->iteration.inc);
+  if (n->iteration.inc) {
+    build_statement(b, n->iteration.inc);
+  }
   LLVMBuildBr(b->builder, cond);
   LLVMPositionBuilderAtEnd(b->builder, after);
 }
@@ -250,6 +256,7 @@ void build_statement_iteration(builder b, astn n) {
 }
 
 void build_statement(builder b, astn n) {
+  assert(n);
   if (g_is_empty_statement(n)) {
     // do nothing
     log_trace("got an empty statement, do nothing");

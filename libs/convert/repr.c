@@ -515,6 +515,18 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
 
     break;
   }
+  case ast_statement_if:
+    buf = sdscat(buf, "{\"name\":\"if\",\"children\":[");
+    buf = convert_repr_jsonify_ast(n->_if.cond, buf, shallow);
+    buf = sdscat(buf, ",");
+    buf = convert_repr_jsonify_ast(n->_if._t, buf, shallow);
+    buf = sdscat(buf, ",");
+    buf = convert_repr_jsonify_ast(n->_if._f, buf, shallow);
+    if (buf[sdslen(buf) - 1] == ',') {
+      sdssetlen(buf, sdslen(buf) - 1);
+    }
+    buf = sdscat(buf, "]}");
+    break;
   }
   return buf;
 }
@@ -622,6 +634,7 @@ char *convert_repr_ast_type(enum ast_type t) {
     STRCASE(ast_enumeration);
     STRCASE(ast_enumerator);
     STRCASE(ast_statement_iteration);
+    STRCASE(ast_statement_if);
   }
   return NULL;
 }

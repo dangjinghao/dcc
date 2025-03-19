@@ -195,6 +195,12 @@ astn ast_copy(astn n) {
     new->iteration.inc = ast_copy(n->iteration.inc);
     break;
   }
+  case ast_statement_if:
+    new->_if.cond = ast_copy(n->_if.cond);
+    new->_if._t = ast_copy(n->_if._t);
+    new->_if._f = ast_copy(n->_if._f);
+
+    break;
   }
   return new;
 }
@@ -325,6 +331,11 @@ void ast_free(astn node) {
     ast_free(node->iteration.init);
     ast_free(node->iteration.cond);
     ast_free(node->iteration.inc);
+    break;
+  case ast_statement_if:
+    ast_free(node->_if.cond);
+    ast_free(node->_if._t);
+    ast_free(node->_if._f);
     break;
   }
   free(node);

@@ -70,20 +70,29 @@ astn parse_statement_iteration(parser p) {
   case TOK_KW_FOR: {
     parser_consume_with(p, '(');
     parser_push_scope(p);
-    if (g_is_declaration_firstset(p)) {
+    if (p->current_token == ';') {
+      iter->iteration.init = NULL;
+      parser_consume(p);
+    } else if (g_is_declaration_firstset(p)) {
       astn decl = ast_new(ast_block);
       parse_external_declaration(p, &decl->block.list);
       iter->iteration.init = decl;
+      // ';' is consumed
     } else {
-      // statement_expression supports empty statement, so it will be used in the init and cond
-      iter->iteration.init = parse_statement_expression(p);
+      // expr
+      iter->iteration.init = parse_expression(p);
+      parser_consume_with(p, ';');
     }
-    // ';' is consumed by the parse_statement_expression
-    iter->iteration.cond = parse_statement_expression(p);
+    if (p->current_token == ';') {
+      iter->iteration.cond = NULL;
+    } else {
+      iter->iteration.cond = parse_expression(p);
+    }
+    parser_consume(p);
     if (p->current_token != ')') {
       iter->iteration.inc = parse_expression(p);
     } else {
-      iter->iteration.inc = g_new_empty_statement();
+      iter->iteration.inc = NULL;
     }
     parser_consume_with(p, ')');
     iter->iteration.body = parse_statement(p);
@@ -117,7 +126,7 @@ astn parse_statement_jump(parser p) {
     break;
   case TOK_KW_RETURN:
     if (p->current_token == ';') {
-      jump->jump_statement.expr = g_new_empty_statement();
+      jump->jump_statement.expr = NULL;
     } else {
       jump->jump_statement.expr = parse_expression(p);
     }
@@ -194,7 +203,15 @@ astn parse_statement_labeled(parser p) {
     break;
   }
   }
-  astn stmt = parse_statement(p);
+  astn stmt;
+  if (!g_is_statement_firstset(p)) {
+    log_trace("got an empty statement in labeled statement parsing process");
+    // C99 feature: labeled empty statement
+    // just add an empty statement
+    stmt = g_new_empty_statement();
+  } else {
+    stmt = parse_statement(p);
+  }
   astn ls = ast_new(ast_statement_labeled);
   ls->labeled_statement.type = label_type;
   ls->labeled_statement.label_value = label;
