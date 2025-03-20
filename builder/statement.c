@@ -11,6 +11,7 @@
 #include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
+#include <stdlib.h>
 
 void build_statement_jump_return(builder b, astn n) {
   astn func = n->jump_statement.scope_ref;
@@ -320,11 +321,26 @@ void build_statement_if(builder b, astn n) {
   LLVMPositionBuilderAtEnd(b->builder, after_block);
 }
 
+static int build_case_ref_cmp(const void *a, const void *b) {
+  astn *case_ref_a = (astn *)a;
+  astn *case_ref_b = (astn *)b;
+  assert((*case_ref_a)->labeled_statement.label_value->type ==
+         ast_expr_primary);
+  assert((*case_ref_b)->labeled_statement.label_value->type ==
+         ast_expr_primary);
+  long case_v_a = (*case_ref_a)->labeled_statement.label_value->primary.v._int;
+  long case_v_b = (*case_ref_b)->labeled_statement.label_value->primary.v._int;
+  return case_v_a - case_v_b;
+}
+
 void build_statement_switch_allocate_algo(builder b, astn n,
                                           LLVMBasicBlockRef switch_after) {
   typed_value cond_val = build_expression(b, n->_switch.cond);
   astn cond_val_base_type = slist_peek_head(&cond_val->type_chain);
   astn *case_ref;
+  // sort case_refs, prepare for binary search
+  qsort(n->_switch.case_refs.data, n->_switch.case_refs.used,
+        n->_switch.case_refs.item_size, build_case_ref_cmp);
   dynarray_foreach(&n->_switch.case_refs, case_ref) {
     assert((*case_ref)->labeled_statement.label_value->type ==
            ast_expr_primary);
