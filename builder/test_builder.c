@@ -61,6 +61,11 @@ void tbc_struct() {
             "refs; struct{char c; "
             "char*s; struct{short s;}s;} abss;");
 }
+
+void tbc_struct_decl_only(){
+  tbc_entry("struct s{int a;char b;}; struct s s1; int F(){struct s s2;}");
+}
+
 void tbc_multi_subscope_extern() {
   tbc_entry("int F1(){extern Fe();{extern Fe();}} int F2(){extern Fe(); "
             "{extern Fe();}}");

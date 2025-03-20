@@ -26,6 +26,8 @@ We should dependence less LLVM library features.
 
 DONOT USE i1 directly, cast it to i8.
 
+Lazy declare struct declaration because the symtab that builder touched contains symbol only.
+
 ## TODO LIST
 
 - [x] use slist instead of dynarray for performance

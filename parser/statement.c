@@ -190,7 +190,6 @@ astn parse_statement_labeled(parser p) {
   // goto label has the same first set as normal expression statement,
   // we can use snapshot
   astn label = NULL;
-  astn scope_ref = NULL;
   enum tok_type label_type = p->current_token;
   switch (p->current_token) {
   case TOK_IDENT: {
@@ -213,13 +212,11 @@ astn parse_statement_labeled(parser p) {
     parser_consume(p);
     label = parse_expr_const_int(p);
     parser_consume_with(p, ':');
-    scope_ref = p->switch_scope;
     break;
   }
   case TOK_KW_DEFAULT: {
     parser_consume(p);
     parser_consume_with(p, ':');
-    scope_ref = p->switch_scope;
     break;
   }
   }
@@ -236,6 +233,5 @@ astn parse_statement_labeled(parser p) {
   ls->labeled_statement.type = label_type;
   ls->labeled_statement.label_value = label;
   ls->labeled_statement.stmt = stmt;
-  ls->labeled_statement.scope_ref = scope_ref;
   return ls;
 }

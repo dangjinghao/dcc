@@ -27,12 +27,12 @@ dynarray build_struct_member_declaration_type(astn n, builder b, dynarray arr) {
 LLVMTypeRef build_convert_struct_type(builder b, astn n) {
   LLVMTypeRef t;
   if (n->type == ast_ref) {
-    // the reference of existing struct definition
     n = n->ref;
     assert(n->type == ast_struct_union_declaration);
-    assert(n->struct_union_declaration.V);
+  }
+  if (n->struct_union_declaration.V) {
+    log_debug("reuse the existing struct definition");
     t = n->struct_union_declaration.V;
-    log_debug("refering the existed struct type:%s", LLVMGetStructName(t));
   } else {
     assert(n->type == ast_struct_union_declaration);
     struct dynarray dyn_elements;

@@ -80,7 +80,6 @@ typedef struct astn {
       struct astn *label_value;
       struct astn *stmt;
       // used for case, default
-      struct astn *scope_ref;
     } labeled_statement;
     struct declaration {
       sds ident;
