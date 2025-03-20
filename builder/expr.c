@@ -855,10 +855,19 @@ typed_value build_load_declaration(builder b, astn n) {
       points_to_type_chain);
 }
 
+typed_value build_expr_enum(builder b, astn n) {
+  assert(n->type == ast_enumerator);
+  return typed_value_new(LLVMConstInt(LLVMInt32TypeInContext(b->context),
+                                      n->enumerator.value, false),
+                         build_base_type_chain_by_lit(TOK_LIT_INT));
+}
+
 typed_value build_expr_ref(builder b, astn n) {
   switch (n->ref->type) {
   case ast_declaration:
     return build_load_declaration(b, n->ref);
+  case ast_enumerator:
+    return build_expr_enum(b, n->ref);
   default:
     BUILDING();
   }

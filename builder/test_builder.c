@@ -287,3 +287,7 @@ void tbc_if_else_chain() {
   tbc_entry(
       "int fib(int n){if(n <= 1){return n;}else{return fib(n-1) + fib(n-2);}}");
 }
+
+void tbc_enum() {
+  tbc_entry("enum E{A = 1,B = 2,C = 4};int F(){enum E e = A|B|C;return e;}");
+}

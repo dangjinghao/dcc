@@ -7,6 +7,7 @@
 #include "macro/macro.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include "token.h"
 #include <assert.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
@@ -75,6 +76,7 @@ LLVMTypeRef build_convert_base_type(builder b, astn n) {
     return LLVMInt16TypeInContext(c);
   case TOK_KW_FLOAT:
     return LLVMFloatTypeInContext(c);
+  case TOK_KW_ENUM:
   case TOK_KW_INT:
     static_assert(sizeof(int) == 4);
     return LLVMInt32TypeInContext(c);
