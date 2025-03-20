@@ -41,7 +41,27 @@ astn parse_statement_compound(parser parser) {
   parser_consume_with(parser, '}');
   return block;
 }
-astn parse_statement_selection(parser p) { BUILDING(); }
+astn parse_statement_selection(parser p) {
+  assert(g_is_selection_statement_firstset(p));
+  astn sel;
+  if (p->current_token == TOK_KW_IF) {
+    parser_consume(p);
+    sel = ast_new(ast_statement_if);
+    parser_consume_with(p, '(');
+    sel->_if.cond = parse_expression(p);
+    parser_consume_with(p, ')');
+    sel->_if._t = parse_statement(p);
+    if (p->current_token == TOK_KW_ELSE) {
+      parser_consume(p);
+      sel->_if._f = parse_statement(p);
+    } else {
+      sel->_if._f = NULL;
+    }
+  } else {
+    BUILDING();
+  }
+  return sel;
+}
 
 astn parse_statement_iteration(parser p) {
   assert(g_is_iteration_statement_firstset(p));

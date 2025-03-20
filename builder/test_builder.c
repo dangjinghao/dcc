@@ -271,3 +271,14 @@ void tbc_continue_break() {
 }
 
 void tbc_empty_label() { tbc_entry("int F(){int a; L1:a = 1; L2: }"); }
+
+void tbc_if() { tbc_entry("int F(){int a = 1;if(a > 1){a = 2;}return a;}"); }
+
+void tbc_if_else() {
+  tbc_entry("int F(){int a = 1;if(a > 1){a = 2;}else{a = 3;}return a;}");
+}
+
+void tbc_if_else_chain() {
+  tbc_entry(
+      "int fib(int n){if(n <= 1){return n;}else{return fib(n-1) + fib(n-2);}}");
+}

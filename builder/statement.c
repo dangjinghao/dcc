@@ -258,6 +258,32 @@ void build_statement_iteration(builder b, astn n) {
   }
 }
 
+void build_statement_if(builder b, astn n) {
+  assert(n->type == ast_statement_if);
+  LLVMBasicBlockRef then_block =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "if_then");
+  LLVMBasicBlockRef after_block =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "if_after");
+  typed_value cond_val = build_expression(b, n->_if.cond);
+  LLVMValueRef cond_test = build_value_ne0(b, cond_val);
+  LLVMBasicBlockRef else_block =
+      n->_if._f ? LLVMAppendBasicBlockInContext(b->context, b->fn, "if_else")
+                : after_block;
+
+  LLVMBuildCondBr(b->builder, cond_test, then_block, else_block);
+  LLVMPositionBuilderAtEnd(b->builder, then_block);
+  build_statement(b, n->_if._t);
+  LLVMBuildBr(b->builder, after_block);
+
+  if (n->_if._f) {
+    LLVMPositionBuilderAtEnd(b->builder, else_block);
+    build_statement(b, n->_if._f);
+    LLVMBuildBr(b->builder, after_block);
+  }
+
+  LLVMPositionBuilderAtEnd(b->builder, after_block);
+}
+
 void build_statement(builder b, astn n) {
   assert(n);
   if (g_is_empty_statement(n)) {
@@ -277,6 +303,9 @@ void build_statement(builder b, astn n) {
     return;
   case ast_statement_iteration:
     build_statement_iteration(b, n);
+    return;
+  case ast_statement_if:
+    build_statement_if(b, n);
     return;
   default:
     build_expression(b, n);
