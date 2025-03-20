@@ -13,6 +13,8 @@
 void build_statement_jump_return(builder b, astn n) {
   astn func = n->jump_statement.scope_ref;
   assert(func->type == ast_declaration);
+  LLVMBasicBlockRef after_return =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, "after_return");
   slist func_type_chain = build_function_return_type_chain(b, func);
   astn func_return_type = slist_peek_head(func_type_chain);
   if ((!n->jump_statement.expr) &&
@@ -21,14 +23,15 @@ void build_statement_jump_return(builder b, astn n) {
   } else if ((!n->jump_statement.expr) &&
              func_return_type->ctype.type == TOK_KW_VOID) {
     LLVMBuildRetVoid(b->builder);
-    return;
+  } else {
+    // n->jump_statement.expr exists
+    typed_value ret_val = build_expression(b, n->jump_statement.expr);
+    log_trace("try to cast return value to function return type");
+    typed_value ret_val_casted =
+        build_type_convert_to(b, ret_val, func_type_chain);
+    LLVMBuildRet(b->builder, ret_val_casted->v);
   }
-  // n->jump_statement.expr exists
-  typed_value ret_val = build_expression(b, n->jump_statement.expr);
-  log_trace("try to cast return value to function return type");
-  typed_value ret_val_casted =
-      build_type_convert_to(b, ret_val, func_type_chain);
-  LLVMBuildRet(b->builder, ret_val_casted->v);
+  LLVMPositionBuilderAtEnd(b->builder, after_return);
 }
 
 void build_statement_jump_goto(builder b, astn n) {
