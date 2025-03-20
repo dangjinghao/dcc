@@ -1,6 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
+#include "dynarray/dynarray.h"
 #include "lexer.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
@@ -156,7 +157,7 @@ typedef struct astn {
       struct astn *cond;
       struct astn *body;
       // case/default labeled statement
-      struct slist case_refs;
+      struct dynarray case_refs;
       struct astn *default_ref;
       LLVMBasicBlockRef break_block;
     } _switch;

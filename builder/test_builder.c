@@ -293,8 +293,9 @@ void tbc_enum() {
 }
 
 void tbc_switch_default() {
-  tbc_entry("int F(){int a = 1;switch(a){int a = 0;case 1: a = 1;case 2: a = "
-            "2;break;case 3: a = 3;default: a = 4;}return a;}");
+  tbc_entry("int F(){int a = 1;switch(a){int a = 0;default: a = 4;case 1: a = "
+            "1;case 3: a = 3;case 2: a = "
+            "2;break;case 5: a = 5; case 4: a = 4; }return a;}");
 }
 
 void tbc_switch_no_default() {

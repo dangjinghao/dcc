@@ -1,5 +1,6 @@
 
 #include "ast.h"
+#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
@@ -202,12 +203,12 @@ astn parse_statement(parser p) {
 static bool parse_statement_labeled_case_check_duplicate(parser p, astn label) {
   assert(label->type == ast_expr_primary);
   assert(label->primary.type == TOK_LIT_LONG);
-  astn prev;
-  slist_foreach(&p->switch_scope->_switch.case_refs, prev) {
-    assert(prev->type == ast_statement_labeled);
-    assert(prev->labeled_statement.type == TOK_KW_CASE);
-    assert(prev->labeled_statement.label_value->type == ast_expr_primary);
-    if (prev->labeled_statement.label_value->primary.v._int ==
+  astn *prev;
+  dynarray_foreach(&p->switch_scope->_switch.case_refs, prev) {
+    assert((*prev)->type == ast_statement_labeled);
+    assert((*prev)->labeled_statement.type == TOK_KW_CASE);
+    assert((*prev)->labeled_statement.label_value->type == ast_expr_primary);
+    if ((*prev)->labeled_statement.label_value->primary.v._int ==
         label->primary.v._int) {
       return true;
     }
@@ -279,7 +280,7 @@ astn parse_statement_labeled(parser p) {
       compiler_error(p->lexer, "case label not in switch statement");
     }
     log_trace("add case label:%ld", label->primary.v._int);
-    slist_add_tail(&p->switch_scope->_switch.case_refs, ls);
+    dynarray_add(&p->switch_scope->_switch.case_refs, &ls);
   } else if (label_type == TOK_KW_DEFAULT) {
     if (!p->switch_scope) {
       compiler_error(p->lexer, "default label not in switch statement");

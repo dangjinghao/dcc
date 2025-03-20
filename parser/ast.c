@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "dynarray/dynarray.h"
 #include "slist/slist.h"
 
 astn ast_new(enum ast_type type) {
@@ -33,7 +34,7 @@ astn ast_new(enum ast_type type) {
     slist_init(&node->enumeration.enumerators);
     break;
   case ast_statement_switch:
-    slist_init(&node->_switch.case_refs);
+    dynarray_default(&node->_switch.case_refs, sizeof(astn));
   default:
     break;
   }
@@ -206,7 +207,7 @@ astn ast_copy(astn n) {
   case ast_statement_switch:
     new->_switch.cond = ast_copy(n->_switch.cond);
     new->_switch.body = ast_copy(n->_switch.body);
-    slist_copy(&new->_switch.case_refs, &n->_switch.case_refs);
+    dynarray_copy(&new->_switch.case_refs, &n->_switch.case_refs);
     new->_switch.default_ref = n->_switch.default_ref;
     break;
   }
@@ -348,7 +349,7 @@ void ast_free(astn node) {
   case ast_statement_switch:
     ast_free(node->_switch.cond);
     ast_free(node->_switch.body);
-    slist_free(&node->_switch.case_refs);
+    dynarray_free(&node->_switch.case_refs);
     break;
   }
   free(node);

@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "builder.h"
 #include "convert/convert.h"
+#include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "log/log.h"
 #include "sds/sds.h"
@@ -323,10 +324,11 @@ void build_statement_switch_allocate_algo(builder b, astn n,
                                           LLVMBasicBlockRef switch_after) {
   typed_value cond_val = build_expression(b, n->_switch.cond);
   astn cond_val_base_type = slist_peek_head(&cond_val->type_chain);
-  astn case_ref;
-  slist_foreach(&n->_switch.case_refs, case_ref) {
-    assert(case_ref->labeled_statement.label_value->type == ast_expr_primary);
-    long case_v = case_ref->labeled_statement.label_value->primary.v._int;
+  astn *case_ref;
+  dynarray_foreach(&n->_switch.case_refs, case_ref) {
+    assert((*case_ref)->labeled_statement.label_value->type ==
+           ast_expr_primary);
+    long case_v = (*case_ref)->labeled_statement.label_value->primary.v._int;
     LLVMValueRef case_cmp = LLVMBuildICmp(
         b->builder, LLVMIntEQ, cond_val->v,
         LLVMConstInt(build_convert_base_type(b, cond_val_base_type), case_v, 1),
@@ -334,7 +336,8 @@ void build_statement_switch_allocate_algo(builder b, astn n,
     LLVMBasicBlockRef case_test_after =
         LLVMAppendBasicBlockInContext(b->context, b->fn, "case_test_after");
     LLVMBuildCondBr(b->builder, case_cmp,
-                    case_ref->labeled_statement.start_block, case_test_after);
+                    (*case_ref)->labeled_statement.start_block,
+                    case_test_after);
     LLVMPositionBuilderAtEnd(b->builder, case_test_after);
   }
   astn _default = n->_switch.default_ref;
