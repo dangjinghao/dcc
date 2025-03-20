@@ -62,7 +62,7 @@ void tbc_struct() {
             "char*s; struct{short s;}s;} abss;");
 }
 
-void tbc_struct_decl_only(){
+void tbc_struct_decl_only() {
   tbc_entry("struct s{int a;char b;}; struct s s1; int F(){struct s s2;}");
 }
 
@@ -290,4 +290,29 @@ void tbc_if_else_chain() {
 
 void tbc_enum() {
   tbc_entry("enum E{A = 1,B = 2,C = 4};int F(){enum E e = A|B|C;return e;}");
+}
+
+void tbc_switch_default() {
+  tbc_entry("int F(){int a = 1;switch(a){int a = 0;case 1: a = 1;case 2: a = "
+            "2;break;case 3: a = 3;default: a = 4;}return a;}");
+}
+
+void tbc_switch_no_default() {
+  tbc_entry("int F(){int a = 1;switch(a){int a = 0;case 1: a = 1;case 2: a = "
+            "2;break;case 3: a = 3;}return a;}");
+}
+
+void tbc_switch_return() {
+  tbc_entry("int F(int a){switch(a){case 1: return -1;case 2: return "
+            "-2;case 3:case 4:  return -5; default: return a;}}");
+}
+
+void tbc_switch_dup() {
+  tbc_entry("int F(int a){switch(a){case 1: return -1;case 1: return 2;}}");
+}
+
+void tbc_switch_dup_default() {
+  tbc_entry(
+      "int F(int a){switch(a){case 1: return -1;default: return 2;default: "
+      "return 3;}}");
 }

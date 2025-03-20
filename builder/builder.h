@@ -19,14 +19,14 @@ typedef struct label {
   bool defined;
   sds name;
   LLVMBasicBlockRef block;
-} *label;
+} *goto_label;
 
 void builder_destroy(builder b);
 builder builder_new(builder b, char *module_name, slist symtab);
-label builder_label_find(builder b, sds name);
+goto_label builder_label_find(builder b, sds name);
 void builder_label_list_free(builder b);
 void builder_check_label_list_undefined(builder b);
-label builder_label_new(builder b, sds name);
+goto_label builder_label_new(builder b, sds name);
 slist build_base_type_chain_by_lit(enum tok_type type);
 slist build_type_chain_expr_primary(astn n);
 typed_value build_type_convert_to(builder b, typed_value v, slist type_chain);
@@ -62,4 +62,5 @@ extern const char *STATIC_VAR_FMT;
 extern const char *STRUCT_FMT;
 extern const char *VAR_FMT;
 extern const char *GOTO_BLK_FMT;
+extern const char *CASE_BLK_FMT;
 #endif

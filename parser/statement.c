@@ -3,9 +3,9 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
-#include "macro/macro.h"
 #include "parser.h"
 #include "slist/slist.h"
+#include "token.h"
 
 astn parse_statement_expression(parser p) {
   assert(g_is_expression_statement_firstset(p));
@@ -58,7 +58,17 @@ astn parse_statement_selection(parser p) {
       sel->_if._f = NULL;
     }
   } else {
-    BUILDING();
+    parser_consume(p);
+    sel = ast_new(ast_statement_switch);
+    parser_consume_with(p, '(');
+    sel->_switch.cond = parse_expression(p);
+    parser_consume_with(p, ')');
+    astn prev_switch_scope = p->switch_scope;
+    astn prev_break_scope = p->break_scope;
+    p->break_scope = p->switch_scope = sel;
+    sel->_switch.body = parse_statement(p);
+    p->switch_scope = prev_switch_scope;
+    p->break_scope = prev_break_scope;
   }
   return sel;
 }
@@ -68,8 +78,9 @@ astn parse_statement_iteration(parser p) {
   astn iter = ast_new(ast_statement_iteration);
   iter->iteration.type = p->current_token;
   parser_consume(p);
-  astn prev_scope = p->break_scope;
-  p->break_scope = iter;
+  astn prev_break_scope = p->break_scope;
+  astn prev_continue_scope = p->continue_scope;
+  p->continue_scope = p->break_scope = iter;
   switch (iter->iteration.type) {
   case TOK_KW_WHILE: {
     parser_consume_with(p, '(');
@@ -122,7 +133,8 @@ astn parse_statement_iteration(parser p) {
   default:
     break;
   }
-  p->break_scope = prev_scope;
+  p->break_scope = prev_break_scope;
+  p->continue_scope = prev_continue_scope;
   return iter;
 }
 
@@ -139,8 +151,10 @@ astn parse_statement_jump(parser p) {
     jump->jump_statement.scope_ref = NULL;
     break;
   case TOK_KW_CONTINUE:
+    jump->jump_statement.scope_ref = p->continue_scope;
+    assert(jump->jump_statement.scope_ref);
+    break;
   case TOK_KW_BREAK:
-    // TODO: special case for break in switch
     jump->jump_statement.scope_ref = p->break_scope;
     assert(jump->jump_statement.scope_ref);
     break;
@@ -185,6 +199,22 @@ astn parse_statement(parser p) {
   return stmt;
 }
 
+static bool parse_statement_labeled_case_check_duplicate(parser p, astn label) {
+  assert(label->type == ast_expr_primary);
+  assert(label->primary.type == TOK_LIT_LONG);
+  astn prev;
+  slist_foreach(&p->switch_scope->_switch.case_refs, prev) {
+    assert(prev->type == ast_statement_labeled);
+    assert(prev->labeled_statement.type == TOK_KW_CASE);
+    assert(prev->labeled_statement.label_value->type == ast_expr_primary);
+    if (prev->labeled_statement.label_value->primary.v._int ==
+        label->primary.v._int) {
+      return true;
+    }
+  }
+  return false;
+}
+
 astn parse_statement_labeled(parser p) {
   assert(g_is_labeled_statement_firstset(p));
   // goto label has the same first set as normal expression statement,
@@ -211,6 +241,11 @@ astn parse_statement_labeled(parser p) {
   case TOK_KW_CASE: {
     parser_consume(p);
     label = parse_expr_const_int(p);
+    long v = parser_eval_const_int_expr(label);
+    ast_free(label);
+    label = ast_new(ast_expr_primary);
+    label->primary.type = TOK_LIT_LONG;
+    label->primary.v._int = v;
     parser_consume_with(p, ':');
     break;
   }
@@ -233,5 +268,26 @@ astn parse_statement_labeled(parser p) {
   ls->labeled_statement.type = label_type;
   ls->labeled_statement.label_value = label;
   ls->labeled_statement.stmt = stmt;
+  if (label_type == TOK_KW_CASE) {
+    // check the case value is unique
+    if (parse_statement_labeled_case_check_duplicate(p, label)) {
+      compiler_error(p->lexer, "duplicate case label:%ld",
+                     label->primary.v._int);
+    }
+    // add to switch scope
+    if (!p->switch_scope) {
+      compiler_error(p->lexer, "case label not in switch statement");
+    }
+    log_trace("add case label:%ld", label->primary.v._int);
+    slist_add_tail(&p->switch_scope->_switch.case_refs, ls);
+  } else if (label_type == TOK_KW_DEFAULT) {
+    if (!p->switch_scope) {
+      compiler_error(p->lexer, "default label not in switch statement");
+    } else if (p->switch_scope->_switch.default_ref) {
+      compiler_error(p->lexer, "duplicate default label");
+    }
+    log_trace("setting default label");
+    p->switch_scope->_switch.default_ref = ls;
+  }
   return ls;
 }

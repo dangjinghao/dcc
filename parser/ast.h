@@ -29,6 +29,7 @@ enum ast_type {
   ast_enumerator,
   ast_statement_iteration,
   ast_statement_if,
+  ast_statement_switch,
 };
 
 enum type_qualifier {
@@ -80,6 +81,7 @@ typedef struct astn {
       struct astn *label_value;
       struct astn *stmt;
       // used for case, default
+      LLVMBasicBlockRef start_block;
     } labeled_statement;
     struct declaration {
       sds ident;
@@ -150,6 +152,14 @@ typedef struct astn {
       struct astn *_t;
       struct astn *_f;
     } _if;
+    struct _switch {
+      struct astn *cond;
+      struct astn *body;
+      // case/default labeled statement
+      struct slist case_refs;
+      struct astn *default_ref;
+      LLVMBasicBlockRef break_block;
+    } _switch;
   };
 } *astn;
 

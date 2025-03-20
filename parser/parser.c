@@ -19,7 +19,7 @@ void parser_new_from_lexer(parser parser, struct lexer *lexer) {
   slist_init(&parser->idtab);
   slist_init(&parser->tagtab);
   slist_init(&parser->symtab);
-  parser->switch_scope = parser->break_scope =
+  parser->continue_scope = parser->switch_scope = parser->break_scope =
       parser->function_scope = NULL;
   parser->uidcnt = 0;
 }

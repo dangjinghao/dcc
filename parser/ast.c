@@ -32,6 +32,8 @@ astn ast_new(enum ast_type type) {
   case ast_enumeration:
     slist_init(&node->enumeration.enumerators);
     break;
+  case ast_statement_switch:
+    slist_init(&node->_switch.case_refs);
   default:
     break;
   }
@@ -201,6 +203,12 @@ astn ast_copy(astn n) {
     new->_if._f = ast_copy(n->_if._f);
 
     break;
+  case ast_statement_switch:
+    new->_switch.cond = ast_copy(n->_switch.cond);
+    new->_switch.body = ast_copy(n->_switch.body);
+    slist_copy(&new->_switch.case_refs, &n->_switch.case_refs);
+    new->_switch.default_ref = n->_switch.default_ref;
+    break;
   }
   return new;
 }
@@ -336,6 +344,11 @@ void ast_free(astn node) {
     ast_free(node->_if.cond);
     ast_free(node->_if._t);
     ast_free(node->_if._f);
+    break;
+  case ast_statement_switch:
+    ast_free(node->_switch.cond);
+    ast_free(node->_switch.body);
+    slist_free(&node->_switch.case_refs);
     break;
   }
   free(node);

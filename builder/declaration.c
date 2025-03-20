@@ -193,8 +193,19 @@ LLVMValueRef build_alloca_variable(builder b, astn n) {
   assert(n->type == ast_declaration);
   sds sym_name = build_symbol_name(n);
   LLVMTypeRef value_type = build_variable_declaration_type(b, n);
+  LLVMBasicBlockRef current_block = LLVMGetInsertBlock(b->builder);
+  LLVMBasicBlockRef entry_block = LLVMGetFirstBasicBlock(b->fn);
+  LLVMValueRef last_entry_inst = LLVMGetLastInstruction(entry_block);
+  if (last_entry_inst && LLVMIsATerminatorInst(last_entry_inst)) {
+    LLVMPositionBuilderBefore(b->builder, last_entry_inst);
+  } else {
+    log_trace("entry block is empty or non-terminator, skip position before "
+              "the last instruction");
+    LLVMPositionBuilderAtEnd(b->builder, entry_block);
+  }
   auto pv = LLVMBuildAlloca(b->builder, value_type, sym_name);
   sdsfree(sym_name);
+  LLVMPositionBuilderAtEnd(b->builder, current_block);
   build_alloca_variable_init(b, n, pv);
   return pv;
 }

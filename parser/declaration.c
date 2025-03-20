@@ -3,7 +3,6 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
-#include "macro/macro.h"
 #include "parser.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
@@ -236,10 +235,6 @@ astn parse_declaration_specifiers(parser parser) {
     }
   }
   if (tn->type == TOK_UNKNOWN) {
-    if (tn->storage == TOK_KW_AUTO) {
-      // c23 auto type derivation reserved keywords
-      BUILDING();
-    }
     log_trace("set default type to int");
     tn->type = TOK_KW_INT;
   }

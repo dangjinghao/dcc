@@ -527,6 +527,13 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
     }
     buf = sdscat(buf, "]}");
     break;
+  case ast_statement_switch:
+    buf = sdscat(buf, "{\"name\":\"switch\",\"children\":[");
+    buf = convert_repr_jsonify_ast(n->_switch.cond, buf, shallow);
+    buf = sdscat(buf, ",");
+    buf = convert_repr_jsonify_ast(n->_switch.body, buf, shallow);
+    buf = sdscat(buf, "]}");
+    break;
   }
   return buf;
 }
@@ -635,6 +642,7 @@ char *convert_repr_ast_type(enum ast_type t) {
     STRCASE(ast_enumerator);
     STRCASE(ast_statement_iteration);
     STRCASE(ast_statement_if);
+    STRCASE(ast_statement_switch);
   }
   return NULL;
 }

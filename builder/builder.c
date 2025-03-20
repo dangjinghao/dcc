@@ -8,16 +8,19 @@ const char *STATIC_VAR_FMT = "%s.%ld";
 const char *STRUCT_FMT = "struct.%s.%ld";
 const char *VAR_FMT = "%s.%ld";
 const char *GOTO_BLK_FMT = "goto.%s";
+const char *CASE_BLK_FMT = "case.%ld";
 builder builder_new(builder b, char *module_name, slist symtab) {
   b->context = LLVMContextCreate();
   b->module = LLVMModuleCreateWithNameInContext(module_name, b->context);
   b->builder = LLVMCreateBuilderInContext(b->context);
   b->symtab = symtab;
+  b->fn = NULL;
+
   slist_init(&b->labels);
   return b;
 }
 
-label builder_label_find(builder b, sds name) {
+goto_label builder_label_find(builder b, sds name) {
   struct label *label;
   slist_foreach(&b->labels, label) {
     if (sdscmp(label->name, name) == 0) {
@@ -27,8 +30,8 @@ label builder_label_find(builder b, sds name) {
   return NULL;
 }
 
-label builder_label_new(builder b, sds name) {
-  label l = calloc(1, sizeof(struct label));
+goto_label builder_label_new(builder b, sds name) {
+  goto_label l = calloc(1, sizeof(struct label));
   sds block_name = sdscatfmt(sdsempty(), GOTO_BLK_FMT, name);
   l->name = sdsdup(name);
   l->block = LLVMAppendBasicBlockInContext(b->context, b->fn, block_name);

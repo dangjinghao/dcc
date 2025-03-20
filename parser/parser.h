@@ -16,9 +16,11 @@ typedef struct parser {
   // this order is important, because we can only traverse the list from head to tail
   // strong symbol with same ident will be found first, just like 'cover' the weak symbol
   struct slist symtab;
-  // for break, continue, set the value when in the scope of if, for, while, do-while
+  // for break, iteration and switch statement will use this
   astn break_scope;
-  // for case and break in switch statement
+  // for continue, iteration statement will use this
+  astn continue_scope;
+  // for switch statement
   astn switch_scope;
   // do not modify the value for some ugly depenencies
   astn function_scope;

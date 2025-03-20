@@ -1,16 +1,11 @@
 # DCC
 
-The parser would not generate a AST which corresponding to the source code, to reduce the complexity of codegen process.
-
-We call this AST `reduced AST`.
-
-the extern declaration in block scope would be ignored in codegen stage
-
-We can delay the static declaration to codegen stage, llvm supports it
-
-We would **not free** the memory in builder stage.
-
-we have to use `parser.symtab` because we cannot process this situation:
+- The parser would not generate a AST which 100% corresponding to the source code, to reduce the complexity of codegen/build process.
+  - We call this AST `reduced AST`.
+- The `extern` declaration in block scope would be ignored in build stage
+- We don't have to move the static declaration to global scope, llvm supports add extern symbol to global scope  
+- We **WOULD NOT FREE** the memory in builder stage.
+- We have to use `parser.symtab` because we cannot process this situation:
 
 ```c
 extern int V;
@@ -18,15 +13,18 @@ void F(){V = 1;}
 int V;
 ```
 
-the parser processing flow is top to down, so when processing the body of function `F`, V refers to `extern int V`, but in fact after the full code is parsed, `V` symbol means `int V`. We have to re-locate the symbol that a ast node **refers** by symtab in codegen stage.That's why we need symtab which save the extern or normal declarations.
+  the parser processing flow is top to down, so when processing the body of function `F`, V refers to `extern int V`, but in fact after the full code is parsed, `V` symbol means `int V`. We have to re-locate the symbol that a ast node **refers** by symtab in build stage.That's why we need symtab which save the extern or normal declarations.
 
-Now we just ignore the full functional codegen implementation of global variable initializer. Take more care of runtime codegen (e.g. code in function) until we complete it.
+- Now we just ignore the full functional build implementation of global variable initializer and take more care of runtime build (e.g. code in function) until we complete it.
+- We should dependence less LLVM library features expect for instruction generation.
+- **DO NOT USE** *i1* directly, cast it to *i8*.
+- Postpone to declare struct because some struct declaration is not variable declaration, e.g.:
 
-We should dependence less LLVM library features.
+```c
+struct s{int a;char b;};
+```
 
-DONOT USE i1 directly, cast it to i8.
-
-Lazy declare struct declaration because the symtab that builder touched contains symbol only.
+- We have to move builder position to entry(first) block for `alloca` a variable rather create this instruction in other basic block. Because, in LLVM every time one `alloca` instruction was executed, the stack pointer would be pull down.
 
 ## TODO LIST
 
@@ -48,8 +46,9 @@ Lazy declare struct declaration because the symtab that builder touched contains
 - [x] binop self assign
 - [x] logic operation
 - [x] iteration statement
-- [ ] break/continue in iteration statement
-- [ ] if-else statement
+- [x] break/continue in iteration statement
+- [x] if-else statement
+- [ ] iteration and switch mixture test
 - [ ] reorganize builder API again
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
@@ -58,7 +57,8 @@ Lazy declare struct declaration because the symtab that builder touched contains
   - [x] function call
   - [ ] struct get member
   - [ ] array
-- [ ] update switch case
+- [x] basic switch implementation
+  - [ ] binary search optimization
 - [ ] string reference table in builder
 - [ ] {} initializer
 - [ ] sizeof constant expression
