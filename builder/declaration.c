@@ -288,12 +288,10 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
 
       // Save the alloca as the parameter's value
       assert(param_decl->declaration.V == NULL);
-      struct slist ptr_type_chain;
-      slist_copy(&ptr_type_chain, &param_decl->declaration.type_chain);
-      astn ptr = ast_new(ast_ctype);
-      ptr->ctype.type = '*';
-      slist_add_head(&ptr_type_chain, ptr);
-      param_decl->declaration.V = typed_value_new(alloca, &ptr_type_chain);
+
+      slist ptr_type_chain =
+          build_type_chain_add_pointer(b, &param_decl->declaration.type_chain);
+      param_decl->declaration.V = typed_value_new(alloca, ptr_type_chain);
 
       sdsfree(param_name);
       param_idx++;
@@ -357,14 +355,9 @@ typed_value build_declaration(builder b, astn n) {
   default:
     break;
   }
-  struct slist ptr_type_chain;
-  slist_copy(&ptr_type_chain, &n->declaration.type_chain);
-  log_trace("add pointer type to typed value: %s",
-            LLVMGetValueName2(v, &(size_t){}));
-  astn ptr = ast_new(ast_ctype);
-  ptr->ctype.type = '*';
-  slist_add_head(&ptr_type_chain, ptr);
-  n->declaration.V = typed_value_new(v, &ptr_type_chain);
+  slist ptr_type_chain =
+      build_type_chain_add_pointer(b, &n->declaration.type_chain);
+  n->declaration.V = typed_value_new(v, ptr_type_chain);
   // we should build the function body after add it to n.declaration.V
   if (g_is_function_definition(n)) {
     // it may be used in defining a new function in a function scope

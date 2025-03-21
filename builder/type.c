@@ -252,3 +252,11 @@ slist build_function_return_type_chain(builder b, astn n) {
   assert(params->type == ast_parameters);
   return return_type_chain;
 }
+
+slist build_type_chain_add_pointer(builder b, slist type_chain) {
+  slist new_type_chain = build_type_chain_copy(type_chain);
+  astn ptr = ast_new(ast_ctype);
+  ptr->ctype.type = '*';
+  slist_add_head(new_type_chain, ptr);
+  return new_type_chain;
+}
