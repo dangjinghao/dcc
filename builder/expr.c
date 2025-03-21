@@ -13,9 +13,6 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
-typedef LLVMValueRef (*llvm_func_t)(LLVMBuilderRef, LLVMValueRef, LLVMValueRef,
-                                    const char *);
-
 bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs) {
   astn lhs_base_type = slist_peek_head(&lhs->type_chain);
   astn rhs_base_type = slist_peek_head(&rhs->type_chain);
@@ -32,15 +29,15 @@ bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs) {
  * @param binop 
  * @return typed_value 
  */
-typed_value build_expr_binop_ptr(builder b, astn binop, typed_value lhs,
+typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
                                  typed_value rhs) {
-  if (binop->binop.op != '+' && binop->binop.op != '-') {
+  if (op != '+' && op != '-') {
     goto FAIL;
   }
   astn lhs_base_type = slist_peek_head(&lhs->type_chain);
   astn rhs_base_type = slist_peek_head(&rhs->type_chain);
   if (lhs_base_type->ctype.type == '*' && rhs_base_type->ctype.type == '*' &&
-      binop->binop.op == '-') {
+      op == '-') {
     // ptr - ptr
     // convert to int
     LLVMValueRef lhs_int = LLVMBuildPtrToInt(
@@ -61,7 +58,7 @@ typed_value build_expr_binop_ptr(builder b, astn binop, typed_value lhs,
     return typed_value_new(result, item_type_chain);
   } else if ((g_is_int_family_tok(lhs_base_type->ctype.type) ||
               g_is_int_family_tok(rhs_base_type->ctype.type)) &&
-             binop->binop.op == '+') {
+             op == '+') {
     // int + ptr or ptr + int
     typed_value ptr;
     typed_value index;
@@ -87,8 +84,7 @@ typed_value build_expr_binop_ptr(builder b, astn binop, typed_value lhs,
                                         &index->v, 1, "ptr_plus_int");
     return typed_value_new(result, &ptr->type_chain);
   } else if (lhs_base_type->ctype.type == '*' &&
-             g_is_int_family_tok(rhs_base_type->ctype.type) &&
-             binop->binop.op == '-') {
+             g_is_int_family_tok(rhs_base_type->ctype.type) && op == '-') {
     // ptr - int
     // use getelementptr
     slist item_type_chain =
@@ -126,46 +122,15 @@ typed_value build_expr_binop_template(builder b, astn binop,
   typed_value rhs = build_expression(b, binop->binop.rhs);
   if (build_expr_is_binop_with_ptr(lhs, rhs)) {
     log_trace("ptr operation detected in binop expression");
-    return build_expr_binop_ptr(b, binop, lhs, rhs);
+    return build_expr_binop_ptr(b, lhs, binop->binop.op, rhs);
   }
-  typed_value *exprs =
-      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
-  astn base_type = slist_peek_head(&exprs[0]->type_chain);
-  if (g_is_int_family_tok(base_type->ctype.type)) {
-    return typed_value_new(
-        llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
-        &exprs[0]->type_chain);
-  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
-    return typed_value_new(
-        llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
-        &exprs[0]->type_chain);
-  }
-  log_panic("Unsupported type in binary operation:%s",
-            convert_repr_ast_type(base_type->ctype.type));
+  return build_value_expr_binop_template(b, lhs, rhs, llvm_build_f, f_names);
 }
 
 typed_value build_expr_binop_div(builder b, astn binop) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
-  typed_value *exprs =
-      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
-  astn base_type = slist_peek_head(&exprs[0]->type_chain);
-  if (g_is_int_family_tok(base_type->ctype.type) &&
-      base_type->ctype.signint == TOK_KW_SIGNED) {
-    return typed_value_new(
-        LLVMBuildSDiv(b->builder, exprs[0]->v, exprs[1]->v, "sdiv"),
-        &exprs[0]->type_chain);
-  } else if (g_is_int_family_tok(base_type->ctype.type) &&
-             base_type->ctype.signint == TOK_KW_UNSIGNED) {
-    return typed_value_new(
-        LLVMBuildUDiv(b->builder, exprs[0]->v, exprs[1]->v, "udiv"),
-        &exprs[0]->type_chain);
-  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
-    return typed_value_new(
-        LLVMBuildFDiv(b->builder, exprs[0]->v, exprs[1]->v, "fdiv"),
-        &exprs[0]->type_chain);
-  }
-  BUILDING();
+  return build_value_expr_binop_div(b, lhs, rhs);
 }
 
 /**
@@ -182,25 +147,7 @@ typed_value build_expr_binop_su_template(builder b, astn binop,
                                          char *f_names[2]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
-  typed_value *exprs =
-      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
-
-  // only int family is allowed
-  astn base_type = slist_peek_head(&exprs[0]->type_chain);
-  if (!g_is_int_family_tok(base_type->ctype.type)) {
-    log_panic("%s or %s operation only allowed on int type", f_names[0],
-              f_names[1]);
-  }
-
-  if (base_type->ctype.signint == TOK_KW_SIGNED) {
-    return typed_value_new(
-        llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
-        &exprs[0]->type_chain);
-  }
-  // unsigned
-  return typed_value_new(
-      llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
-      &exprs[0]->type_chain);
+  return build_value_expr_binop_su_template(b, lhs, rhs, llvm_build_f, f_names);
 }
 
 typed_value build_expr_binop_bit_template(builder b, astn binop,
@@ -208,18 +155,7 @@ typed_value build_expr_binop_bit_template(builder b, astn binop,
                                           char *f_name) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
-  typed_value *exprs =
-      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
-  // only int family is allowed
-  astn lhs_base_type = slist_peek_head(&exprs[0]->type_chain);
-  astn rhs_base_type = slist_peek_head(&exprs[1]->type_chain);
-  if (!(g_is_int_family_tok(lhs_base_type->ctype.type) &&
-        g_is_int_family_tok(rhs_base_type->ctype.type))) {
-    log_panic("%s operation is only allowed on int type", f_name);
-  }
-  return typed_value_new(
-      llvm_build_f(b->builder, exprs[0]->v, exprs[1]->v, f_name),
-      &exprs[0]->type_chain);
+  return build_value_expr_binop_bit_template(b, lhs, rhs, llvm_build_f, f_name);
 }
 
 /**
@@ -277,54 +213,80 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
 }
 
 typed_value build_expr_binop_assign(builder b, astn binop) {
-  typed_value lhs, rhs;
-  if (binop->binop.op != '=') {
-    // build extracted ast
-    astn assign_ast = ast_new(ast_expr_binop);
-    switch (binop->binop.op) {
-    case TOK_SYM_SELF_ADD:
-      assign_ast->binop.op = '+';
-      break;
-    case TOK_SYM_SELF_SUB:
-      assign_ast->binop.op = '-';
-      break;
-    case TOK_SYM_SELF_MUL:
-      assign_ast->binop.op = '*';
-      break;
-    case TOK_SYM_SELF_DIV:
-      assign_ast->binop.op = '/';
-      break;
-    case TOK_SYM_SELF_MOD:
-      assign_ast->binop.op = '%';
-      break;
-    case TOK_SYM_SELF_LSHIFT:
-      assign_ast->binop.op = TOK_SYM_LSHIFT;
-      break;
-    case TOK_SYM_SELF_RSHIFT:
-      assign_ast->binop.op = TOK_SYM_RSHIFT;
-      break;
-    case TOK_SYM_SELF_BIT_AND:
-      assign_ast->binop.op = '&';
-      break;
-    case TOK_SYM_SELF_BIT_OR:
-      assign_ast->binop.op = '|';
-      break;
-    case TOK_SYM_SELF_BIT_XOR:
-      assign_ast->binop.op = '^';
-      break;
-    default:
-      log_panic("Unsupported self assign operation: %s",
-                convert_repr_ast_type(binop->binop.op));
+  typed_value lhs = build_lvalue_exprssion(b, binop->binop.lhs);
+  typed_value rhs = build_expression(b, binop->binop.rhs);
+  switch (binop->binop.op) {
+  case TOK_SYM_SELF_ADD: {
+    typed_value lhs_load = build_value_load(b, lhs);
+    astn load_base_type = slist_peek_head(&lhs_load->type_chain);
+    if (load_base_type->ctype.type == '*') {
+      log_trace("ptr operation detected in += expression");
+      rhs = build_expr_binop_ptr(b, lhs_load, '+', rhs);
+    } else {
+      rhs = build_value_expr_binop_template(
+          b, lhs_load, rhs, (llvm_func_t[]){LLVMBuildAdd, LLVMBuildFAdd},
+          (char *[]){"selfadd", "selffadd"});
     }
-    assign_ast->binop.lhs = binop->binop.lhs;
-    assign_ast->binop.rhs = binop->binop.rhs;
-    lhs = build_lvalue_exprssion(b, assign_ast->binop.lhs);
-    rhs = build_expr_binop(b, assign_ast);
-    assign_ast->binop.lhs = assign_ast->binop.rhs = NULL;
-    ast_free(assign_ast);
-  } else {
-    lhs = build_lvalue_exprssion(b, binop->binop.lhs);
-    rhs = build_expression(b, binop->binop.rhs);
+    break;
+  }
+  case TOK_SYM_SELF_SUB: {
+    typed_value lhs_load = build_value_load(b, lhs);
+    astn load_base_type = slist_peek_head(&lhs_load->type_chain);
+    if (load_base_type->ctype.type == '*') {
+      log_trace("ptr operation detected in -=  expression");
+      rhs = build_expr_binop_ptr(b, lhs_load, '-', rhs);
+    } else {
+      rhs = build_value_expr_binop_template(
+          b, lhs_load, rhs, (llvm_func_t[]){LLVMBuildSub, LLVMBuildFSub},
+          (char *[]){"selfsub", "selffsub"});
+    }
+    break;
+  }
+  case TOK_SYM_SELF_MUL: {
+    rhs = build_value_expr_binop_template(
+        b, build_value_load(b, lhs), rhs,
+        (llvm_func_t[]){LLVMBuildMul, LLVMBuildFMul},
+        (char *[]){"selfmul", "selffmul"});
+    break;
+  }
+  case TOK_SYM_SELF_DIV: {
+    rhs = build_value_expr_binop_div(b, build_value_load(b, lhs), rhs);
+    break;
+  }
+  case TOK_SYM_SELF_MOD: {
+    rhs = build_value_expr_binop_su_template(
+        b, build_value_load(b, lhs), rhs,
+        (llvm_func_t[]){LLVMBuildSRem, LLVMBuildURem},
+        (char *[]){"selfsrem", "selfurem"});
+    break;
+  }
+  case TOK_SYM_SELF_LSHIFT: {
+    rhs = build_value_expr_binop_bit_template(b, build_value_load(b, lhs), rhs,
+                                              LLVMBuildShl, "selfshl");
+    break;
+  }
+  case TOK_SYM_SELF_RSHIFT: {
+    rhs = build_value_expr_binop_su_template(
+        b, build_value_load(b, lhs), rhs,
+        (llvm_func_t[]){LLVMBuildShl, LLVMBuildLShr},
+        (char *[]){"selfshl", "selflshr"});
+    break;
+  }
+  case TOK_SYM_SELF_BIT_AND: {
+    rhs = build_value_expr_binop_bit_template(b, build_value_load(b, lhs), rhs,
+                                              LLVMBuildAnd, "selfbitand");
+    break;
+  }
+  case TOK_SYM_SELF_BIT_OR: {
+    rhs = build_value_expr_binop_bit_template(b, build_value_load(b, lhs), rhs,
+                                              LLVMBuildOr, "selfbitor");
+    break;
+  }
+  case TOK_SYM_SELF_BIT_XOR: {
+    rhs = build_value_expr_binop_bit_template(b, build_value_load(b, lhs), rhs,
+                                              LLVMBuildXor, "selfbitxor");
+    break;
+  }
   }
   build_value_store(b, rhs, lhs);
   // loadlhs again for return
@@ -525,7 +487,7 @@ typed_value build_expr_binop(builder b, astn n) {
     return build_expr_binop_logic_short_circuit(b, n, false);
   }
   }
-  BUILDING();
+  log_panic("Unsupported binary operation:%c", convert_repr_token(n->binop.op));
 }
 
 typed_value build_expr_unary_pos(builder b, astn n) {
@@ -852,7 +814,7 @@ typed_value build_expr_ref(builder b, astn n) {
   case ast_enumerator:
     return build_expr_enum(b, n->ref);
   default:
-    BUILDING();
+    log_panic("Unsupported ref type:%s", convert_repr_ast_type(n->ref->type));
   }
 }
 
@@ -905,7 +867,7 @@ typed_value build_expression(builder b, astn n) {
   }
   default:
   }
-  BUILDING();
+  log_panic("Unsupported expression type:%s", convert_repr_ast_type(n->type));
 }
 
 typed_value build_lvalue_exprssion(builder b, astn n) {

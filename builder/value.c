@@ -53,3 +53,107 @@ typed_value build_value_load(builder b, typed_value v) {
   LLVMValueRef load = LLVMBuildLoad2(b->builder, points_to_type, v->v, "load");
   return typed_value_new(load, points_to_type_chain);
 }
+
+typed_value build_value_expr_binop_template(builder b, typed_value lhs,
+                                            typed_value rhs,
+                                            llvm_func_t llvm_build_f[2],
+                                            char *f_names[2]) {
+  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
+    log_panic("Ptr should not be used in there, it should be processed in "
+              "build_expr_binop");
+  }
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+  astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  if (g_is_int_family_tok(base_type->ctype.type)) {
+    return typed_value_new(
+        llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
+        &exprs[0]->type_chain);
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
+    return typed_value_new(
+        llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
+        &exprs[0]->type_chain);
+  }
+  log_panic("Unsupported type in binary operation:%s",
+            convert_repr_ast_type(base_type->ctype.type));
+}
+
+typed_value build_value_expr_binop_div(builder b, typed_value lhs,
+                                       typed_value rhs) {
+  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
+    log_panic("Ptr should not be used in there, it should be processed in "
+              "build_expr_binop");
+  }
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+  astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  if (g_is_int_family_tok(base_type->ctype.type) &&
+      base_type->ctype.signint == TOK_KW_SIGNED) {
+    return typed_value_new(
+        LLVMBuildSDiv(b->builder, exprs[0]->v, exprs[1]->v, "sdiv"),
+        &exprs[0]->type_chain);
+  } else if (g_is_int_family_tok(base_type->ctype.type) &&
+             base_type->ctype.signint == TOK_KW_UNSIGNED) {
+    return typed_value_new(
+        LLVMBuildUDiv(b->builder, exprs[0]->v, exprs[1]->v, "udiv"),
+        &exprs[0]->type_chain);
+  } else if (g_is_fp_family_tok(base_type->ctype.type)) {
+    return typed_value_new(
+        LLVMBuildFDiv(b->builder, exprs[0]->v, exprs[1]->v, "fdiv"),
+        &exprs[0]->type_chain);
+  } else {
+    log_panic("Unsupported type in div operation:%s",
+              convert_repr_ast_type(base_type->ctype.type));
+  }
+}
+
+typed_value build_value_expr_binop_su_template(builder b, typed_value lhs,
+                                               typed_value rhs,
+                                               llvm_func_t llvm_build_f[2],
+                                               char *f_names[2]) {
+  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
+    log_panic("Ptr should not be used in this binop, it should be processed in "
+              "build_expr_binop");
+  }
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+
+  // only int family is allowed
+  astn base_type = slist_peek_head(&exprs[0]->type_chain);
+  if (!g_is_int_family_tok(base_type->ctype.type)) {
+    log_panic("%s or %s operation only allowed on int type", f_names[0],
+              f_names[1]);
+  }
+
+  if (base_type->ctype.signint == TOK_KW_SIGNED) {
+    return typed_value_new(
+        llvm_build_f[0](b->builder, exprs[0]->v, exprs[1]->v, f_names[0]),
+        &exprs[0]->type_chain);
+  }
+  // unsigned
+  return typed_value_new(
+      llvm_build_f[1](b->builder, exprs[0]->v, exprs[1]->v, f_names[1]),
+      &exprs[0]->type_chain);
+}
+
+typed_value build_value_expr_binop_bit_template(builder b, typed_value lhs,
+                                                typed_value rhs,
+                                                llvm_func_t llvm_build_f,
+                                                char *f_name) {
+  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
+    log_panic("Ptr should not be used in there, it should be processed in "
+              "build_expr_binop");
+  }
+  typed_value *exprs =
+      build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
+  // only int family is allowed
+  astn lhs_base_type = slist_peek_head(&exprs[0]->type_chain);
+  astn rhs_base_type = slist_peek_head(&exprs[1]->type_chain);
+  if (!(g_is_int_family_tok(lhs_base_type->ctype.type) &&
+        g_is_int_family_tok(rhs_base_type->ctype.type))) {
+    log_panic("%s operation is only allowed on int type", f_name);
+  }
+  return typed_value_new(
+      llvm_build_f(b->builder, exprs[0]->v, exprs[1]->v, f_name),
+      &exprs[0]->type_chain);
+}

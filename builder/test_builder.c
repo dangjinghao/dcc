@@ -220,6 +220,28 @@ void tbc_self_assign() {
             "7;v &= 8;v |= 9;v ^= 10;v <<= 11;v >>= 12;}");
 }
 
+void tbc_self_assign_side_effect() {
+  tbc_entry("int idx(); \
+            void F(){\
+            int *p;\
+            p[idx()] += 42;\
+            p[idx()] -= 42;\
+            p[idx()] *= 42;\
+            p[idx()] /= 42;\
+            p[idx()] %= 42;\
+            p[idx()] &= 42;\
+            p[idx()] |= 42;\
+            p[idx()] ^= 42;\
+            p[idx()] <<= 42;\
+            p[idx()] >>= 42;\
+            }");
+}
+
+void tbc_self_assign_ptr_wrong() {
+  tbc_entry("void F(){int *p; p += 1; p -= 1; p *= 1; p /= 1; p %= 1; p &= 1; "
+            "p |= 1; p ^= 1; p <<= 1; p >>= 1;}");
+}
+
 void tbc_ptr_self_assign() {
   tbc_entry("void F(){int* v = 0;v = v + 2;v += 3;v -= 4;}");
 }
