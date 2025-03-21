@@ -591,13 +591,7 @@ typed_value build_expr_unary_deref(builder b, astn n) {
   if (base_type->ctype.type != '*') {
     log_panic("Unary dereference operation is only allowed on pointer types");
   }
-  slist points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &expr->type_chain);
-  LLVMTypeRef points_to_type =
-      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
-  return typed_value_new(
-      LLVMBuildLoad2(b->builder, points_to_type, expr->v, "deref"),
-      points_to_type_chain);
+  return build_value_load(b, expr);
 }
 
 /**
@@ -619,9 +613,7 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
       build_convert_base_type(b, slist_peek_head(points_to_type_chain));
 
   // Load current value
-  LLVMValueRef old =
-      LLVMBuildLoad2(b->builder, points_to_type, expr->v, "incload");
-
+  LLVMValueRef old = build_value_load(b, expr)->v;
   // Create the constant for incrementing (1)
   LLVMValueRef one;
   astn base_type = slist_peek_head(points_to_type_chain);
@@ -840,10 +832,7 @@ typed_value build_load_declaration(builder b, astn n) {
     // the function symbol itself is a pointer
     return typed_value_new(var->v, &var->type_chain);
   }
-  LLVMTypeRef points_to_type = build_convert_base_type(b, points_to_base_type);
-  return typed_value_new(
-      LLVMBuildLoad2(b->builder, points_to_type, var->v, "load"),
-      points_to_type_chain);
+  return build_value_load(b, var);
 }
 
 typed_value build_expr_enum(builder b, astn n) {

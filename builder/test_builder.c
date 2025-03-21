@@ -199,7 +199,7 @@ void tbc_ptr_unary_right() {
             "++p;char*p5 = --p;void*pp = &p;int c =*p; c = !p;}");
 }
 
-void tbc_ptr_self_inc() { tbc_entry("void F(){int* p = 0; char*x = p++; --p;}"); }
+void tbc_ptr_self_inc() { tbc_entry("void F(){int* p = 0; char*x = p++;char c =  *--p;}"); }
 
 void tbc_ptr_null() {
   tbc_entry("int F(){char*p = 0x10; return (long)p ? (long)p : (char) p; }");
