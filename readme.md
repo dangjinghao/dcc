@@ -2,6 +2,7 @@
 
 - The parser would not generate a AST which 100% corresponding to the source code, to reduce the complexity of codegen/build process.
   - We call this AST `reduced AST`.
+  - `int i,j,k = 10;` -> `int i;int j; int k = 10;`
 - The `extern` declaration in block scope would be ignored in build stage
 - We don't have to move the static declaration to global scope, llvm supports add extern symbol to global scope  
 - We **WOULD NOT FREE** the memory in builder stage.
@@ -26,6 +27,8 @@ struct s{int a;char b;};
 
 - We have to move builder position to entry(first) block for `alloca` a variable rather create this instruction in other basic block. Because, in LLVM every time one `alloca` instruction was executed, the stack pointer would be pull down.
 
+- We will store the alloca variable in entry block in every function.
+
 ## TODO LIST
 
 - [x] use slist instead of dynarray for performance
@@ -48,7 +51,7 @@ struct s{int a;char b;};
 - [x] iteration statement
 - [x] break/continue in iteration statement
 - [x] if-else statement
-- [ ] iteration and switch mixture test
+- [x] iteration and switch mixture test
 - [ ] reorganize builder API again
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test

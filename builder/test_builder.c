@@ -317,3 +317,39 @@ void tbc_switch_dup_default() {
       "int F(int a){switch(a){case 1: return -1;default: return 2;default: "
       "return 3;}}");
 }
+void tbc_switch_iter_mix() {
+  tbc_entry("int F(int a) {\
+  while (a < 10) {\
+    a++;\
+    if (a == 5)\
+      break;\
+    else if (a == 3)\
+      continue;\
+    else a++;\
+    switch (a) {\
+    case 1:\
+      a = 1;\
+      break;\
+    case 2: {\
+      int b = 1;\
+      while (b < 10) {\
+        b++;\
+        if (b == 5)\
+          break;\
+        else if (b == 3)\
+          continue;\
+      }\
+      continue;\
+      return b;\
+    }\
+    case 3:\
+      break;\
+    default:\
+      continue;\
+    }\
+  }\
+  return a;\
+}");
+}
+
+void tbc_return_void() { tbc_entry("void F(){return F();}"); }
