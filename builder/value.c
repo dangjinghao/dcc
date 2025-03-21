@@ -1,6 +1,7 @@
 #include "builder.h"
 #include "convert/convert.h"
 #include "grammar.h"
+#include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
@@ -30,4 +31,25 @@ LLVMValueRef build_value_eq0(builder b, typed_value v) {
 
 LLVMValueRef build_value_ne0(builder b, typed_value v) {
   return build_value_cmp0(b, v, LLVMIntNE, LLVMRealONE, "testnot0");
+}
+
+void build_value_store(builder b, typed_value v, typed_value ptr) {
+  // get lhs points type
+  slist points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &ptr->type_chain);
+  // cast rhs to lhs type
+  v = build_type_convert_to(b, v, points_to_type_chain);
+  // store rhs to lhs
+  LLVMBuildStore(b->builder, v->v, ptr->v);
+}
+
+typed_value build_value_load(builder b, typed_value v) {
+  // get lhs points type
+  slist points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &v->type_chain);
+  LLVMTypeRef points_to_type =
+      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
+  // load rhs to lhs
+  LLVMValueRef load = LLVMBuildLoad2(b->builder, points_to_type, v->v, "load");
+  return typed_value_new(load, points_to_type_chain);
 }

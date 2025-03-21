@@ -37,6 +37,8 @@ void build_trans_unit(builder b, slist symtab);
 
 LLVMValueRef build_value_eq0(builder b, typed_value v);
 LLVMValueRef build_value_ne0(builder b, typed_value v);
+void build_value_store(builder b, typed_value v, typed_value ptr);
+typed_value build_value_load(builder b, typed_value v);
 
 typed_value build_lvalue_exprssion(builder b, astn n);
 typed_value build_expr_binop(builder b, astn n);

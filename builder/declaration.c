@@ -8,6 +8,7 @@
 #include "sds/sds.h"
 #include "slist/slist.h"
 #include "token.h"
+#include "typed_value/typed_value.h"
 #include <assert.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
@@ -176,19 +177,6 @@ LLVMValueRef build_global_variable(builder b, astn n) {
   return pv;
 }
 
-void build_alloca_variable_init(builder b, astn n, LLVMValueRef pv) {
-  if (n->declaration.extdata) {
-    astn init = n->declaration.extdata;
-    assert(init->type == ast_initializer);
-    log_trace("alloca variable %s has initializer",
-              LLVMGetValueName2(pv, &(size_t){}));
-    auto v = build_expression(b, init->initializer.init);
-    log_trace("try to cast the initializer to the variable type");
-    v = build_type_convert_to(b, v, &n->declaration.type_chain);
-    LLVMBuildStore(b->builder, v->v, pv);
-  }
-}
-
 LLVMValueRef build_alloca_variable(builder b, astn n) {
   assert(n->type == ast_declaration);
   sds sym_name = build_symbol_name(n);
@@ -206,7 +194,19 @@ LLVMValueRef build_alloca_variable(builder b, astn n) {
   auto pv = LLVMBuildAlloca(b->builder, value_type, sym_name);
   sdsfree(sym_name);
   LLVMPositionBuilderAtEnd(b->builder, current_block);
-  build_alloca_variable_init(b, n, pv);
+
+  // initialize the alloca variable
+  if (n->declaration.extdata) {
+    astn init = n->declaration.extdata;
+    assert(init->type == ast_initializer);
+    log_trace("alloca variable %s has initializer",
+              LLVMGetValueName2(pv, &(size_t){}));
+    auto v = build_expression(b, init->initializer.init);
+    typed_value ptr = typed_value_new(
+        pv, build_type_chain_add_pointer(b, &n->declaration.type_chain));
+    build_value_store(b, v, ptr);
+  }
+
   return pv;
 }
 
@@ -284,7 +284,10 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
 
       // Store the parameter value into the alloca
       LLVMValueRef param = LLVMGetParam(v, param_idx);
-      LLVMBuildStore(b->builder, param, alloca);
+      slist param_decl_type_chain = &param_decl->declaration.type_chain;
+      typed_value ptr = typed_value_new(
+          alloca, build_type_chain_add_pointer(b, param_decl_type_chain));
+      build_value_store(b, typed_value_new(param, param_decl_type_chain), ptr);
 
       // Save the alloca as the parameter's value
       assert(param_decl->declaration.V == NULL);

@@ -195,12 +195,11 @@ void tbc_func_uncallable() { tbc_entry("int F(){int a = 1; return a();}"); }
 
 void tbc_ptr_unary_wrong() { tbc_entry("void F(){char* p; +p; -p; ~p;}"); }
 void tbc_ptr_unary_right() {
-
   tbc_entry("void F(){char* p; char*p2 = p++;char*p3 = p--;char*p4 = "
             "++p;char*p5 = --p;void*pp = &p;int c =*p; c = !p;}");
 }
 
-void tbc_ptr_self_inc() { tbc_entry("void F(){int* p; char*x = p++; --p;}"); }
+void tbc_ptr_self_inc() { tbc_entry("void F(){int* p = 0; char*x = p++; --p;}"); }
 
 void tbc_ptr_null() {
   tbc_entry("int F(){char*p = 0x10; return (long)p ? (long)p : (char) p; }");

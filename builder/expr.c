@@ -326,19 +326,9 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
     lhs = build_lvalue_exprssion(b, binop->binop.lhs);
     rhs = build_expression(b, binop->binop.rhs);
   }
-  // get lhs points type
-  slist points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &lhs->type_chain);
-  LLVMTypeRef points_to_type =
-      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
-  // cast rhs to lhs type
-  typed_value rhs_casted = build_type_convert_to(b, rhs, points_to_type_chain);
-  // store rhs to lhs
-  LLVMBuildStore(b->builder, rhs_casted->v, lhs->v);
-  // load lhs to return
-  return typed_value_new(
-      LLVMBuildLoad2(b->builder, points_to_type, lhs->v, "loadlval"),
-      points_to_type_chain);
+  build_value_store(b, rhs, lhs);
+  // loadlhs again for return
+  return build_value_load(b, lhs);
 }
 
 typed_value build_expr_ternary(builder b, astn ternary) {
@@ -682,14 +672,15 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
       updated = LLVMBuildFSub(b->builder, old, one, "fdec1");
     }
   }
+  typed_value updated_v = typed_value_new(updated, points_to_type_chain);
   // Store the new value
-  LLVMBuildStore(b->builder, updated, expr->v);
+  build_value_store(b, updated_v, expr);
 
   // For postfix, return the original value; for prefix, return the incremented value
   if (postfix) {
     return typed_value_new(old, points_to_type_chain);
   } else {
-    return typed_value_new(updated, points_to_type_chain);
+    return updated_v;
   }
 }
 
