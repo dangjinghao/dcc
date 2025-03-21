@@ -29,10 +29,16 @@ void build_statement_jump_return(builder b, astn n) {
   } else {
     // n->jump_statement.expr exists
     typed_value ret_val = build_expression(b, n->jump_statement.expr);
-    log_trace("try to cast return value to function return type");
-    typed_value ret_val_casted =
-        build_type_convert_to(b, ret_val, func_type_chain);
-    LLVMBuildRet(b->builder, ret_val_casted->v);
+    astn ret_val_base_type = slist_peek_head(&ret_val->type_chain);
+    if (ret_val_base_type->ctype.type == TOK_KW_VOID) {
+      log_trace("return a function call with void return type");
+      LLVMBuildRetVoid(b->builder);
+    } else {
+      log_trace("try to cast return value to function return type");
+      typed_value ret_val_casted =
+          build_type_convert_to(b, ret_val, func_type_chain);
+      LLVMBuildRet(b->builder, ret_val_casted->v);
+    }
   }
   LLVMPositionBuilderAtEnd(b->builder, after_return);
 }
