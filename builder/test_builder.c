@@ -199,7 +199,9 @@ void tbc_ptr_unary_right() {
             "++p;char*p5 = --p;void*pp = &p;int c =*p; c = !p;}");
 }
 
-void tbc_ptr_self_inc() { tbc_entry("void F(){int* p = 0; char*x = p++;char c =  *--p;}"); }
+void tbc_ptr_self_inc() {
+  tbc_entry("void F(){int* p = 0; char*x = p++;char c =  *--p;}");
+}
 
 void tbc_ptr_null() {
   tbc_entry("int F(){char*p = 0x10; return (long)p ? (long)p : (char) p; }");
@@ -352,3 +354,13 @@ void tbc_switch_iter_mix() {
 }
 
 void tbc_return_void() { tbc_entry("void F(){return F();}"); }
+
+void tbc_sc_memleak() {
+  tbc_entry("\
+    void F(){\
+    int v1,v2=2,*vp;\
+    v1 += v2;\
+    v1 += vp[v1];\
+    vp[v2] = v1;\
+    }");
+}

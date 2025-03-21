@@ -759,7 +759,7 @@ typed_value build_expr_unary(builder b, astn n) {
       return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
                                        n->unary.postfix);
     case '[': {
-      // build arr[idx] -> *( arr + idx)
+      // convert arr[idx] -> *(arr + idx)
       astn arr = n->unary.expr;
       astn idx = n->unary.extdata;
       // create binop
@@ -767,7 +767,10 @@ typed_value build_expr_unary(builder b, astn n) {
       binop->binop.op = '+';
       binop->binop.lhs = arr;
       binop->binop.rhs = idx;
-      return build_expr_unary_deref(b, binop);
+      typed_value r = build_expr_unary_deref(b, binop);
+      binop->binop.lhs = binop->binop.rhs = NULL;
+      ast_free(binop);
+      return r;
     }
     case '(': {
       return build_expr_unary_func_call(b, n);
@@ -924,7 +927,10 @@ typed_value build_lvalue_exprssion(builder b, astn n) {
       binop->binop.op = '+';
       binop->binop.lhs = arr;
       binop->binop.rhs = idx;
-      return build_expr_binop(b, binop);
+      typed_value v = build_expr_binop(b, binop);
+      binop->binop.lhs = binop->binop.rhs = NULL;
+      ast_free(binop);
+      return v;
     }
     case TOK_SYM_ARROW:
     case '.':
