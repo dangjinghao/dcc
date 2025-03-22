@@ -260,3 +260,24 @@ slist build_type_chain_add_pointer(builder b, slist type_chain) {
   slist_add_head(new_type_chain, ptr);
   return new_type_chain;
 }
+
+int build_type_get_struct_member(astn struct_declaration, sds name,astn *result) {
+
+  assert(struct_declaration->type == ast_struct_union_declaration);
+  slist members =
+      &struct_declaration->struct_union_declaration.member_declarations;
+  int index = 0;
+  astn member;
+  slist_foreach(members, member) {
+    assert(member->type == ast_declaration);
+    log_trace("looking for member: %s, got: %s", name,
+              member->declaration.ident);
+    if (member->declaration.ident &&
+        sdscmp(member->declaration.ident, name) == 0) {
+      *result = member;
+      return index;
+    }
+    index += 1;
+  }
+  return -1;
+}

@@ -52,17 +52,22 @@ struct s{int a;char b;};
 - [x] break/continue in iteration statement
 - [x] if-else statement
 - [x] iteration and switch mixture test
-- [ ] reorganize builder API again
+- [ ] integrate struct
+  - [ ] copy/assign struct to other struct
+  - [ ] { } initializer
+  - [ ] passing as parameter
+  - [ ] return from function
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary
   - [x] unary expression array index
   - [x] function call
-  - [ ] struct get member
+  - [x] struct get member
   - [ ] array
 - [x] basic switch implementation
   - [ ] binary search optimization
 - [ ] string reference table in builder
+- [ ] reorganize builder API again
 - [ ] {} initializer
 - [ ] sizeof constant expression
 - [ ] node meta data

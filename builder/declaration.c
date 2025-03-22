@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "builder.h"
+#include "convert/convert.h"
 #include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
@@ -21,6 +22,9 @@ dynarray build_struct_member_declaration_type(astn n, builder b, dynarray arr) {
   slist_foreach(&n->struct_union_declaration.member_declarations,
                 struct_declaration) {
     LLVMTypeRef t = build_variable_declaration_type(b, struct_declaration);
+    if (struct_declaration->declaration.extdata) {
+      BUILDING();
+    }
     dynarray_add(arr, &t);
   }
   return arr;
@@ -94,7 +98,7 @@ LLVMTypeRef build_convert_base_type(builder b, astn n) {
     break;
   }
 
-  BUILDING();
+  log_panic("Unsupported base type:%s", convert_repr_token(t));
   return NULL;
 }
 

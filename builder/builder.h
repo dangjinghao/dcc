@@ -60,7 +60,7 @@ typed_value build_value_expr_binop_div(builder b, typed_value lhs,
                                        typed_value rhs);
 
 bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs);
-typed_value build_lvalue_exprssion(builder b, astn n);
+typed_value build_lvalue_expression(builder b, astn n);
 typed_value build_expr_binop(builder b, astn n);
 typed_value build_expression(builder b, astn n);
 
@@ -72,8 +72,12 @@ slist build_type_chain_copy(slist type_chain);
 slist build_type_get_points_to_type_chian(builder b, slist type_chain);
 slist build_function_return_type_chain(builder b, astn n);
 slist build_type_chain_add_pointer(builder b, slist type_chain);
+int build_type_get_struct_member(astn struct_declaration, sds name,
+                                 astn *result);
+LLVMTypeRef build_convert_struct_type(builder b, astn n);
 typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values);
+
 void build_statement(builder b, astn n);
 void build_block(builder b, astn blk);
 

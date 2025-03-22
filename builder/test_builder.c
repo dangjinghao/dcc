@@ -386,3 +386,58 @@ void tbc_sc_memleak() {
     vp[v2] = v1;\
     }");
 }
+
+void tbc_and_not() {
+  tbc_entry("int F(){int a = 1;int b = 2;return !(a && b);}");
+}
+
+void tbc_struct_get_member() {
+  tbc_entry("struct S{int a;char b;};\
+    int F(){\
+      struct S s;\
+      char c = s.b + s.a;\
+  }");
+}
+
+void tbc_struct_deref_member() {
+  tbc_entry("struct S{int a;char b;};\
+    int F(){\
+      struct S *sp,s1;\
+      long c = sp->b + s1.a;\
+  }");
+}
+
+void tbc_struct_lvalue_member() {
+  tbc_entry("struct S{int a;char b;};\
+    int F(){\
+      struct S *sp,s1;\
+      sp->a = s1.b;\
+      s1.a = sp->a;\
+  }");
+}
+
+void tbc_struct_typedef() {
+  tbc_entry("typedef struct S{int a;char b;}S_t;\
+    int F(){\
+      S_t s;\
+      s.a = 1;\
+  }");
+}
+
+void tbc_struct_in_struct() {
+  tbc_entry("struct s1{int a;struct s2 {int b; float c;} s;};\
+    int F(){\
+      struct s1 s;\
+      s.a = 1;\
+      s.s.c = 2;\
+  }");
+}
+
+void tbc_struct_self(){
+  tbc_entry("struct S{int a;char b;};\
+    int F(struct S *sp){\
+      ;\
+      (sp+1)->a++;\
+      (sp+1)->b-=1;\
+  }");
+}

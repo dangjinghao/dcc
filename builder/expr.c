@@ -213,7 +213,7 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
 }
 
 typed_value build_expr_binop_assign(builder b, astn binop) {
-  typed_value lhs = build_lvalue_exprssion(b, binop->binop.lhs);
+  typed_value lhs = build_lvalue_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
   switch (binop->binop.op) {
   case TOK_SYM_SELF_ADD: {
@@ -567,7 +567,7 @@ typed_value build_expr_unary_deref(builder b, astn n) {
  */
 typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
                                       bool postfix) {
-  typed_value expr = build_lvalue_exprssion(b, n);
+  typed_value expr = build_lvalue_expression(b, n);
   // Get the value pointed to
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &expr->type_chain);
@@ -691,6 +691,43 @@ typed_value build_expr_unary_func_call(builder b, astn n) {
   return typed_value_new(call, func_return_type_chain);
 }
 
+typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
+  typed_value struct_ptr = build_lvalue_expression(b, n->unary.expr);
+  astn member = n->unary.extdata;
+  assert(member->type == ast_ident);
+  slist points_to_struct_type_chain =
+      build_type_get_points_to_type_chian(b, &struct_ptr->type_chain);
+  astn points_to_base_type = slist_peek_head(points_to_struct_type_chain);
+  assert(points_to_base_type->type == ast_ctype);
+  assert(points_to_base_type->ctype.type == TOK_KW_STRUCT);
+  if (points_to_base_type->ctype.type != TOK_KW_STRUCT) {
+    log_panic("Only struct type can be used for . operation");
+  }
+  astn struct_declaration = points_to_base_type->ctype.user_defined_type;
+  if (struct_declaration->type == ast_ref) {
+    struct_declaration = struct_declaration->ref;
+  }
+  // get the member index
+  astn member_declaration;
+  int member_idx = build_type_get_struct_member(
+      struct_declaration, member->ident, &member_declaration);
+  if (member_idx < 0) {
+    log_panic("Member %s not found in struct", member->ident);
+  }
+  slist member_type_chain = &member_declaration->declaration.type_chain;
+  LLVMValueRef gep = LLVMBuildStructGEP2(
+      b->builder, build_convert_struct_type(b, struct_declaration),
+      struct_ptr->v, member_idx, "struct_gep");
+  // add pointer to member type chain
+  slist member_ptr_type_chain =
+      build_type_chain_add_pointer(b, member_type_chain);
+  // because gep computed the address of the member, we need to load it
+  return typed_value_new(gep, member_ptr_type_chain);
+}
+
+typed_value build_expr_unary_get_member(builder b, astn n) {
+  return build_value_load(b, build_expr_unary_get_member_ptr(b, n));
+}
 typed_value build_expr_unary(builder b, astn n) {
   if (!n->unary.postfix) {
     // suffix
@@ -706,7 +743,7 @@ typed_value build_expr_unary(builder b, astn n) {
     case '*':
       return build_expr_unary_deref(b, n->unary.expr);
     case '&':
-      return build_lvalue_exprssion(b, n->unary.expr);
+      return build_lvalue_expression(b, n->unary.expr);
     case TOK_SYM_SELF_INC:
     case TOK_SYM_SELF_DEC:
       return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
@@ -737,12 +774,28 @@ typed_value build_expr_unary(builder b, astn n) {
     case '(': {
       return build_expr_unary_func_call(b, n);
     }
-    case TOK_SYM_ARROW:
-    case '.':
-      break;
+    case TOK_SYM_ARROW: {
+      // s->m is equivalent to (*s).m
+      astn deref = ast_new(ast_expr_unary);
+      deref->unary.op = '*';
+      deref->unary.postfix = false;
+      deref->unary.expr = n->unary.expr;
+      n->unary.expr = deref;
+      log_trace("replaced -> with .");
+      n->unary.op = '.';
+      typed_value result = build_expr_unary_get_member(b, n);
+      n->unary.expr = deref->unary.expr;
+      deref->unary.expr = NULL;
+      ast_free(deref);
+      return result;
+    }
+
+    case '.': {
+      return build_expr_unary_get_member(b, n);
+    }
     }
   }
-  BUILDING();
+  log_panic("Unsupported unary operation:%s", convert_repr_token(n->unary.op));
 }
 
 typed_value build_expr_primary(builder b, astn n) {
@@ -870,7 +923,7 @@ typed_value build_expression(builder b, astn n) {
   log_panic("Unsupported expression type:%s", convert_repr_ast_type(n->type));
 }
 
-typed_value build_lvalue_exprssion(builder b, astn n) {
+typed_value build_lvalue_expression(builder b, astn n) {
   switch (n->type) {
   case ast_ref: {
     assert(n->ref->type == ast_declaration);
@@ -894,9 +947,24 @@ typed_value build_lvalue_exprssion(builder b, astn n) {
       ast_free(binop);
       return v;
     }
-    case TOK_SYM_ARROW:
-    case '.':
-      BUILDING();
+    case TOK_SYM_ARROW: {
+      // s->m is equivalent to (*s).m
+      astn deref = ast_new(ast_expr_unary);
+      deref->unary.op = '*';
+      deref->unary.postfix = false;
+      deref->unary.expr = n->unary.expr;
+      n->unary.expr = deref;
+      log_trace("replaced -> with .");
+      n->unary.op = '.';
+      typed_value result = build_expr_unary_get_member_ptr(b, n);
+      n->unary.expr = deref->unary.expr;
+      deref->unary.expr = NULL;
+      ast_free(deref);
+      return result;
+    }
+    case '.': {
+      return build_expr_unary_get_member_ptr(b, n);
+    }
     }
     break;
   }
