@@ -29,6 +29,10 @@ struct s{int a;char b;};
 
 - We will store the alloca variable in entry block in every function.
 
+- Return struct by value or pass struct by value would lead to wrong ir code situation, so it is banned.
+  - I don't think I can resolve it simply.
+  - Clang adrress this issue by handling the struct/union encode/decode logic in its frontend.
+
 ## TODO LIST
 
 - [x] use slist instead of dynarray for performance
@@ -55,8 +59,7 @@ struct s{int a;char b;};
 - [ ] integrate struct
   - [ ] copy/assign struct to other struct
   - [ ] { } initializer
-  - [ ] passing as parameter
-  - [ ] return from function
+- [ ] union support
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary

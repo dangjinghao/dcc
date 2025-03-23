@@ -280,7 +280,13 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
         // Skip varargs parameter
         break;
       }
-
+      // check whether the parameter declaration is struct or union, we don't support it right now
+      astn param_base_type = g_get_declaration_base_type(param_decl);
+      if (param_base_type->type == ast_ctype &&
+          param_base_type->ctype.type == TOK_KW_STRUCT) {
+        log_panic("Pass struct or union parameter by value is not supported "
+                  "right now");
+      }
       // Create an alloca for this parameter
       sds param_name = build_symbol_name(param_decl);
       LLVMTypeRef param_type = build_variable_declaration_type(b, param_decl);
@@ -317,6 +323,9 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     LLVMBuildRetVoid(b->builder);
     return;
   } else {
+    if (func_return_base_type->ctype.type == TOK_KW_STRUCT) {
+      log_panic("Return struct or union by value is not supported right now");
+    }
     auto default_type = build_convert_base_type(b, func_return_base_type);
     LLVMBuildRet(b->builder, LLVMConstNull(default_type));
   }
