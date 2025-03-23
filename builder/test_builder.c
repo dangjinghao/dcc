@@ -433,11 +433,45 @@ void tbc_struct_in_struct() {
   }");
 }
 
-void tbc_struct_self(){
+void tbc_struct_self() {
   tbc_entry("struct S{int a;char b;};\
     int F(struct S *sp){\
       ;\
       (sp+1)->a++;\
       (sp+1)->b-=1;\
+  }");
+}
+
+void tbc_struct_return() {
+  tbc_entry("struct S{int a;char b; short*fp;};\
+    struct S F(){\
+      struct S s;\
+      s.a = 1;\
+      s.b = 2;\
+      s.fp = (void*)0;\
+      return s;\
+  }");
+}
+
+void tbc_struct_copy() {
+  tbc_entry("struct S{int a;char b;double fpd; short*fp;};\
+    double F(){\
+      struct S s1,s2;\
+      s2.a = 1;\
+      s2.b = 2;\
+      s2.fpd = 3;\
+      s2.fp = (void*)0;\
+      s1 = s2;\
+      return s1.fpd + s1.a + s1.b;\
+  }");
+}
+
+void tbc_struct_copy_from_outer() {
+  tbc_entry("struct S{int a;char b;double fpd; short*fp;};\
+    double F(struct S*src){\
+      struct S s1,s2,s3,s4;\
+      s4 = s3 = s2 = s1 = *&src[1];\
+      *src = s4;\
+      return src->fpd + s1.a + s2.b;\
   }");
 }

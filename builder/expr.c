@@ -212,9 +212,37 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
                          build_base_type_chain_by_lit(TOK_LIT_CHAR));
 }
 
+typed_value build_expr_binop_assign_cpy_struct(builder b, typed_value lhs_ptr,
+                                               typed_value rhs_struct) {
+  astn rhs_base_type = slist_peek_head(&rhs_struct->type_chain);
+  slist lhs_points_to_type_chain =
+      build_type_get_points_to_type_chian(b, &lhs_ptr->type_chain);
+  astn lhs_base_type = slist_peek_head(lhs_points_to_type_chain);
+
+  assert(lhs_base_type->type == ast_ctype && rhs_base_type->type == ast_ctype);
+  assert(lhs_base_type->ctype.type == TOK_KW_STRUCT &&
+         rhs_base_type->ctype.type == TOK_KW_STRUCT);
+  // in fact the rhs_struct is a ptr llvm type, we just check that
+  assert(LLVMGetTypeKind(LLVMTypeOf(rhs_struct->v)) == LLVMPointerTypeKind);
+  LLVMTypeRef struct_type =
+      build_struct_declaration(b, rhs_base_type->ctype.user_defined_type);
+  LLVMBuildMemCpy(b->builder, lhs_ptr->v, 1, rhs_struct->v, 1,
+                  LLVMSizeOf(struct_type));
+  return build_value_load(b, lhs_ptr);
+}
+
 typed_value build_expr_binop_assign(builder b, astn binop) {
   typed_value lhs = build_lvalue_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  astn rhs_base_type = slist_peek_head(&rhs->type_chain);
+  if (rhs_base_type->type == ast_ctype &&
+      rhs_base_type->ctype.type == TOK_KW_STRUCT && binop->binop.op == '=') {
+    return build_expr_binop_assign_cpy_struct(b, lhs, rhs);
+  } else if (rhs_base_type->type == ast_ctype &&
+             rhs_base_type->ctype.type == TOK_KW_STRUCT &&
+             binop->binop.op != '=') {
+    log_panic("Unsupported self assign operation on struct type");
+  }
   switch (binop->binop.op) {
   case TOK_SYM_SELF_ADD: {
     typed_value lhs_load = build_value_load(b, lhs);
@@ -716,7 +744,7 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
   }
   slist member_type_chain = &member_declaration->declaration.type_chain;
   LLVMValueRef gep = LLVMBuildStructGEP2(
-      b->builder, build_convert_struct_type(b, struct_declaration),
+      b->builder, build_struct_declaration(b, struct_declaration),
       struct_ptr->v, member_idx, "struct_gep");
   // add pointer to member type chain
   slist member_ptr_type_chain =

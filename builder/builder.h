@@ -74,7 +74,7 @@ slist build_function_return_type_chain(builder b, astn n);
 slist build_type_chain_add_pointer(builder b, slist type_chain);
 int build_type_get_struct_member(astn struct_declaration, sds name,
                                  astn *result);
-LLVMTypeRef build_convert_struct_type(builder b, astn n);
+LLVMTypeRef build_struct_declaration(builder b, astn n);
 typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values);
 

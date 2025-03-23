@@ -1,6 +1,9 @@
+#include "ast.h"
 #include "builder.h"
 #include "convert/convert.h"
 #include "grammar.h"
+#include "log/log.h"
+#include "token.h"
 #include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
@@ -47,10 +50,17 @@ typed_value build_value_load(builder b, typed_value v) {
   // get lhs points type
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &v->type_chain);
-  LLVMTypeRef points_to_type =
-      build_convert_base_type(b, slist_peek_head(points_to_type_chain));
-  // load rhs to lhs
-  LLVMValueRef load = LLVMBuildLoad2(b->builder, points_to_type, v->v, "load");
+  astn points_to_base_type = slist_peek_head(points_to_type_chain);
+  LLVMTypeRef points_to_type = build_convert_base_type(b, points_to_base_type);
+  LLVMValueRef load;
+  if (points_to_base_type->type == ast_ctype &&
+      points_to_base_type->ctype.type == TOK_KW_STRUCT) {
+    log_trace("Try to load struct type from pointer, return the struct pointer "
+              "directly");
+    load = v->v;
+  } else {
+    load = LLVMBuildLoad2(b->builder, points_to_type, v->v, "load");
+  }
   return typed_value_new(load, points_to_type_chain);
 }
 

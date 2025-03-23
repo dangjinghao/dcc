@@ -57,7 +57,7 @@ struct s{int a;char b;};
 - [x] if-else statement
 - [x] iteration and switch mixture test
 - [ ] integrate struct
-  - [ ] copy/assign struct to other struct
+  - [x] copy/assign struct to other struct
   - [ ] { } initializer
 - [ ] union support
 - [ ] expr

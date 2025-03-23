@@ -30,12 +30,12 @@ dynarray build_struct_member_declaration_type(astn n, builder b, dynarray arr) {
   return arr;
 }
 
-LLVMTypeRef build_convert_struct_type(builder b, astn n) {
+LLVMTypeRef build_struct_declaration(builder b, astn n) {
   LLVMTypeRef t;
   if (n->type == ast_ref) {
     n = n->ref;
-    assert(n->type == ast_struct_union_declaration);
   }
+  assert(n->type == ast_struct_union_declaration);
   if (n->struct_union_declaration.V) {
     log_debug("reuse the existing struct definition");
     t = n->struct_union_declaration.V;
@@ -93,7 +93,7 @@ LLVMTypeRef build_convert_base_type(builder b, astn n) {
   case '*':
     return LLVMPointerTypeInContext(c, 0);
   case TOK_KW_STRUCT:
-    return build_convert_struct_type(b, n->ctype.user_defined_type);
+    return build_struct_declaration(b, n->ctype.user_defined_type);
   default:
     break;
   }
