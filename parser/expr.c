@@ -8,7 +8,7 @@
 #include "slist/slist.h"
 #include <assert.h>
 #include <stdbool.h>
-static astn parse_expr_primary_combine_str(parser parser) {
+static astn parse_expr_primary_litstr_cat(parser parser) {
   assert(parser->current_token == TOK_LIT_STRING);
   astn node = ast_new(ast_expr_primary);
   node->primary.type = TOK_LIT_STRING;
@@ -36,7 +36,7 @@ astn parse_expr_primary(parser parser) {
   astn node = NULL;
   switch (parser->current_token) {
   case TOK_LIT_STRING:
-    node = parse_expr_primary_combine_str(parser);
+    node = parse_expr_primary_litstr_cat(parser);
     break;
   // gnu switch case range extension
   case (__TOK_LIT_START + 1)...(TOK_LIT_STRING - 1):
@@ -49,7 +49,7 @@ astn parse_expr_primary(parser parser) {
   case TOK_IDENT: {
     node = parse_expr_ident(parser);
     astn ref_id =
-        parser_find_ident_in_all_scope_in(node->ident, &parser->idtab);
+        parser_scope_all_find_ident(node->ident, &parser->idtab);
     if (!ref_id) {
       compiler_error(parser->lexer, "Undefined identifier %s", node->ident);
     }
@@ -70,9 +70,15 @@ astn parse_expr_primary(parser parser) {
 
   return node;
 }
-
-static astn parse_expr_unary_advanced_postfix_if_need(parser parser,
-                                                      astn unary) {
+/**
+ * @brief This function will process some advanced postfix unary operators or just return the original unary node,
+ * so that we can reduce the complexity of the parser.
+ * 
+ * @param parser 
+ * @param unary 
+ * @return astn 
+ */
+static astn parse_expr_unary_advanced_postfix(parser parser, astn unary) {
   switch (unary->unary.op) {
   case '[': {
     if (parser->current_token == ']') {
@@ -120,14 +126,14 @@ astn parse_expr_unary_postfix(parser parser) {
     node->unary.op = parser->current_token;
     node->unary.postfix = true;
     parser_consume(parser);
-    parse_expr_unary_advanced_postfix_if_need(parser, node);
+    parse_expr_unary_advanced_postfix(parser, node);
     node->unary.expr = v;
     v = node;
   }
   return v;
 }
 
-astn parse_expr_cast(parser parser) {
+astn parse_expr_unary_cast(parser parser) {
   assert(g_is_cast_expression_firstset(parser));
   if (parser->current_token != '(') {
     return parse_expr_unary(parser);
@@ -146,7 +152,7 @@ astn parse_expr_cast(parser parser) {
   astn node = ast_new(ast_expr_typecast);
   parse_type_name(parser, &node->typecast.type_chain);
   parser_consume_with(parser, ')');
-  node->typecast.expr = parse_expr_cast(parser);
+  node->typecast.expr = parse_expr_unary_cast(parser);
   return node;
 }
 
@@ -187,7 +193,7 @@ astn parse_expr_unary_prefix(parser parser) {
     break;
   }
   default: {
-    node->unary.expr = parse_expr_cast(parser);
+    node->unary.expr = parse_expr_unary_cast(parser);
     break;
   }
   }
@@ -213,8 +219,8 @@ parse_expr_binop_normal_handle(astn left, parser parser,
   astn n = ast_new(ast_expr_binop);
   n->binop.op = self->token;
   n->binop.lhs = left;
-  n->binop.rhs = parse_expr_assign1(parser, self->right_assoc ? self->prec - 1
-                                                              : self->prec);
+  n->binop.rhs = parse_expr_assign_inner(
+      parser, self->right_assoc ? self->prec - 1 : self->prec);
   return n;
 }
 
@@ -229,7 +235,7 @@ parse_expr_binop_ternary_handle(astn left, parser parser,
   return n;
 }
 
-struct parse_expr_infix_parselet parse_expr_infix_parselets[] = {
+static struct parse_expr_infix_parselet parse_expr_infix_parselets[] = {
     {
         '%',
         210,
@@ -414,8 +420,8 @@ struct parse_expr_infix_parselet parse_expr_infix_parselets[] = {
 };
 
 /* Pratt algorithm parser */
-astn parse_expr_assign1(parser parser, int ctx_prec) {
-  astn left = parse_expr_cast(parser);
+astn parse_expr_assign_inner(parser parser, int ctx_prec) {
+  astn left = parse_expr_unary_cast(parser);
 
   while (true) {
     int infix_token = parser->current_token;
@@ -440,7 +446,9 @@ astn parse_expr_assign1(parser parser, int ctx_prec) {
   return left;
 }
 
-astn parse_expr_assign(parser parser) { return parse_expr_assign1(parser, 0); }
+astn parse_expr_assign(parser parser) {
+  return parse_expr_assign_inner(parser, 0);
+}
 
 /**
  * @brief the comma expression is a sequence of expressions separated by commas,
@@ -472,7 +480,7 @@ astn parse_expr_const_int(parser parser) {
   struct lexer lexer;
   lexer_snapshot_new(&lexer, parser->lexer);
   astn e = parse_expr_assign(parser);
-  if (!parser_check_constant_int_expr(e)) {
+  if (!parser_expr_check_const_int(e)) {
     compiler_error(&lexer, "Expected constant expression");
   }
   return e;

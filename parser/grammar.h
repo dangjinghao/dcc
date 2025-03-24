@@ -50,7 +50,7 @@ static inline bool g_is_typedef_name_firstset(parser parser) {
   if (parser->current_token != TOK_IDENT) {
     return false;
   }
-  return parser_get_typedef_by_type_name(
+  return parser_lookup_typedef(
              parser, parser->lexer->lex_token._ident) != NULL;
 }
 

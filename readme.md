@@ -67,6 +67,8 @@ struct s{int a;char b;};
   - [ ] array
 - [x] basic switch implementation
   - [ ] binary search optimization
+- [ ] use chable in building symtab
+- [ ] QA scaffold
 - [ ] string reference table in builder
 - [ ] reorganize builder API again
 - [ ] {} initializer
@@ -84,7 +86,7 @@ struct s{int a;char b;};
 ## API Organization method
 
 ```makefile
-$(MODULE_NAME)_$(CLASSIFY)_$('is' if return bool or 'get'/'set' for getter/setter or 'new' for create new object or any other verb)_$(TARGET if necessary)
+$(MODULE_NAME)_$(CLASSIFY)_$('is' if return bool or 'get'/'set' for getter/setter or 'new' for create new object or any other verb)_$(TARGET if it exists in the object)
 ```
 
 the file which has the same name as its parent directory is allowed to use only one time name.

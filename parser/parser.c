@@ -88,20 +88,20 @@ void parser_pop_scope(parser parser) {
   }
 }
 
-static inline astn parser_cmp_astn_ident(astn data, sds ident) {
+static inline astn parser_astn_ident_cmp(astn data, sds ident) {
   if (0 == sdscmp(parse_declaration_get_ident(data), ident)) {
     return data;
   }
   return NULL;
 }
 
-astn parser_find_ident_in_all_scope_in(sds ident, slist tab) {
+astn parser_scope_all_find_ident(sds ident, slist tab) {
   astn data;
   slist_foreach(tab, data) {
     if (data == __parser_scope_fence_ptr) {
       continue;
     }
-    astn r = parser_cmp_astn_ident(data, ident);
+    astn r = parser_astn_ident_cmp(data, ident);
     if (r) {
       return r;
     }
@@ -109,13 +109,13 @@ astn parser_find_ident_in_all_scope_in(sds ident, slist tab) {
   return NULL;
 }
 
-astn parser_find_ident_in_current_scope_in(sds ident, slist tab) {
+astn parser_scope_current_find_ident(sds ident, slist tab) {
   astn data;
   slist_foreach(tab, data) {
     if (data == __parser_scope_fence_ptr) {
       break;
     }
-    astn r = parser_cmp_astn_ident(data, ident);
+    astn r = parser_astn_ident_cmp(data, ident);
     if (r) {
       return r;
     }
@@ -123,21 +123,21 @@ astn parser_find_ident_in_current_scope_in(sds ident, slist tab) {
   return NULL;
 }
 
-void parser_add_symbol_to_current_scope_in(astn n, slist tab) {
+void parser_scope_current_add_symbol(astn n, slist tab) {
   log_debug("add declaration %s to current scope",
             parse_declaration_get_ident(n));
   slist_add_head(tab, n);
 }
 
-astn parser_get_typedef_by_type_name(parser parser, sds ident) {
-  astn d = parser_find_ident_in_all_scope_in(ident, &parser->idtab);
+astn parser_lookup_typedef(parser parser, sds ident) {
+  astn d = parser_scope_all_find_ident(ident, &parser->idtab);
   if (d && g_is_declaration_typedef(d)) {
     return d;
   }
   return NULL;
 }
 
-bool parser_is_current_block_global(parser parser) {
+bool parser_scope_is_current_global(parser parser) {
   // find NULL in the idtab
   return parser->function_scope == NULL;
 }
@@ -150,15 +150,15 @@ bool parser_is_current_block_global(parser parser) {
  * @param parser 
  * @param n 
  */
-void parser_declare_new_symbol(parser parser, astn n) {
+void parser_new_declaration(parser parser, astn n) {
   assert(n->type == ast_declaration);
   astn decl_specs = g_get_declaration_specifier(n);
   if (n->declaration.ident == NULL) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
-  astn existing_symbol = parser_find_ident_in_current_scope_in(
-      n->declaration.ident, &parser->idtab);
+  astn existing_symbol =
+      parser_scope_current_find_ident(n->declaration.ident, &parser->idtab);
   if (existing_symbol && decl_specs->ctype.storage == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
               n->declaration.ident);
@@ -170,28 +170,33 @@ void parser_declare_new_symbol(parser parser, astn n) {
   }
 
   n->declaration.uid = parser_get_uid(parser);
-  parser_add_symbol_to_current_scope_in(n, &parser->idtab);
-  if (parser_is_current_block_global(parser) ||
+  parser_scope_current_add_symbol(n, &parser->idtab);
+  if (parser_scope_is_current_global(parser) ||
       decl_specs->ctype.storage == TOK_KW_EXTERN) {
     // we need add the extern symbol which is defined in block scope to symtab
     parser_symtab_add(parser, n);
   }
 }
-
-void parser_declare_new_enumerator(parser parser, astn n) {
-  assert(n->type == ast_enumerator);
-  if (n->enumerator.ident == NULL) {
+/**
+ * @brief add the declarator, e.g. enum {a, b, c}; add a, b, c to the current scope
+ * 
+ * @param parser 
+ * @param enumerator 
+ */
+void parser_new_enumerator(parser parser, astn enumerator) {
+  assert(enumerator->type == ast_enumerator);
+  if (enumerator->enumerator.ident == NULL) {
     log_debug("this is an abstract enumerator, skipping");
     return;
   }
-  astn existing_sym = parser_find_ident_in_current_scope_in(n->enumerator.ident,
-                                                            &parser->idtab);
+  astn existing_sym = parser_scope_current_find_ident(
+      enumerator->enumerator.ident, &parser->idtab);
   if (existing_sym) {
     compiler_error(parser->lexer, "redefined enumerator %s",
-                   n->enumerator.ident);
+                   enumerator->enumerator.ident);
   }
-  n->enumerator.uid = parser_get_uid(parser);
-  parser_add_symbol_to_current_scope_in(n, &parser->idtab);
+  enumerator->enumerator.uid = parser_get_uid(parser);
+  parser_scope_current_add_symbol(enumerator, &parser->idtab);
 }
 /**
  * @brief declare a new struct/union/enum tag
@@ -199,13 +204,13 @@ void parser_declare_new_enumerator(parser parser, astn n) {
  * @param parser 
  * @param n 
  */
-void parser_declare_new_tag(parser parser, astn n) {
+void parser_new_tag(parser parser, astn n) {
   if (n->type == ast_struct_union_declaration) {
     if (n->struct_union_declaration.ident == NULL) {
       log_debug("this is an abstract struct declarator, skipping declaration");
       return;
     }
-    astn existing_tag = parser_find_ident_in_current_scope_in(
+    astn existing_tag = parser_scope_current_find_ident(
         n->struct_union_declaration.ident, &parser->tagtab);
     if (existing_tag) {
       compiler_error(parser->lexer, "redefined  tag with identifier %s",
@@ -218,8 +223,8 @@ void parser_declare_new_tag(parser parser, astn n) {
       log_debug("this is an abstract enumeration, skipping declaration");
       return;
     }
-    astn existing_tag = parser_find_ident_in_current_scope_in(
-        n->enumeration.ident, &parser->tagtab);
+    astn existing_tag =
+        parser_scope_current_find_ident(n->enumeration.ident, &parser->tagtab);
     if (existing_tag) {
       compiler_error(parser->lexer, "redefined tag with identifier %s",
                      n->enumeration.ident);
@@ -227,7 +232,7 @@ void parser_declare_new_tag(parser parser, astn n) {
     n->enumeration.uid = parser_get_uid(parser);
   }
 
-  parser_add_symbol_to_current_scope_in(n, &parser->tagtab);
+  parser_scope_current_add_symbol(n, &parser->tagtab);
 }
 
 size_t parser_get_uid(parser parser) {
@@ -258,8 +263,8 @@ void parser_unfold_type_chain(parser parser, slist type_chain) {
   }
 }
 
-long parser_eval_const_int_expr(astn expr) {
-  assert(parser_check_constant_int_expr(expr));
+long parser_expr_eval_const_int(astn expr) {
+  assert(parser_expr_check_const_int(expr));
   if (expr->type == ast_ref) {
     expr = expr->ref;
   }
@@ -284,8 +289,8 @@ long parser_eval_const_int_expr(astn expr) {
     }
   }
   case ast_expr_binop: {
-    long long lhs = parser_eval_const_int_expr(expr->binop.lhs);
-    long long rhs = parser_eval_const_int_expr(expr->binop.rhs);
+    long long lhs = parser_expr_eval_const_int(expr->binop.lhs);
+    long long rhs = parser_expr_eval_const_int(expr->binop.rhs);
     switch (expr->binop.op) {
     case '+':
       return lhs + rhs;
@@ -332,20 +337,20 @@ long parser_eval_const_int_expr(astn expr) {
     }
   }
   case ast_expr_ternary: {
-    return parser_eval_const_int_expr(expr->ternary.cond)
-               ? parser_eval_const_int_expr(expr->ternary._t)
-               : parser_eval_const_int_expr(expr->ternary._f);
+    return parser_expr_eval_const_int(expr->ternary.cond)
+               ? parser_expr_eval_const_int(expr->ternary._t)
+               : parser_expr_eval_const_int(expr->ternary._f);
   }
   case ast_expr_unary: {
     switch (expr->unary.op) {
     case '+':
-      return +parser_eval_const_int_expr(expr->unary.expr);
+      return +parser_expr_eval_const_int(expr->unary.expr);
     case '-':
-      return -parser_eval_const_int_expr(expr->unary.expr);
+      return -parser_expr_eval_const_int(expr->unary.expr);
     case '~':
-      return ~parser_eval_const_int_expr(expr->unary.expr);
+      return ~parser_expr_eval_const_int(expr->unary.expr);
     case '!':
-      return !parser_eval_const_int_expr(expr->unary.expr);
+      return !parser_expr_eval_const_int(expr->unary.expr);
     case TOK_KW_SIZEOF:
     case '&':
     case '[':
@@ -368,7 +373,7 @@ long parser_eval_const_int_expr(astn expr) {
   return false;
 }
 
-bool parser_check_constant_int_expr(astn expr) {
+bool parser_expr_check_const_int(astn expr) {
   if (expr->type == ast_ref) {
     expr = expr->ref;
   }
@@ -383,13 +388,13 @@ bool parser_check_constant_int_expr(astn expr) {
            expr->primary.type == TOK_LIT_CHAR;
   }
   case ast_expr_binop: {
-    return parser_check_constant_int_expr(expr->binop.lhs) &&
-           parser_check_constant_int_expr(expr->binop.rhs);
+    return parser_expr_check_const_int(expr->binop.lhs) &&
+           parser_expr_check_const_int(expr->binop.rhs);
   }
   case ast_expr_ternary: {
-    return parser_check_constant_int_expr(expr->ternary.cond) &&
-           parser_check_constant_int_expr(expr->ternary._t) &&
-           parser_check_constant_int_expr(expr->ternary._f);
+    return parser_expr_check_const_int(expr->ternary.cond) &&
+           parser_expr_check_const_int(expr->ternary._t) &&
+           parser_expr_check_const_int(expr->ternary._f);
   }
   case ast_expr_unary: {
     switch (expr->unary.op) {
@@ -411,7 +416,7 @@ bool parser_check_constant_int_expr(astn expr) {
     break;
   }
   case ast_expr_typecast: {
-    return parser_check_constant_int_expr(expr->typecast.expr);
+    return parser_expr_check_const_int(expr->typecast.expr);
   }
   default:
     log_panic(

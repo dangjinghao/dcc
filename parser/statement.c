@@ -242,7 +242,7 @@ astn parse_statement_labeled(parser p) {
   case TOK_KW_CASE: {
     parser_consume(p);
     label = parse_expr_const_int(p);
-    long v = parser_eval_const_int_expr(label);
+    long v = parser_expr_eval_const_int(label);
     ast_free(label);
     label = ast_new(ast_expr_primary);
     label->primary.type = TOK_LIT_LONG;

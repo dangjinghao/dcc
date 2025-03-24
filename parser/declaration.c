@@ -30,30 +30,9 @@ astn parse_translation_unit(parser parser) {
   return n;
 }
 
-static void parse_set_type_qualifier(struct ctype *tn,
-                                     enum type_qualifier qualifier) {
+static inline void parse_type_qualifier_set(struct ctype *tn,
+                                            enum type_qualifier qualifier) {
   tn->qualifier |= qualifier;
-}
-
-void parse_set_normal_type_specifier(struct ctype *t, parser parser) {
-  enum tok_type tok = parser->current_token;
-  enum tok_type prev_type = t->type;
-  if (g_is_sign_tok(tok)) {
-    if (t->signint != TOK_UNKNOWN) {
-      compiler_error(parser->lexer, "re-signed type");
-    }
-    t->signint = tok;
-  } else if (prev_type == TOK_UNKNOWN) {
-    t->type = tok;
-  } else if ((g_is_int_family_tok(prev_type) && g_is_int_family_tok(tok))) {
-    // to support long int / short int
-    if (lexer_token_get_sizeof(tok) > lexer_token_get_sizeof(prev_type)) {
-      t->type = tok;
-    }
-  } else {
-    log_panic("invalid type: current_tok: %s,prev_tok: %s",
-              convert_repr_token(tok), convert_repr_token(prev_type));
-  }
 }
 
 astn parse_struct_declarator(parser parser, astn decl_specs) {
@@ -64,7 +43,7 @@ astn parse_struct_declarator(parser parser, astn decl_specs) {
     parse_declarator(parser, type_chain);
     slist_add_tail(type_chain, decl_specs);
     parser_unfold_type_chain(parser, type_chain);
-    n->declaration.ident = parse_remove_type_chain_ident(type_chain);
+    n->declaration.ident = parse_type_chain_pop_ident(type_chain);
   }
   if (parser->current_token == ':') {
     parser_consume_with(parser, ':');
@@ -103,7 +82,7 @@ astn parse_struct_or_union_specifier(parser parser) {
     }
     parser_consume_with(parser, '}');
     if (n->struct_union_declaration.ident) {
-      parser_declare_new_tag(parser, n);
+      parser_new_tag(parser, n);
     }
     log_debug("add uid to struct declaration")
   } else {
@@ -112,7 +91,7 @@ astn parse_struct_or_union_specifier(parser parser) {
       compiler_error(parser->lexer,
                      "struct/union declaration without an identifier");
     }
-    astn ref = parser_find_ident_in_all_scope_in(
+    astn ref = parser_scope_all_find_ident(
         n->struct_union_declaration.ident, &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
@@ -133,7 +112,7 @@ astn parse_enumerator(parser parser, slist enumerators, long *enum_counter) {
   if (parser->current_token == '=') {
     parser_consume(parser);
     astn const_expr = parse_expr_const_int(parser);
-    n->enumerator.value = parser_eval_const_int_expr(const_expr);
+    n->enumerator.value = parser_expr_eval_const_int(const_expr);
     *enum_counter = n->enumerator.value;
     ast_free(const_expr);
   } else {
@@ -141,7 +120,7 @@ astn parse_enumerator(parser parser, slist enumerators, long *enum_counter) {
   }
   *enum_counter += 1;
   slist_add_tail(enumerators, n);
-  parser_declare_new_enumerator(parser, n);
+  parser_new_enumerator(parser, n);
   return n;
 }
 
@@ -166,14 +145,14 @@ astn parse_enumeration(parser parser) {
     }
     parser_consume_with(parser, '}');
     if (n->enumeration.ident) {
-      parser_declare_new_tag(parser, n);
+      parser_new_tag(parser, n);
     }
   } else {
     if (!n->enumeration.ident) {
       compiler_error(parser->lexer,
                      "enumeration declaration without an identifier");
     }
-    astn ref = parser_find_ident_in_all_scope_in(n->enumeration.ident,
+    astn ref = parser_scope_all_find_ident(n->enumeration.ident,
                                                  &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
@@ -186,6 +165,28 @@ astn parse_enumeration(parser parser) {
   return n;
 }
 
+static void parse_declaration_specifiers_set_normal_type(struct ctype *t,
+                                                         parser parser) {
+  enum tok_type tok = parser->current_token;
+  enum tok_type prev_type = t->type;
+  if (g_is_sign_tok(tok)) {
+    if (t->signint != TOK_UNKNOWN) {
+      compiler_error(parser->lexer, "re-signed type");
+    }
+    t->signint = tok;
+  } else if (prev_type == TOK_UNKNOWN) {
+    t->type = tok;
+  } else if ((g_is_int_family_tok(prev_type) && g_is_int_family_tok(tok))) {
+    // to support long int / short int
+    if (lexer_token_get_sizeof(tok) > lexer_token_get_sizeof(prev_type)) {
+      t->type = tok;
+    }
+  } else {
+    log_panic("invalid type: current_tok: %s,prev_tok: %s",
+              convert_repr_token(tok), convert_repr_token(prev_type));
+  }
+}
+
 /* {<declaration-specifier>}+ */
 astn parse_declaration_specifiers(parser parser) {
   assert(g_is_declaration_specifier_firstset(parser));
@@ -193,7 +194,7 @@ astn parse_declaration_specifiers(parser parser) {
   struct ctype *tn = &n->ctype;
   while (g_is_declaration_specifier_firstset(parser)) {
     if (g_is_type_qualifier_firstset(parser)) {
-      parse_set_type_qualifier(
+      parse_type_qualifier_set(
           tn, convert_cast_token_to_qualifier(parser->current_token));
       parser_consume(parser);
     } else if (g_is_storage_class_specifier_firstset(parser)) {
@@ -216,7 +217,7 @@ astn parse_declaration_specifiers(parser parser) {
       if (g_is_typedef_name_firstset(parser)) {
         tn->type = TOK_KW_TYPEDEF;
         astn ref = ast_new(ast_ref);
-        ref->ref = parser_get_typedef_by_type_name(
+        ref->ref = parser_lookup_typedef(
             parser, parser->lexer->lex_token._ident);
         tn->user_defined_type = ref;
         assert(parser->current_token == TOK_IDENT);
@@ -229,7 +230,7 @@ astn parse_declaration_specifiers(parser parser) {
         tn->type = parser->current_token;
         tn->user_defined_type = parse_enumeration(parser);
       } else {
-        parse_set_normal_type_specifier(tn, parser);
+        parse_declaration_specifiers_set_normal_type(tn, parser);
         parser_consume(parser);
       }
     }
@@ -293,7 +294,7 @@ slist parse_pointers(parser parser, slist pointers) {
     astn p = ast_new(ast_ctype);
     p->ctype.type = '*';
     while (g_is_type_qualifier_firstset(parser)) {
-      parse_set_type_qualifier(
+      parse_type_qualifier_set(
           &p->ctype, convert_cast_token_to_qualifier(parser->current_token));
       parser_consume(parser);
     }
@@ -402,7 +403,7 @@ slist parse_declarator(parser parser, slist type_chain) {
   return type_chain;
 }
 
-sds parse_remove_type_chain_ident(slist type_chain) {
+sds parse_type_chain_pop_ident(slist type_chain) {
   astn first = slist_peek_head(type_chain);
   if (first->type != ast_ident) {
     // for the abstract declarator, it doesn't have an identifier
@@ -423,7 +424,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, decl_specs);
   parser_unfold_type_chain(parser, type_chain);
-  n->declaration.ident = parse_remove_type_chain_ident(type_chain);
+  n->declaration.ident = parse_type_chain_pop_ident(type_chain);
   if (g_get_function_params(n) && parser->current_token != '{') {
     // we should not use g_is_function_declaration(n) because the function is waiting for parsing.
     // if it is a function declaration, we should add an `extern` storage to
@@ -440,7 +441,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     // this symbol declaration would be delayed to the function definition process
     // and it should only be used in the function parameter parse process
     n->declaration.scope_ref = parser->function_scope;
-    parser_declare_new_symbol(parser, n);
+    parser_new_declaration(parser, n);
   }
   if (parser->current_token == '=') {
     if (g_get_function_params(n)) {
@@ -451,7 +452,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     n->declaration.extdata = parse_initializer(parser);
   } else if (parser->current_token == '{') {
     // function definition
-    if (!parser_is_current_block_global(parser)) {
+    if (!parser_scope_is_current_global(parser)) {
       compiler_error(parser->lexer,
                      "function definition is not allowed in non-global scope");
     }
@@ -474,7 +475,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
                        "there is a function parameter without an identifier");
       }
       p->declaration.scope_ref = parser->function_scope;
-      parser_declare_new_symbol(parser, p);
+      parser_new_declaration(parser, p);
     }
 
     // function body
@@ -544,7 +545,7 @@ slist parse_type_name(parser parser, slist type_chain) {
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, spec_qual);
   parser_unfold_type_chain(parser, type_chain);
-  if (parse_remove_type_chain_ident(type_chain)) {
+  if (parse_type_chain_pop_ident(type_chain)) {
     compiler_error(parser->lexer, "<type-name> should not have an identifier.");
   }
   return type_chain;
