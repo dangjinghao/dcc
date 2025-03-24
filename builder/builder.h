@@ -4,12 +4,14 @@
 #include "dynarray/dynarray.h"
 #include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
+#include <llvm-c/Target.h>
 #include <llvm-c/Types.h>
 typedef struct builder {
   LLVMBuilderRef builder;
   LLVMModuleRef module;
   LLVMContextRef context;
   slist symtab;
+  LLVMTargetDataRef data_layout;
   // current function, used for append basic block only
   LLVMValueRef fn;
   // goto label
@@ -72,9 +74,8 @@ slist build_type_chain_copy(slist type_chain);
 slist build_type_get_points_to_type_chian(builder b, slist type_chain);
 slist build_function_return_type_chain(builder b, astn n);
 slist build_type_chain_add_pointer(builder b, slist type_chain);
-int build_type_get_struct_member(astn struct_declaration, sds name,
-                                 astn *result);
-LLVMTypeRef build_struct_declaration(builder b, astn n);
+int build_type_get_struct_member(astn struct_type, sds name, astn *result);
+LLVMTypeRef build_struct_or_union_declaration(builder b, astn n);
 typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values);
 
@@ -87,6 +88,7 @@ LLVMValueRef build_value_ne0(builder b, typed_value v);
 
 extern const char *STATIC_VAR_FMT;
 extern const char *STRUCT_FMT;
+extern const char *UNION_FMT;
 extern const char *VAR_FMT;
 extern const char *GOTO_BLK_FMT;
 extern const char *CASE_BLK_FMT;

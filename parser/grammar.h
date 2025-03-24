@@ -84,6 +84,10 @@ static inline bool g_is_enumerator_firstset(parser parser) {
 static inline bool g_is_enumerator_list_firstset(parser parser) {
   return g_is_enumerator_firstset(parser);
 }
+
+static inline bool g_is_struct_or_union_token(int token) {
+  return token == TOK_KW_STRUCT || token == TOK_KW_UNION;
+}
 /**
  * @grammar
  * <struct-or-union> ::= struct
@@ -92,7 +96,7 @@ static inline bool g_is_enumerator_list_firstset(parser parser) {
  */
 static inline bool g_is_struct_or_union_firstset(parser parser) {
   int token = parser->current_token;
-  return token == TOK_KW_STRUCT || token == TOK_KW_UNION;
+  return g_is_struct_or_union_token(token);
 }
 
 /**

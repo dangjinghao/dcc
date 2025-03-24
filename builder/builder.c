@@ -1,11 +1,15 @@
 #include "builder.h"
+#include "log/log.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
 #include <llvm-c/Core.h>
+#include <llvm-c/Support.h>
+#include <llvm-c/TargetMachine.h>
 #include <llvm-c/Types.h>
 
 const char *STATIC_VAR_FMT = "%s.%ld";
 const char *STRUCT_FMT = "struct.%s.%ld";
+const char *UNION_FMT = "union.%s.%ld";
 const char *VAR_FMT = "%s.%ld";
 const char *GOTO_BLK_FMT = "goto.%s";
 const char *CASE_BLK_FMT = "case.%ld";
@@ -13,6 +17,12 @@ builder builder_new(builder b, char *module_name, slist symtab) {
   b->context = LLVMContextCreate();
   b->module = LLVMModuleCreateWithNameInContext(module_name, b->context);
   b->builder = LLVMCreateBuilderInContext(b->context);
+
+  const char *targetTriple = LLVMGetDefaultTargetTriple();
+  log_debug("target triple: %s", targetTriple);
+  LLVMSetTarget(b->module, targetTriple);
+  b->data_layout = LLVMGetModuleDataLayout(b->module);
+
   b->symtab = symtab;
   b->fn = NULL;
 

@@ -212,22 +212,23 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
                          build_base_type_chain_by_lit(TOK_LIT_CHAR));
 }
 
-typed_value build_expr_binop_assign_cpy_struct(builder b, typed_value lhs_ptr,
-                                               typed_value rhs_struct) {
+typed_value build_expr_binop_assign_cpy_struct_union(builder b,
+                                                     typed_value lhs_ptr,
+                                                     typed_value rhs_struct) {
   astn rhs_base_type = slist_peek_head(&rhs_struct->type_chain);
   slist lhs_points_to_type_chain =
       build_type_get_points_to_type_chian(b, &lhs_ptr->type_chain);
   astn lhs_base_type = slist_peek_head(lhs_points_to_type_chain);
 
   assert(lhs_base_type->type == ast_ctype && rhs_base_type->type == ast_ctype);
-  assert(lhs_base_type->ctype.type == TOK_KW_STRUCT &&
-         rhs_base_type->ctype.type == TOK_KW_STRUCT);
+  assert(g_is_struct_or_union_token(lhs_base_type->ctype.type) &&
+         g_is_struct_or_union_token(rhs_base_type->ctype.type));
   // in fact the rhs_struct is a ptr llvm type, we just check that
   assert(LLVMGetTypeKind(LLVMTypeOf(rhs_struct->v)) == LLVMPointerTypeKind);
-  LLVMTypeRef struct_type =
-      build_struct_declaration(b, rhs_base_type->ctype.user_defined_type);
+  LLVMTypeRef struct_or_union_type =
+      build_struct_or_union_declaration(b, rhs_base_type);
   LLVMBuildMemCpy(b->builder, lhs_ptr->v, 1, rhs_struct->v, 1,
-                  LLVMSizeOf(struct_type));
+                  LLVMSizeOf(struct_or_union_type));
   return build_value_load(b, lhs_ptr);
 }
 
@@ -236,12 +237,13 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
   typed_value rhs = build_expression(b, binop->binop.rhs);
   astn rhs_base_type = slist_peek_head(&rhs->type_chain);
   if (rhs_base_type->type == ast_ctype &&
-      rhs_base_type->ctype.type == TOK_KW_STRUCT && binop->binop.op == '=') {
-    return build_expr_binop_assign_cpy_struct(b, lhs, rhs);
+      g_is_struct_or_union_token(rhs_base_type->ctype.type) &&
+      binop->binop.op == '=') {
+    return build_expr_binop_assign_cpy_struct_union(b, lhs, rhs);
   } else if (rhs_base_type->type == ast_ctype &&
-             rhs_base_type->ctype.type == TOK_KW_STRUCT &&
+             g_is_struct_or_union_token(rhs_base_type->ctype.type) &&
              binop->binop.op != '=') {
-    log_panic("Unsupported self assign operation on struct type");
+    log_panic("Unsupported self assign operation on struct or union type");
   }
   switch (binop->binop.op) {
   case TOK_SYM_SELF_ADD: {
@@ -727,24 +729,19 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
       build_type_get_points_to_type_chian(b, &struct_ptr->type_chain);
   astn points_to_base_type = slist_peek_head(points_to_struct_type_chain);
   assert(points_to_base_type->type == ast_ctype);
-  assert(points_to_base_type->ctype.type == TOK_KW_STRUCT);
-  if (points_to_base_type->ctype.type != TOK_KW_STRUCT) {
-    log_panic("Only struct type can be used for . operation");
-  }
-  astn struct_declaration = points_to_base_type->ctype.user_defined_type;
-  if (struct_declaration->type == ast_ref) {
-    struct_declaration = struct_declaration->ref;
+  if (!g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
+    log_panic("Only struct or union type can be used for . operation");
   }
   // get the member index
   astn member_declaration;
   int member_idx = build_type_get_struct_member(
-      struct_declaration, member->ident, &member_declaration);
+      points_to_base_type, member->ident, &member_declaration);
   if (member_idx < 0) {
     log_panic("Member %s not found in struct", member->ident);
   }
   slist member_type_chain = &member_declaration->declaration.type_chain;
   LLVMValueRef gep = LLVMBuildStructGEP2(
-      b->builder, build_struct_declaration(b, struct_declaration),
+      b->builder, build_struct_or_union_declaration(b, points_to_base_type),
       struct_ptr->v, member_idx, "struct_gep");
   // add pointer to member type chain
   slist member_ptr_type_chain =

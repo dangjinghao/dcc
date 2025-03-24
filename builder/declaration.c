@@ -11,46 +11,82 @@
 #include "token.h"
 #include "typed_value/typed_value.h"
 #include <assert.h>
+#include <llvm-c/Target.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-dynarray build_struct_member_declaration_type(astn n, builder b, dynarray arr) {
+dynarray build_struct_member_declaration_type(builder b, astn n, dynarray arr) {
   assert(n->type == ast_struct_union_declaration);
-  astn struct_declaration;
+  astn struct_member_declaration;
   slist_foreach(&n->struct_union_declaration.member_declarations,
-                struct_declaration) {
-    LLVMTypeRef t = build_variable_declaration_type(b, struct_declaration);
-    if (struct_declaration->declaration.extdata) {
-      BUILDING();
+                struct_member_declaration) {
+    LLVMTypeRef t =
+        build_variable_declaration_type(b, struct_member_declaration);
+    if (struct_member_declaration->declaration.extdata) {
+      log_panic("Unsupported struct member declaration with bitfield");
     }
     dynarray_add(arr, &t);
   }
   return arr;
 }
 
-LLVMTypeRef build_struct_declaration(builder b, astn n) {
-  LLVMTypeRef t;
-  if (n->type == ast_ref) {
-    n = n->ref;
-  }
+dynarray build_union_member_declaration_type(builder b, astn n, dynarray arr) {
+  // get the max size member type and craete a struct with union name
   assert(n->type == ast_struct_union_declaration);
-  if (n->struct_union_declaration.V) {
+  LLVMTypeRef max_size_type = NULL;
+  astn union_member_declaration;
+  slist_foreach(&n->struct_union_declaration.member_declarations,
+                union_member_declaration) {
+    LLVMTypeRef t =
+        build_variable_declaration_type(b, union_member_declaration);
+    if (union_member_declaration->declaration.extdata) {
+      log_panic("Unsupported union member declaration with bitfield");
+    }
+    if (max_size_type == NULL) {
+      max_size_type = t;
+    } else {
+      size_t old_size = LLVMABISizeOfType(b->data_layout, max_size_type);
+      size_t sz = LLVMABIAlignmentOfType(b->data_layout, t);
+      if (old_size < sz) {
+        max_size_type = t;
+      }
+    }
+  }
+  dynarray_add(arr, &max_size_type);
+  return arr;
+}
+
+LLVMTypeRef build_struct_or_union_declaration(builder b, astn n) {
+  assert(n->type == ast_ctype);
+  assert(g_is_struct_or_union_token(n->ctype.type));
+  astn udt = n->ctype.user_defined_type;
+  LLVMTypeRef t;
+  if (udt->type == ast_ref) {
+    udt = udt->ref;
+  }
+  assert(udt->type == ast_struct_union_declaration);
+  if (udt->struct_union_declaration.V) {
     log_debug("reuse the existing struct definition");
-    t = n->struct_union_declaration.V;
+    t = udt->struct_union_declaration.V;
   } else {
-    assert(n->type == ast_struct_union_declaration);
+    assert(udt->type == ast_struct_union_declaration);
     struct dynarray dyn_elements;
     dynarray_default(&dyn_elements, sizeof(LLVMTypeRef));
-    build_struct_member_declaration_type(n, b, &dyn_elements);
+    if (n->ctype.type == TOK_KW_STRUCT) {
+      build_struct_member_declaration_type(b, udt, &dyn_elements);
+    } else {
+      build_union_member_declaration_type(b, udt, &dyn_elements);
+    }
     size_t elements_count = dyn_elements.used;
     LLVMTypeRef *elements = dyn_elements.data;
-    if (n->struct_union_declaration.ident) {
+    if (udt->struct_union_declaration.ident) {
       sds name;
-      name = sdscatprintf(sdsempty(), STRUCT_FMT,
-                          n->struct_union_declaration.ident,
-                          n->struct_union_declaration.uid);
+      name = sdscatprintf(
+          sdsempty(), n->ctype.type == TOK_KW_STRUCT ? STRUCT_FMT : UNION_FMT,
+          udt->struct_union_declaration.ident,
+          udt->struct_union_declaration.uid);
       log_debug("create struct definition with name: %s", name);
       t = LLVMStructCreateNamed(b->context, name);
       LLVMStructSetBody(t, elements, elements_count, false);
@@ -60,8 +96,7 @@ LLVMTypeRef build_struct_declaration(builder b, astn n) {
       t = LLVMStructTypeInContext(b->context, elements, elements_count, false);
     }
     dynarray_free(&dyn_elements);
-    assert(n->struct_union_declaration.V == NULL);
-    n->struct_union_declaration.V = t;
+    udt->struct_union_declaration.V = t;
   }
   return t;
 }
@@ -92,8 +127,9 @@ LLVMTypeRef build_convert_base_type(builder b, astn n) {
     return LLVMDoubleTypeInContext(c);
   case '*':
     return LLVMPointerTypeInContext(c, 0);
+  case TOK_KW_UNION:
   case TOK_KW_STRUCT:
-    return build_struct_declaration(b, n->ctype.user_defined_type);
+    return build_struct_or_union_declaration(b, n);
   default:
     break;
   }
@@ -283,7 +319,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
       // check whether the parameter declaration is struct or union, we don't support it right now
       astn param_base_type = g_get_declaration_base_type(param_decl);
       if (param_base_type->type == ast_ctype &&
-          param_base_type->ctype.type == TOK_KW_STRUCT) {
+          g_is_struct_or_union_token(param_base_type->ctype.type)) {
         log_panic("Pass struct or union parameter by value is not supported "
                   "right now");
       }
@@ -323,7 +359,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     LLVMBuildRetVoid(b->builder);
     return;
   } else {
-    if (func_return_base_type->ctype.type == TOK_KW_STRUCT) {
+    if (g_is_struct_or_union_token(func_return_base_type->ctype.type)) {
       log_panic("Return struct or union by value is not supported right now");
     }
     auto default_type = build_convert_base_type(b, func_return_base_type);

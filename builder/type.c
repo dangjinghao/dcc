@@ -261,8 +261,13 @@ slist build_type_chain_add_pointer(builder b, slist type_chain) {
   return new_type_chain;
 }
 
-int build_type_get_struct_member(astn struct_declaration, sds name,astn *result) {
-
+int build_type_get_struct_member(astn struct_type, sds name, astn *result) {
+  assert(struct_type->type == ast_ctype);
+  assert(g_is_struct_or_union_token(struct_type->ctype.type));
+  astn struct_declaration = struct_type->ctype.user_defined_type;
+  if (struct_declaration->type == ast_ref) {
+    struct_declaration = struct_declaration->ref;
+  }
   assert(struct_declaration->type == ast_struct_union_declaration);
   slist members =
       &struct_declaration->struct_union_declaration.member_declarations;

@@ -56,9 +56,7 @@ struct s{int a;char b;};
 - [x] break/continue in iteration statement
 - [x] if-else statement
 - [x] iteration and switch mixture test
-- [ ] integrate struct
-  - [x] copy/assign struct to other struct
-  - [ ] { } initializer
+- [x] copy/assign struct to other struct
 - [ ] union support
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test

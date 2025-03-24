@@ -475,3 +475,12 @@ void tbc_struct_copy_from_outer() {
       return src->fpd + s1.a + s2.b;\
   }");
 }
+
+void tbc_union(){
+  tbc_entry("union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
+    int F(){\
+      union U u1,u2;\
+      u1 = u2;\
+      struct S s;\
+  }");
+}

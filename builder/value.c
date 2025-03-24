@@ -54,8 +54,9 @@ typed_value build_value_load(builder b, typed_value v) {
   LLVMTypeRef points_to_type = build_convert_base_type(b, points_to_base_type);
   LLVMValueRef load;
   if (points_to_base_type->type == ast_ctype &&
-      points_to_base_type->ctype.type == TOK_KW_STRUCT) {
-    log_trace("Try to load struct type from pointer, return the struct pointer "
+      g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
+    log_trace("Try to load struct or union type from pointer, return the "
+              "struct pointer "
               "directly");
     load = v->v;
   } else {
