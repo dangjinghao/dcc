@@ -255,7 +255,7 @@ void tbc_void_func_call() { tbc_entry("void F(){{{void f();f();}}}"); }
 
 void tbc_sum5050() {
   tbc_entry(
-      "int F(){int sum = 0;for(int i = 0;i <= 100.; i++){sum += i;}return "
+      "int F(){int sum = 0;for(int i = 0,j = 1,k;i <= 100.; i++){sum += i;}return "
       "sum;}");
 }
 

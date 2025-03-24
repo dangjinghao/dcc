@@ -1,6 +1,5 @@
 #include "ast.h"
 #include "builder.h"
-#include "convert/convert.h"
 #include "dynarray/dynarray.h"
 #include "grammar.h"
 #include "lexer.h"
@@ -11,19 +10,19 @@
 #include "token.h"
 #include "typed_value/typed_value.h"
 #include <assert.h>
-#include <llvm-c/Target.h>
 #include <llvm-c/Core.h>
+#include <llvm-c/Target.h>
 #include <llvm-c/Types.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-dynarray build_struct_member_declaration_type(builder b, astn n, dynarray arr) {
+dynarray build_declaration_type_struct_member(builder b, astn n, dynarray arr) {
   assert(n->type == ast_struct_union_declaration);
   astn struct_member_declaration;
   slist_foreach(&n->struct_union_declaration.member_declarations,
                 struct_member_declaration) {
     LLVMTypeRef t =
-        build_variable_declaration_type(b, struct_member_declaration);
+        build_declaration_variable_type(b, struct_member_declaration);
     if (struct_member_declaration->declaration.extdata) {
       log_panic("Unsupported struct member declaration with bitfield");
     }
@@ -32,7 +31,7 @@ dynarray build_struct_member_declaration_type(builder b, astn n, dynarray arr) {
   return arr;
 }
 
-dynarray build_union_member_declaration_type(builder b, astn n, dynarray arr) {
+dynarray build_declaration_type_union_member(builder b, astn n, dynarray arr) {
   // get the max size member type and craete a struct with union name
   assert(n->type == ast_struct_union_declaration);
   LLVMTypeRef max_size_type = NULL;
@@ -40,7 +39,7 @@ dynarray build_union_member_declaration_type(builder b, astn n, dynarray arr) {
   slist_foreach(&n->struct_union_declaration.member_declarations,
                 union_member_declaration) {
     LLVMTypeRef t =
-        build_variable_declaration_type(b, union_member_declaration);
+        build_declaration_variable_type(b, union_member_declaration);
     if (union_member_declaration->declaration.extdata) {
       log_panic("Unsupported union member declaration with bitfield");
     }
@@ -58,7 +57,7 @@ dynarray build_union_member_declaration_type(builder b, astn n, dynarray arr) {
   return arr;
 }
 
-LLVMTypeRef build_struct_or_union_declaration(builder b, astn n) {
+LLVMTypeRef build_declaration_struct_or_union(builder b, astn n) {
   assert(n->type == ast_ctype);
   assert(g_is_struct_or_union_token(n->ctype.type));
   astn udt = n->ctype.user_defined_type;
@@ -75,9 +74,9 @@ LLVMTypeRef build_struct_or_union_declaration(builder b, astn n) {
     struct dynarray dyn_elements;
     dynarray_default(&dyn_elements, sizeof(LLVMTypeRef));
     if (n->ctype.type == TOK_KW_STRUCT) {
-      build_struct_member_declaration_type(b, udt, &dyn_elements);
+      build_declaration_type_struct_member(b, udt, &dyn_elements);
     } else {
-      build_union_member_declaration_type(b, udt, &dyn_elements);
+      build_declaration_type_union_member(b, udt, &dyn_elements);
     }
     size_t elements_count = dyn_elements.used;
     LLVMTypeRef *elements = dyn_elements.data;
@@ -101,43 +100,6 @@ LLVMTypeRef build_struct_or_union_declaration(builder b, astn n) {
   return t;
 }
 
-LLVMTypeRef build_convert_base_type(builder b, astn n) {
-  assert(n->type == ast_ctype);
-  int t = n->ctype.type;
-  auto c = b->context;
-  switch (t) {
-  case TOK_KW_VOID:
-    return LLVMVoidTypeInContext(c);
-  case TOK_KW_CHAR:
-    static_assert(sizeof(char) == 1);
-    return LLVMInt8TypeInContext(c);
-  case TOK_KW_SHORT:
-    static_assert(sizeof(short) == 2);
-    return LLVMInt16TypeInContext(c);
-  case TOK_KW_FLOAT:
-    return LLVMFloatTypeInContext(c);
-  case TOK_KW_ENUM:
-  case TOK_KW_INT:
-    static_assert(sizeof(int) == 4);
-    return LLVMInt32TypeInContext(c);
-  case TOK_KW_LONG:
-    static_assert(sizeof(long) == 8);
-    return LLVMInt64TypeInContext(c);
-  case TOK_KW_DOUBLE:
-    return LLVMDoubleTypeInContext(c);
-  case '*':
-    return LLVMPointerTypeInContext(c, 0);
-  case TOK_KW_UNION:
-  case TOK_KW_STRUCT:
-    return build_struct_or_union_declaration(b, n);
-  default:
-    break;
-  }
-
-  log_panic("Unsupported base type:%s", convert_repr_token(t));
-  return NULL;
-}
-
 /**
  * @brief build a variable declaration type,
  * if the declaration is a function declaration, return the return type
@@ -146,7 +108,7 @@ LLVMTypeRef build_convert_base_type(builder b, astn n) {
  * @param n 
  * @return LLVMTypeRef 
  */
-LLVMTypeRef build_variable_declaration_type(builder b, astn n) {
+LLVMTypeRef build_declaration_variable_type(builder b, astn n) {
   assert(n->type == ast_declaration);
   astn _t = g_get_declaration_base_type(n);
   if (_t->type == ast_parameters) {
@@ -154,7 +116,7 @@ LLVMTypeRef build_variable_declaration_type(builder b, astn n) {
   } else if (_t->type == ast_expr_unary) {
     BUILDING();
   }
-  return build_convert_base_type(b, _t);
+  return build_type_ctype_convert_to_llvm(b, _t);
 }
 
 /**
@@ -193,7 +155,7 @@ sds build_symbol_name(astn n) {
   return NULL;
 }
 
-void build_global_variable_init(LLVMValueRef pv, astn n,
+void build_variable_global_init(LLVMValueRef pv, astn n,
                                 LLVMTypeRef value_type) {
   if (!n->declaration.extdata) {
     log_debug("no initializer for %s, use default",
@@ -204,23 +166,23 @@ void build_global_variable_init(LLVMValueRef pv, astn n,
   }
 }
 
-LLVMValueRef build_global_variable(builder b, astn n) {
+LLVMValueRef build_variable_global(builder b, astn n) {
   assert(n->type == ast_declaration);
   sds sym_name = build_symbol_name(n);
-  LLVMTypeRef value_type = build_variable_declaration_type(b, n);
+  LLVMTypeRef value_type = build_declaration_variable_type(b, n);
   LLVMValueRef pv = LLVMAddGlobal(b->module, value_type, sym_name);
   sdsfree(sym_name);
   astn decl_specs = g_get_declaration_specifier(n);
   if (decl_specs->ctype.storage != TOK_KW_EXTERN) {
-    build_global_variable_init(pv, n, value_type);
+    build_variable_global_init(pv, n, value_type);
   }
   return pv;
 }
 
-LLVMValueRef build_alloca_variable(builder b, astn n) {
+LLVMValueRef build_variable_alloca(builder b, astn n) {
   assert(n->type == ast_declaration);
   sds sym_name = build_symbol_name(n);
-  LLVMTypeRef value_type = build_variable_declaration_type(b, n);
+  LLVMTypeRef value_type = build_declaration_variable_type(b, n);
   LLVMBasicBlockRef current_block = LLVMGetInsertBlock(b->builder);
   LLVMBasicBlockRef entry_block = LLVMGetFirstBasicBlock(b->fn);
   LLVMValueRef last_entry_inst = LLVMGetLastInstruction(entry_block);
@@ -259,30 +221,10 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
       break;
     }
     astn param_base_type = g_get_declaration_base_type(param_declaration);
-    LLVMTypeRef t = build_convert_base_type(b, param_base_type);
+    LLVMTypeRef t = build_type_ctype_convert_to_llvm(b, param_base_type);
     dynarray_add(arr, &t);
   }
   return arr;
-}
-
-LLVMTypeRef build_function_llvm_type_by_ast(builder b, astn n) {
-  LLVMTypeRef func;
-  LLVMTypeRef ret_type = build_variable_declaration_type(b, n);
-  if (g_is_function_void_param(n)) {
-    func = LLVMFunctionType(ret_type, NULL, 0, 0);
-  } else {
-    bool is_va = false;
-    if (g_is_function_varargs(n)) {
-      is_va = true;
-    }
-    struct dynarray params_type;
-    dynarray_default(&params_type, sizeof(LLVMTypeRef));
-    build_function_parameters_type(b, g_get_function_params(n), &params_type);
-    func =
-        LLVMFunctionType(ret_type, params_type.data, params_type.used, is_va);
-    dynarray_free(&params_type);
-  }
-  return func;
 }
 
 /**
@@ -296,7 +238,7 @@ LLVMTypeRef build_function_llvm_type_by_ast(builder b, astn n) {
 LLVMValueRef build_function_prototype(builder b, astn n) {
   assert(g_get_function_params(n));
   sds func_name = build_symbol_name(n);
-  LLVMTypeRef func = build_function_llvm_type_by_ast(b, n);
+  LLVMTypeRef func = build_type_declaration_function_convert_to_llvm(b, n);
   LLVMValueRef v = LLVMAddFunction(b->module, func_name, func);
   sdsfree(func_name);
   return v;
@@ -325,7 +267,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
       }
       // Create an alloca for this parameter
       sds param_name = build_symbol_name(param_decl);
-      LLVMTypeRef param_type = build_variable_declaration_type(b, param_decl);
+      LLVMTypeRef param_type = build_declaration_variable_type(b, param_decl);
       LLVMValueRef alloca = LLVMBuildAlloca(b->builder, param_type, param_name);
 
       // Store the parameter value into the alloca
@@ -347,7 +289,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     }
   }
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
-  build_block(b, body);
+  build_statement_block(b, body);
   astn func_return_base_type = g_get_declaration_function_return_base_type(n);
   if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(b->builder))) {
     // the last statement is terminator
@@ -362,7 +304,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     if (g_is_struct_or_union_token(func_return_base_type->ctype.type)) {
       log_panic("Return struct or union by value is not supported right now");
     }
-    auto default_type = build_convert_base_type(b, func_return_base_type);
+    auto default_type = build_type_ctype_convert_to_llvm(b, func_return_base_type);
     LLVMBuildRet(b->builder, LLVMConstNull(default_type));
   }
 }
@@ -390,9 +332,9 @@ typed_value build_declaration(builder b, astn n) {
   } else if (g_is_declaration_in_function_scope(n) &&
              decl_specs->ctype.storage != TOK_KW_EXTERN) {
     // variable in function
-    v = build_alloca_variable(b, n);
+    v = build_variable_alloca(b, n);
   } else {
-    v = build_global_variable(b, n);
+    v = build_variable_global(b, n);
   }
 
   // storage class setting
@@ -416,7 +358,7 @@ typed_value build_declaration(builder b, astn n) {
     LLVMValueRef prev_function = b->fn;
     b->fn = v;
     build_function_body(b, n, v);
-    builder_check_label_list_undefined(b);
+    builder_label_list_check_undefined(b);
     builder_label_list_free(b);
     b->fn = prev_function;
   }

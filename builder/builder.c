@@ -51,7 +51,7 @@ goto_label builder_label_new(builder b, sds name) {
   return l;
 }
 
-void builder_check_label_list_undefined(builder b) {
+void builder_label_list_check_undefined(builder b) {
   struct label *label;
   slist_foreach(&b->labels, label) {
     if (!label->defined) {

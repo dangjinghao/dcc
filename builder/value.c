@@ -14,15 +14,18 @@ LLVMValueRef build_value_cmp0(builder b, typed_value v, LLVMIntPredicate iPred,
   if (g_is_int_family_tok(base_type->ctype.type)) {
     return LLVMBuildICmp(
         b->builder, iPred, v->v,
-        LLVMConstInt(build_convert_base_type(b, base_type), 0, false), label);
+        LLVMConstInt(build_type_ctype_convert_to_llvm(b, base_type), 0, false),
+        label);
   } else if (base_type->ctype.type == '*') {
     return LLVMBuildICmp(
         b->builder, iPred, v->v,
-        LLVMConstPointerNull(build_convert_base_type(b, base_type)), label);
+        LLVMConstPointerNull(build_type_ctype_convert_to_llvm(b, base_type)),
+        label);
   } else if (g_is_fp_family_tok(base_type->ctype.type)) {
     return LLVMBuildFCmp(
         b->builder, fPred, v->v,
-        LLVMConstReal(build_convert_base_type(b, base_type), 0), label);
+        LLVMConstReal(build_type_ctype_convert_to_llvm(b, base_type), 0),
+        label);
   }
   log_panic("Unsupported type comparison: %s",
             convert_repr_ast_type(base_type->ctype.type));
@@ -41,7 +44,7 @@ void build_value_store(builder b, typed_value v, typed_value ptr) {
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &ptr->type_chain);
   // cast rhs to lhs type
-  v = build_type_convert_to(b, v, points_to_type_chain);
+  v = build_type_convert_by_type_chain(b, v, points_to_type_chain);
   // store rhs to lhs
   LLVMBuildStore(b->builder, v->v, ptr->v);
 }
@@ -51,7 +54,8 @@ typed_value build_value_load(builder b, typed_value v) {
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &v->type_chain);
   astn points_to_base_type = slist_peek_head(points_to_type_chain);
-  LLVMTypeRef points_to_type = build_convert_base_type(b, points_to_base_type);
+  LLVMTypeRef points_to_type =
+      build_type_ctype_convert_to_llvm(b, points_to_base_type);
   LLVMValueRef load;
   if (points_to_base_type->type == ast_ctype &&
       g_is_struct_or_union_token(points_to_base_type->ctype.type)) {

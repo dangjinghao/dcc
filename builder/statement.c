@@ -18,7 +18,7 @@ void build_statement_jump_return(builder b, astn n) {
   assert(func->type == ast_declaration);
   LLVMBasicBlockRef after_return =
       LLVMAppendBasicBlockInContext(b->context, b->fn, "after_return");
-  slist func_type_chain = build_function_return_type_chain(b, func);
+  slist func_type_chain = build_type_function_return_type_chain(b, func);
   astn func_return_type = slist_peek_head(func_type_chain);
   if ((!n->jump_statement.expr) &&
       func_return_type->ctype.type != TOK_KW_VOID) {
@@ -36,7 +36,7 @@ void build_statement_jump_return(builder b, astn n) {
     } else {
       log_trace("try to cast return value to function return type");
       typed_value ret_val_casted =
-          build_type_convert_to(b, ret_val, func_type_chain);
+          build_type_convert_by_type_chain(b, ret_val, func_type_chain);
       LLVMBuildRet(b->builder, ret_val_casted->v);
     }
   }
@@ -122,7 +122,7 @@ void build_statement_jump(builder b, astn n) {
             convert_repr_token(n->jump_statement.type));
 }
 
-void build_block(builder b, astn blk) {
+void build_statement_block(builder b, astn blk) {
   assert(blk->type == ast_block);
   astn item;
   slist_foreach(&blk->block.list, item) {
@@ -327,7 +327,7 @@ void build_statement_if(builder b, astn n) {
   LLVMPositionBuilderAtEnd(b->builder, after_block);
 }
 
-static int build_case_ref_cmp(const void *a, const void *b) {
+static int build_statement_switch_case_ref_cmp(const void *a, const void *b) {
   astn *case_ref_a = (astn *)a;
   astn *case_ref_b = (astn *)b;
   assert((*case_ref_a)->labeled_statement.label_value->type ==
@@ -346,14 +346,15 @@ void build_statement_switch_allocate_algo(builder b, astn n,
   astn *case_ref;
   // sort case_refs, prepare for binary search
   qsort(n->_switch.case_refs.data, n->_switch.case_refs.used,
-        n->_switch.case_refs.item_size, build_case_ref_cmp);
+        n->_switch.case_refs.item_size, build_statement_switch_case_ref_cmp);
   dynarray_foreach(&n->_switch.case_refs, case_ref) {
     assert((*case_ref)->labeled_statement.label_value->type ==
            ast_expr_primary);
     long case_v = (*case_ref)->labeled_statement.label_value->primary.v._int;
     LLVMValueRef case_cmp = LLVMBuildICmp(
         b->builder, LLVMIntEQ, cond_val->v,
-        LLVMConstInt(build_convert_base_type(b, cond_val_base_type), case_v, 1),
+        LLVMConstInt(build_type_ctype_convert_to_llvm(b, cond_val_base_type),
+                     case_v, 1),
         "case_cmp");
     LLVMBasicBlockRef case_test_after =
         LLVMAppendBasicBlockInContext(b->context, b->fn, "case_test_after");
@@ -400,7 +401,7 @@ void build_statement(builder b, astn n) {
     build_statement_jump(b, n);
     return;
   case ast_block:
-    build_block(b, n);
+    build_statement_block(b, n);
     return;
   case ast_statement_labeled:
     build_statement_labeled(b, n);
