@@ -732,22 +732,29 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
   if (!g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
     log_panic("Only struct or union type can be used for . operation");
   }
-  // get the member index
   astn member_declaration;
   int member_idx = build_type_get_struct_member(
       points_to_base_type, member->ident, &member_declaration);
   if (member_idx < 0) {
-    log_panic("Member %s not found in struct", member->ident);
+    log_panic("Member %s not found in struct or union", member->ident);
   }
   slist member_type_chain = &member_declaration->declaration.type_chain;
-  LLVMValueRef gep = LLVMBuildStructGEP2(
-      b->builder, build_struct_or_union_declaration(b, points_to_base_type),
-      struct_ptr->v, member_idx, "struct_gep");
-  // add pointer to member type chain
-  slist member_ptr_type_chain =
-      build_type_chain_add_pointer(b, member_type_chain);
-  // because gep computed the address of the member, we need to load it
-  return typed_value_new(gep, member_ptr_type_chain);
+
+  if (points_to_base_type->ctype.type == TOK_KW_STRUCT) {
+    LLVMValueRef gep = LLVMBuildStructGEP2(
+        b->builder, build_struct_or_union_declaration(b, points_to_base_type),
+        struct_ptr->v, member_idx, "struct_gep");
+    // add pointer to member type chain
+    slist member_ptr_type_chain =
+        build_type_chain_add_pointer(b, member_type_chain);
+    // because gep computed the address of the member, we need to load it
+    return typed_value_new(gep, member_ptr_type_chain);
+  } else {
+    // get union member: just return ptr directly and modify the type_chain
+    slist member_ptr_type_chain =
+        build_type_chain_add_pointer(b, member_type_chain);
+    return typed_value_new(struct_ptr->v, member_ptr_type_chain);
+  }
 }
 
 typed_value build_expr_unary_get_member(builder b, astn n) {

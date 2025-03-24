@@ -476,11 +476,55 @@ void tbc_struct_copy_from_outer() {
   }");
 }
 
-void tbc_union(){
-  tbc_entry("union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
+void tbc_union_copy() {
+  tbc_entry(
+      "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
     int F(){\
       union U u1,u2;\
-      u1 = u2;\
+      u2 = u1 = u2;\
       struct S s;\
+  }");
+}
+
+void tbc_union_member() {
+  tbc_entry(
+      "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
+    int F(){\
+      union U u;\
+      u.a = 256;\
+      u.b = 2;\
+      return u.a;\
+  }");
+}
+
+void tbc_union_deref_member() {
+  tbc_entry(
+      "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
+    void F(union U *up){\
+    up->a = 256;\
+    up->b = 2;\
+  }");
+}
+
+void tbc_union_struct_in_union() {
+  tbc_entry(
+      "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
+    void F(){\
+      union U u;\
+      u.s.a = 1;\
+      u.s.b = 2;\
+      u.s.fpd = 3;\
+      u.s.fp = (void*)0;\
+  }");
+}
+
+void tbc_union_struct_ptr_in_union() {
+  tbc_entry(
+      "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} *sp;};\
+    void F(union U *u){\
+      u->sp->a = 1;\
+      u->sp->b = 2;\
+      u->sp->fpd = 3;\
+      u->sp->fp = (void*)0;\
   }");
 }

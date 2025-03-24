@@ -57,7 +57,7 @@ struct s{int a;char b;};
 - [x] if-else statement
 - [x] iteration and switch mixture test
 - [x] copy/assign struct to other struct
-- [ ] union support
+- [x] union support
 - [ ] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary
@@ -70,6 +70,7 @@ struct s{int a;char b;};
 - [ ] string reference table in builder
 - [ ] reorganize builder API again
 - [ ] {} initializer
+  - [ ] struct/union init
 - [ ] sizeof constant expression
 - [ ] node meta data
 - [ ] union
