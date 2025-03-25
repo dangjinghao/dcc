@@ -1,4 +1,3 @@
-#include "grammar.h"
 #include "parser.h"
 
 /**
@@ -9,7 +8,7 @@
  */
 void parser_symtab_add(parser parser, astn n) {
   assert(n->type == ast_declaration);
-  if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
+  if (n->declaration.storage_class == TOK_KW_EXTERN) {
     log_debug("add weak symbol to symtab: %s", n->declaration.ident);
     slist_add_tail(&parser->symtab, n);
   } else {
@@ -52,7 +51,7 @@ slist parser_symtab_reorder_strong_symbols(slist symtab) {
   slist_init(&new_symtab);
   astn n;
   slist_foreach(symtab, n) {
-    if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_EXTERN) {
+    if (n->declaration.storage_class == TOK_KW_EXTERN) {
       log_trace("reorder: add extern symbol to new symtab: %s",
                 n->declaration.ident);
       slist_add_tail(&new_symtab, n);
@@ -70,7 +69,7 @@ slist parser_symtab_reorder_strong_symbols(slist symtab) {
 void parser_symtab_remove_weak_symbols(slist symtab) {
   astn n;
   slist_foreach(symtab, n) {
-    if (g_get_declaration_specifier(n)->ctype.storage != TOK_KW_EXTERN) {
+    if (n->declaration.storage_class != TOK_KW_EXTERN) {
       continue;
     }
     if (parser_symtab_symbol_exist_until(symtab, n)) {

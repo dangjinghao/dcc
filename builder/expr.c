@@ -894,8 +894,7 @@ typed_value build_expr_ref(builder b, astn n) {
  */
 typed_value build_relocate_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
-  astn decl_specs = g_get_declaration_specifier(n);
-  if (decl_specs->ctype.storage == TOK_KW_EXTERN) {
+  if (n->declaration.storage_class == TOK_KW_EXTERN) {
     // relocate extern declaration
     astn exist = parser_symtab_find(b->symtab, parse_declaration_get_ident(n));
     assert(exist);

@@ -1,12 +1,12 @@
 #include "parser.h"
 #include "ast.h"
 #include "convert/convert.h"
-#include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include "token.h"
 #include <stdbool.h>
 int parser_consume(parser parser) {
   return parser->current_token = lexer_get_next_token(parser->lexer);
@@ -131,7 +131,7 @@ void parser_scope_current_add_symbol(astn n, slist tab) {
 
 astn parser_lookup_typedef(parser parser, sds ident) {
   astn d = parser_scope_all_find_ident(ident, &parser->idtab);
-  if (d && g_is_declaration_typedef(d)) {
+  if (d && d->declaration.storage_class == TOK_KW_TYPEDEF) {
     return d;
   }
   return NULL;
@@ -152,27 +152,25 @@ bool parser_scope_is_current_global(parser parser) {
  */
 void parser_new_declaration(parser parser, astn n) {
   assert(n->type == ast_declaration);
-  astn decl_specs = g_get_declaration_specifier(n);
   if (n->declaration.ident == NULL) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
   astn existing_symbol =
       parser_scope_current_find_ident(n->declaration.ident, &parser->idtab);
-  if (existing_symbol && decl_specs->ctype.storage == TOK_KW_EXTERN) {
+  if (existing_symbol && n->declaration.storage_class == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
               n->declaration.ident);
     return;
-  } else if (existing_symbol && decl_specs->ctype.storage != TOK_KW_EXTERN &&
-             g_get_declaration_specifier(existing_symbol)->ctype.storage !=
-                 TOK_KW_EXTERN) {
+  } else if (existing_symbol && n->declaration.storage_class != TOK_KW_EXTERN &&
+             existing_symbol->declaration.storage_class != TOK_KW_EXTERN) {
     compiler_error(parser->lexer, "redefined symbol %s", n->declaration.ident);
   }
 
   n->declaration.uid = parser_get_uid(parser);
   parser_scope_current_add_symbol(n, &parser->idtab);
   if (parser_scope_is_current_global(parser) ||
-      decl_specs->ctype.storage == TOK_KW_EXTERN) {
+      n->declaration.storage_class == TOK_KW_EXTERN) {
     // we need add the extern symbol which is defined in block scope to symtab
     parser_symtab_add(parser, n);
   }
@@ -243,24 +241,25 @@ size_t parser_get_uid(parser parser) {
 void parser_unfold_type_chain(parser parser, slist type_chain) {
   astn tail = slist_peek_tail(type_chain);
   assert(tail->type == ast_ctype);
+  assert(tail->ctype.storage == TOK_UNKNOWN);
   enum type_qualifier qual = tail->ctype.qualifier;
-  enum tok_type storage = tail->ctype.storage;
-  if (tail->ctype.type == TOK_KW_TYPEDEF) {
-    astn n = tail->ctype.user_defined_type;
-    assert(n->type == ast_ref);
-    n = n->ref;
-    ast_free(slist_pop_tail(type_chain));
-    astn t;
-    slist typedef_typechain = &n->declaration.type_chain;
-    slist_foreach(typedef_typechain, t) {
-      slist_add_tail(type_chain, ast_copy(t));
-    }
-    // reset typedef
-    n = slist_peek_tail(type_chain);
-    assert(n->type == ast_ctype && n->ctype.storage == TOK_KW_TYPEDEF);
-    n->ctype.qualifier |= qual;
-    n->ctype.storage = storage;
+  if (tail->ctype.type != TOK_KW_TYPEDEF) {
+    return;
   }
+  astn n = tail->ctype.user_defined_type;
+  assert(n->type == ast_ref);
+  n = n->ref;
+  assert(n->type == ast_declaration);
+  ast_free(slist_pop_tail(type_chain));
+  astn t;
+  slist typedef_typechain = &n->declaration.type_chain;
+  slist_foreach(typedef_typechain, t) {
+    slist_add_tail(type_chain, ast_copy(t));
+  }
+  // reset typedef
+  n = slist_peek_tail(type_chain);
+  assert(n->type == ast_ctype && n->ctype.storage == TOK_UNKNOWN);
+  n->ctype.qualifier |= qual;
 }
 
 long parser_expr_eval_const_int(astn expr) {

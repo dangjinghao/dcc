@@ -34,13 +34,6 @@ static inline bool g_is_storage_class_specifier_firstset(parser parser) {
   return ARRAY_IN(reserved_kw, token, EQ_EQ);
 }
 
-static inline bool g_is_declaration_typedef(astn d) {
-  assert(d->type == ast_declaration);
-  astn t = slist_peek_tail(&d->declaration.type_chain);
-  assert(t->type == ast_ctype);
-  return t->ctype.storage == TOK_KW_TYPEDEF;
-}
-
 /**
  * @grammar
  * <typedef-name> ::= identifier
@@ -50,8 +43,7 @@ static inline bool g_is_typedef_name_firstset(parser parser) {
   if (parser->current_token != TOK_IDENT) {
     return false;
   }
-  return parser_lookup_typedef(
-             parser, parser->lexer->lex_token._ident) != NULL;
+  return parser_lookup_typedef(parser, parser->lexer->lex_token._ident) != NULL;
 }
 
 /**
@@ -639,11 +631,6 @@ static inline bool g_is_function_void_param(astn n) {
     return true;
   }
   return false;
-}
-
-static inline astn g_get_declaration_specifier(astn declaration) {
-  assert(declaration->type == ast_declaration);
-  return slist_peek_tail(&declaration->declaration.type_chain);
 }
 
 static inline astn g_get_declaration_base_type(astn declaration) {

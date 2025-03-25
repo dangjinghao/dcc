@@ -91,8 +91,8 @@ astn parse_struct_or_union_specifier(parser parser) {
       compiler_error(parser->lexer,
                      "struct/union declaration without an identifier");
     }
-    astn ref = parser_scope_all_find_ident(
-        n->struct_union_declaration.ident, &parser->tagtab);
+    astn ref = parser_scope_all_find_ident(n->struct_union_declaration.ident,
+                                           &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
                      n->struct_union_declaration.ident);
@@ -152,8 +152,8 @@ astn parse_enumeration(parser parser) {
       compiler_error(parser->lexer,
                      "enumeration declaration without an identifier");
     }
-    astn ref = parser_scope_all_find_ident(n->enumeration.ident,
-                                                 &parser->tagtab);
+    astn ref =
+        parser_scope_all_find_ident(n->enumeration.ident, &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
                      n->enumeration.ident);
@@ -217,8 +217,8 @@ astn parse_declaration_specifiers(parser parser) {
       if (g_is_typedef_name_firstset(parser)) {
         tn->type = TOK_KW_TYPEDEF;
         astn ref = ast_new(ast_ref);
-        ref->ref = parser_lookup_typedef(
-            parser, parser->lexer->lex_token._ident);
+        ref->ref =
+            parser_lookup_typedef(parser, parser->lexer->lex_token._ident);
         tn->user_defined_type = ref;
         assert(parser->current_token == TOK_IDENT);
         sdsfree(parser->lexer->lex_token._ident);
@@ -313,6 +313,8 @@ slist parse_pointers(parser parser, slist pointers) {
 astn parse_parameter_declaration(parser parser) {
   assert(g_is_parameter_declaration_firstset(parser));
   astn decl_specs = parse_declaration_specifiers(parser);
+  assert(decl_specs->type == ast_ctype &&
+         decl_specs->ctype.storage == TOK_UNKNOWN);
   return parse_init_declarator(parser, decl_specs, true);
 }
 
@@ -423,6 +425,9 @@ astn parse_init_declarator(parser parser, astn decl_specs,
   slist type_chain = &n->declaration.type_chain;
   parse_declarator(parser, type_chain);
   slist_add_tail(type_chain, decl_specs);
+  log_trace("move ctype.storage to declaration.storage_class");
+  n->declaration.storage_class = decl_specs->ctype.storage;
+  decl_specs->ctype.storage = TOK_UNKNOWN;
   parser_unfold_type_chain(parser, type_chain);
   n->declaration.ident = parse_type_chain_pop_ident(type_chain);
   if (g_get_function_params(n) && parser->current_token != '{') {
@@ -434,7 +439,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     log_trace("add extern storage specifier to function declaration: %s",
               n->declaration.ident);
 
-    decl_specs->ctype.storage = TOK_KW_EXTERN;
+    n->declaration.storage_class = TOK_KW_EXTERN;
   }
 
   if (!delay_alloc_id) {
@@ -515,6 +520,8 @@ void parse_external_declaration(parser parser, slist block) {
     }
   } else {
     // struct or union declaration without identifier
+    assert(decl_specs->type == ast_ctype &&
+           decl_specs->ctype.storage == TOK_UNKNOWN);
     astn n = ast_new(ast_declaration);
     slist type_chain = &n->declaration.type_chain;
     slist_add_tail(type_chain, decl_specs);
@@ -529,6 +536,8 @@ void parse_external_declaration(parser parser, slist block) {
 astn parse_specifier_qualifiers(parser parser) {
   assert(g_is_specifier_qualifier_firstset(parser));
   astn spec_qual = parse_declaration_specifiers(parser);
+  assert(spec_qual->type == ast_ctype &&
+         spec_qual->ctype.storage == TOK_UNKNOWN);
   return spec_qual;
 }
 

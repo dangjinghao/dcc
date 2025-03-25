@@ -213,6 +213,11 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
   case ast_declaration: {
     buf = sdscatprintf(buf, "{\"name\":\"%s\",\"children\":[",
                        convert_repr_ast_type(n->type));
+    if (n->declaration.storage_class != TOK_UNKNOWN) {
+      buf = sdscatprintf(buf, "{\"name\":\"<storage> %s\"}",
+                         convert_repr_token(n->declaration.storage_class));
+      buf = sdscat(buf, ",");
+    }
     if (n->declaration.ident) {
       buf = sdscatprintf(buf, "{\"name\":\"<id> %s.%ld\"},",
                          n->declaration.ident, n->declaration.uid);

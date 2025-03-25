@@ -127,10 +127,9 @@ LLVMTypeRef build_declaration_variable_type(builder b, astn n) {
  */
 sds build_symbol_name(astn n) {
   assert(n->type == ast_declaration);
-  astn decl_specs = g_get_declaration_specifier(n);
   if (g_is_declaration_in_function_scope(n) && !g_is_function_declaration(n)) {
     // !g_is_function_declaration(n) to avoid the function declaration in function scope
-    if (decl_specs->ctype.storage == TOK_KW_STATIC) {
+    if (n->declaration.storage_class == TOK_KW_STATIC) {
       // static function variable
       assert(n->declaration.scope_ref->type == ast_declaration);
       assert(n->declaration.scope_ref->declaration.ident);
@@ -143,7 +142,7 @@ sds build_symbol_name(astn n) {
     }
   } else {
     // global scope
-    if (decl_specs->ctype.storage == TOK_KW_STATIC) {
+    if (n->declaration.storage_class == TOK_KW_STATIC) {
       // static global variable
       return sdscatprintf(sdsempty(), STATIC_VAR_FMT, n->declaration.ident,
                           n->declaration.uid);
@@ -172,8 +171,7 @@ LLVMValueRef build_variable_global(builder b, astn n) {
   LLVMTypeRef value_type = build_declaration_variable_type(b, n);
   LLVMValueRef pv = LLVMAddGlobal(b->module, value_type, sym_name);
   sdsfree(sym_name);
-  astn decl_specs = g_get_declaration_specifier(n);
-  if (decl_specs->ctype.storage != TOK_KW_EXTERN) {
+  if (n->declaration.storage_class != TOK_KW_EXTERN) {
     build_variable_global_init(pv, n, value_type);
   }
   return pv;
@@ -304,7 +302,8 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
     if (g_is_struct_or_union_token(func_return_base_type->ctype.type)) {
       log_panic("Return struct or union by value is not supported right now");
     }
-    auto default_type = build_type_ctype_convert_to_llvm(b, func_return_base_type);
+    auto default_type =
+        build_type_ctype_convert_to_llvm(b, func_return_base_type);
     LLVMBuildRet(b->builder, LLVMConstNull(default_type));
   }
 }
@@ -322,15 +321,14 @@ typed_value build_declaration(builder b, astn n) {
     log_trace("declaration %s has been built", n->declaration.ident);
     return n->declaration.V;
   }
-  astn decl_specs = g_get_declaration_specifier(n);
-  assert(decl_specs->ctype.storage != TOK_KW_TYPEDEF);
+  assert(n->declaration.storage_class != TOK_KW_TYPEDEF);
   LLVMValueRef v;
 
   if (g_get_function_params(n)) {
     // function declaration or definition
     v = build_function_prototype(b, n);
   } else if (g_is_declaration_in_function_scope(n) &&
-             decl_specs->ctype.storage != TOK_KW_EXTERN) {
+             n->declaration.storage_class != TOK_KW_EXTERN) {
     // variable in function
     v = build_variable_alloca(b, n);
   } else {
@@ -338,7 +336,7 @@ typed_value build_declaration(builder b, astn n) {
   }
 
   // storage class setting
-  switch (decl_specs->ctype.storage) {
+  switch (n->declaration.storage_class) {
   case TOK_KW_EXTERN:
     LLVMSetLinkage(v, LLVMExternalLinkage);
     break;
@@ -368,7 +366,8 @@ typed_value build_declaration(builder b, astn n) {
 void build_trans_unit(builder b, slist symtab) {
   astn n;
   slist_foreach(symtab, n) {
-    if (g_get_declaration_specifier(n)->ctype.storage == TOK_KW_TYPEDEF) {
+    assert(n->type == ast_declaration);
+    if (n->declaration.storage_class == TOK_KW_TYPEDEF) {
       log_trace("skip the typedef declaration: %s", n->declaration.ident);
       continue;
     }

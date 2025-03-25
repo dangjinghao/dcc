@@ -78,6 +78,7 @@ astn ast_copy(astn n) {
     new->declaration.extdata = ast_copy(n->declaration.extdata);
     new->declaration.scope_ref = n->declaration.scope_ref;
     new->declaration.uid = n->declaration.uid;
+    new->declaration.storage_class = n->declaration.storage_class;
     astn ref;
     slist_foreach(&n->declaration.type_chain, ref) {
       astn copy = ast_copy(ref);

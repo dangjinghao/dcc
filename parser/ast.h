@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include "token.h"
 #include "typed_value/typed_value.h"
 #include <llvm-c/Types.h>
 enum ast_type {
@@ -73,6 +74,7 @@ typedef struct astn {
       enum type_qualifier qualifier;
       // trick: fill token_type with 0 or TOK_UNKNOWN
       int type;
+      // storage should not be used after parsed
       enum tok_type signint, storage;
       // used for struct, union, enum, holds a reference only, do not free it
       struct astn *user_defined_type;
@@ -96,6 +98,7 @@ typedef struct astn {
        * ast_parameters is used for function parameters(<parameter-type-list>),
        * ast_ctype
        */
+      enum tok_type storage_class;
       struct slist type_chain;
       typed_value V;
     } declaration;

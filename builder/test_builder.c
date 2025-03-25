@@ -417,10 +417,11 @@ void tbc_struct_lvalue_member() {
 }
 
 void tbc_struct_typedef() {
-  tbc_entry("typedef struct S{int a;char b;}S_t;\
+  tbc_entry("typedef volatile long l_t;typedef struct S{int a;const l_t b;}S_t;\
     int F(){\
       S_t s;\
       s.a = 1;\
+      s.b = 2;\
   }");
 }
 
