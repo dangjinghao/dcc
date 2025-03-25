@@ -72,7 +72,7 @@ struct s{int a;char b;};
 - [ ] string reference table in builder
 - [x] reorganize builder API again
 - [ ] {} initializer
-  - [ ] struct/union init
+  - [ ] struct/union/array init
 - [ ] sizeof constant expression
 - [ ] node meta data
 - [ ] union

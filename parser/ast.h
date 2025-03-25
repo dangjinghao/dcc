@@ -19,7 +19,7 @@ enum ast_type {
   ast_ident,
   ast_statement_labeled,
   ast_ref,
-  ast_struct_union_declaration,
+  ast_struct_or_union_declaration,
   ast_parameters,
   ast_arguments,
   ast_block,
@@ -92,17 +92,17 @@ typedef struct astn {
       struct astn *extdata;
       size_t uid;
       struct astn *scope_ref;
+      enum tok_type storage_class;
       /* the logical type chain of the declaration,
        * it contains those node type:
        * ast_expr_unary is used for array declaration [<expr>],
        * ast_parameters is used for function parameters(<parameter-type-list>),
        * ast_ctype
        */
-      enum tok_type storage_class;
       struct slist type_chain;
       typed_value V;
     } declaration;
-    struct struct_union_declaration {
+    struct struct_or_union_declaration {
       sds ident;
       // if ident is empty, it is an anonymous struct/union,
       // do not allocate the uid for it
@@ -110,7 +110,7 @@ typedef struct astn {
       LLVMTypeRef V;
       // store the struct declaration type in the list
       struct slist member_declarations;
-    } struct_union_declaration;
+    } struct_or_union_declaration;
     struct enumeration {
       sds ident;
       size_t uid;

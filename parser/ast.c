@@ -12,8 +12,8 @@ astn ast_new(enum ast_type type) {
   case ast_expr_typecast:
     slist_init(&node->typecast.type_chain);
     break;
-  case ast_struct_union_declaration:
-    slist_init(&node->struct_union_declaration.member_declarations);
+  case ast_struct_or_union_declaration:
+    slist_init(&node->struct_or_union_declaration.member_declarations);
     break;
   case ast_parameters:
     slist_init(&node->parameters.list);
@@ -107,16 +107,16 @@ astn ast_copy(astn n) {
     }
     break;
   }
-  case ast_struct_union_declaration: {
-    new->struct_union_declaration.ident =
-        n->struct_union_declaration.ident
-            ? sdsdup(n->struct_union_declaration.ident)
+  case ast_struct_or_union_declaration: {
+    new->struct_or_union_declaration.ident =
+        n->struct_or_union_declaration.ident
+            ? sdsdup(n->struct_or_union_declaration.ident)
             : NULL;
-    new->struct_union_declaration.uid = n->struct_union_declaration.uid;
+    new->struct_or_union_declaration.uid = n->struct_or_union_declaration.uid;
     astn ref;
-    slist_foreach(&n->struct_union_declaration.member_declarations, ref) {
+    slist_foreach(&n->struct_or_union_declaration.member_declarations, ref) {
       astn copy = ast_copy(ref);
-      slist_add_tail(&new->struct_union_declaration.member_declarations, copy);
+      slist_add_tail(&new->struct_or_union_declaration.member_declarations, copy);
     }
     break;
   }
@@ -279,13 +279,13 @@ void ast_free(astn node) {
   case ast_ref: {
     break;
   }
-  case ast_struct_union_declaration: {
+  case ast_struct_or_union_declaration: {
     astn ref;
-    slist_foreach(&node->struct_union_declaration.member_declarations, ref) {
+    slist_foreach(&node->struct_or_union_declaration.member_declarations, ref) {
       ast_free(ref);
     }
-    sdsfree(node->struct_union_declaration.ident);
-    slist_free(&node->struct_union_declaration.member_declarations);
+    sdsfree(node->struct_or_union_declaration.ident);
+    slist_free(&node->struct_or_union_declaration.member_declarations);
     break;
   }
   case ast_parameters: {

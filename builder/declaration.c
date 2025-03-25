@@ -17,9 +17,9 @@
 #include <stddef.h>
 
 dynarray build_declaration_type_struct_member(builder b, astn n, dynarray arr) {
-  assert(n->type == ast_struct_union_declaration);
+  assert(n->type == ast_struct_or_union_declaration);
   astn struct_member_declaration;
-  slist_foreach(&n->struct_union_declaration.member_declarations,
+  slist_foreach(&n->struct_or_union_declaration.member_declarations,
                 struct_member_declaration) {
     LLVMTypeRef t =
         build_declaration_variable_type(b, struct_member_declaration);
@@ -32,11 +32,11 @@ dynarray build_declaration_type_struct_member(builder b, astn n, dynarray arr) {
 }
 
 dynarray build_declaration_type_union_member(builder b, astn n, dynarray arr) {
-  // get the max size member type and craete a struct with union name
-  assert(n->type == ast_struct_union_declaration);
+  // get the max size member type
+  assert(n->type == ast_struct_or_union_declaration);
   LLVMTypeRef max_size_type = NULL;
   astn union_member_declaration;
-  slist_foreach(&n->struct_union_declaration.member_declarations,
+  slist_foreach(&n->struct_or_union_declaration.member_declarations,
                 union_member_declaration) {
     LLVMTypeRef t =
         build_declaration_variable_type(b, union_member_declaration);
@@ -47,7 +47,7 @@ dynarray build_declaration_type_union_member(builder b, astn n, dynarray arr) {
       max_size_type = t;
     } else {
       size_t old_size = LLVMABISizeOfType(b->data_layout, max_size_type);
-      size_t sz = LLVMABIAlignmentOfType(b->data_layout, t);
+      size_t sz = LLVMABISizeOfType(b->data_layout, t);
       if (old_size < sz) {
         max_size_type = t;
       }
@@ -65,12 +65,12 @@ LLVMTypeRef build_declaration_struct_or_union(builder b, astn n) {
   if (udt->type == ast_ref) {
     udt = udt->ref;
   }
-  assert(udt->type == ast_struct_union_declaration);
-  if (udt->struct_union_declaration.V) {
+  assert(udt->type == ast_struct_or_union_declaration);
+  if (udt->struct_or_union_declaration.V) {
     log_debug("reuse the existing struct definition");
-    t = udt->struct_union_declaration.V;
+    t = udt->struct_or_union_declaration.V;
   } else {
-    assert(udt->type == ast_struct_union_declaration);
+    assert(udt->type == ast_struct_or_union_declaration);
     struct dynarray dyn_elements;
     dynarray_default(&dyn_elements, sizeof(LLVMTypeRef));
     if (n->ctype.type == TOK_KW_STRUCT) {
@@ -80,22 +80,22 @@ LLVMTypeRef build_declaration_struct_or_union(builder b, astn n) {
     }
     size_t elements_count = dyn_elements.used;
     LLVMTypeRef *elements = dyn_elements.data;
-    if (udt->struct_union_declaration.ident) {
+    if (udt->struct_or_union_declaration.ident) {
       sds name;
       name = sdscatprintf(
           sdsempty(), n->ctype.type == TOK_KW_STRUCT ? STRUCT_FMT : UNION_FMT,
-          udt->struct_union_declaration.ident,
-          udt->struct_union_declaration.uid);
-      log_debug("create struct definition with name: %s", name);
+          udt->struct_or_union_declaration.ident,
+          udt->struct_or_union_declaration.uid);
+      log_debug("create struct/union definition with name: %s", name);
       t = LLVMStructCreateNamed(b->context, name);
       LLVMStructSetBody(t, elements, elements_count, false);
       sdsfree(name);
     } else {
-      log_debug("create anonymous struct definition");
+      log_debug("create anonymous struct/union definition");
       t = LLVMStructTypeInContext(b->context, elements, elements_count, false);
     }
     dynarray_free(&dyn_elements);
-    udt->struct_union_declaration.V = t;
+    udt->struct_or_union_declaration.V = t;
   }
   return t;
 }

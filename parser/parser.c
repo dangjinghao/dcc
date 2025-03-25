@@ -203,18 +203,18 @@ void parser_new_enumerator(parser parser, astn enumerator) {
  * @param n 
  */
 void parser_new_tag(parser parser, astn n) {
-  if (n->type == ast_struct_union_declaration) {
-    if (n->struct_union_declaration.ident == NULL) {
+  if (n->type == ast_struct_or_union_declaration) {
+    if (n->struct_or_union_declaration.ident == NULL) {
       log_debug("this is an abstract struct declarator, skipping declaration");
       return;
     }
     astn existing_tag = parser_scope_current_find_ident(
-        n->struct_union_declaration.ident, &parser->tagtab);
+        n->struct_or_union_declaration.ident, &parser->tagtab);
     if (existing_tag) {
       compiler_error(parser->lexer, "redefined  tag with identifier %s",
-                     n->struct_union_declaration.ident);
+                     n->struct_or_union_declaration.ident);
     }
-    n->struct_union_declaration.uid = parser_get_uid(parser);
+    n->struct_or_union_declaration.uid = parser_get_uid(parser);
   } else {
     assert(n->type == ast_enumeration);
     if (n->enumeration.ident == NULL) {

@@ -39,7 +39,7 @@ LLVMValueRef build_value_ne0(builder b, typed_value v) {
   return build_value_cmp0(b, v, LLVMIntNE, LLVMRealONE, "testnot0");
 }
 
-void build_value_cpy_struct_union(builder b, typed_value lhs_ptr,
+void build_value_cpy_struct_or_union(builder b, typed_value lhs_ptr,
                                   typed_value rhs_struct) {
   astn rhs_base_type = slist_peek_head(&rhs_struct->type_chain);
   slist lhs_points_to_type_chain =
@@ -58,20 +58,19 @@ void build_value_cpy_struct_union(builder b, typed_value lhs_ptr,
 }
 
 void build_value_store(builder b, typed_value v, typed_value ptr) {
-  // get lhs points type
+  // get ptr points to type
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &ptr->type_chain);
   astn points_to_base_type = slist_peek_head(points_to_type_chain);
-  // cast rhs to lhs type
-  v = build_type_convert_by_type_chain(b, v, points_to_type_chain);
   // special case for struct or union
   if (points_to_base_type->type == ast_ctype &&
       g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
     log_trace("Try to store struct or union type to pointer");
-    build_value_cpy_struct_union(b, ptr, v);
-    return;
+    return build_value_cpy_struct_or_union(b, ptr, v);
   }
-  // normal: store rhs to lhs
+  // cast rhs to ptr points to type
+  v = build_type_convert_by_type_chain(b, v, points_to_type_chain);
+  // normal: store rhs to where ptr points to
   LLVMBuildStore(b->builder, v->v, ptr->v);
 }
 

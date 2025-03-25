@@ -68,34 +68,34 @@ slist parse_struct_declaration(parser parser, slist member_declarations) {
 
 astn parse_struct_or_union_specifier(parser parser) {
   assert(g_is_struct_or_union_specifier(parser));
-  astn n = ast_new(ast_struct_union_declaration);
+  astn n = ast_new(ast_struct_or_union_declaration);
   parser_consume(parser);
   if (parser->current_token == TOK_IDENT) {
-    n->struct_union_declaration.ident = parser->lexer->lex_token._ident;
+    n->struct_or_union_declaration.ident = parser->lexer->lex_token._ident;
     parser_consume(parser);
   }
   if (parser->current_token == '{') {
     parser_consume(parser);
     while (g_is_struct_declaration_firstset(parser)) {
       parse_struct_declaration(
-          parser, &n->struct_union_declaration.member_declarations);
+          parser, &n->struct_or_union_declaration.member_declarations);
     }
     parser_consume_with(parser, '}');
-    if (n->struct_union_declaration.ident) {
+    if (n->struct_or_union_declaration.ident) {
       parser_new_tag(parser, n);
     }
     log_debug("add uid to struct declaration")
   } else {
     // struct declaration, check if it existing
-    if (!n->struct_union_declaration.ident) {
+    if (!n->struct_or_union_declaration.ident) {
       compiler_error(parser->lexer,
                      "struct/union declaration without an identifier");
     }
-    astn ref = parser_scope_all_find_ident(n->struct_union_declaration.ident,
+    astn ref = parser_scope_all_find_ident(n->struct_or_union_declaration.ident,
                                            &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
-                     n->struct_union_declaration.ident);
+                     n->struct_or_union_declaration.ident);
     }
     ast_free(n);
     n = ast_new(ast_ref);
@@ -564,8 +564,8 @@ sds parse_declaration_get_ident(astn n) {
   switch (n->type) {
   case ast_declaration:
     return n->declaration.ident;
-  case ast_struct_union_declaration:
-    return n->struct_union_declaration.ident;
+  case ast_struct_or_union_declaration:
+    return n->struct_or_union_declaration.ident;
   case ast_enumeration:
     return n->enumeration.ident;
   case ast_enumerator:

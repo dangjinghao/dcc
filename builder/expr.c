@@ -704,11 +704,11 @@ typed_value build_expr_unary_func_call(builder b, astn n) {
 }
 
 typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
-  typed_value struct_ptr = build_lvalue_expression(b, n->unary.expr);
+  typed_value struct_or_union_ptr = build_lvalue_expression(b, n->unary.expr);
   astn member = n->unary.extdata;
   assert(member->type == ast_ident);
   slist points_to_struct_type_chain =
-      build_type_get_points_to_type_chian(b, &struct_ptr->type_chain);
+      build_type_get_points_to_type_chian(b, &struct_or_union_ptr->type_chain);
   astn points_to_base_type = slist_peek_head(points_to_struct_type_chain);
   assert(points_to_base_type->type == ast_ctype);
   if (!g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
@@ -725,7 +725,7 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
   if (points_to_base_type->ctype.type == TOK_KW_STRUCT) {
     LLVMValueRef gep = LLVMBuildStructGEP2(
         b->builder, build_declaration_struct_or_union(b, points_to_base_type),
-        struct_ptr->v, member_idx, "struct_gep");
+        struct_or_union_ptr->v, member_idx, "struct_gep");
     // add pointer to member type chain
     slist member_ptr_type_chain =
         build_type_chain_add_pointer(b, member_type_chain);
@@ -735,7 +735,7 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
     // get union member: just return ptr directly and modify the type_chain
     slist member_ptr_type_chain =
         build_type_chain_add_pointer(b, member_type_chain);
-    return typed_value_new(struct_ptr->v, member_ptr_type_chain);
+    return typed_value_new(struct_or_union_ptr->v, member_ptr_type_chain);
   }
 }
 

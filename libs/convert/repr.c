@@ -394,17 +394,17 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
     buf = convert_repr_jsonify_ast(n->ref, buf, true);
     buf = sdscat(buf, "]}");
     break;
-  case ast_struct_union_declaration:
+  case ast_struct_or_union_declaration:
     buf = sdscatprintf(buf, "{\"name\":\"struct/union\",\"children\":[");
-    if (n->struct_union_declaration.ident) {
+    if (n->struct_or_union_declaration.ident) {
       buf = sdscatprintf(buf, "{\"name\":\"<id> %s\"},",
-                         n->struct_union_declaration.ident);
+                         n->struct_or_union_declaration.ident);
     } else {
       buf = sdscatprintf(buf, "{\"name\":\"<empty-id>\"},");
     }
     if (!shallow) {
       astn ref;
-      slist_foreach(&n->struct_union_declaration.member_declarations, ref) {
+      slist_foreach(&n->struct_or_union_declaration.member_declarations, ref) {
         buf = convert_repr_jsonify_ast(ref, buf, shallow);
         buf = sdscat(buf, ",");
       }
@@ -634,7 +634,7 @@ char *convert_repr_ast_type(enum ast_type t) {
     STRCASE(ast_ctype);
     STRCASE(ast_statement_labeled);
     STRCASE(ast_expr_typecast);
-    STRCASE(ast_struct_union_declaration);
+    STRCASE(ast_struct_or_union_declaration);
     STRCASE(ast_ref);
     STRCASE(ast_parameters);
     STRCASE(ast_arguments);

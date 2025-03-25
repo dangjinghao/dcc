@@ -271,9 +271,9 @@ int build_type_struct_type_get_member(astn struct_type, sds name,
   if (struct_declaration->type == ast_ref) {
     struct_declaration = struct_declaration->ref;
   }
-  assert(struct_declaration->type == ast_struct_union_declaration);
+  assert(struct_declaration->type == ast_struct_or_union_declaration);
   slist members =
-      &struct_declaration->struct_union_declaration.member_declarations;
+      &struct_declaration->struct_or_union_declaration.member_declarations;
   int index = 0;
   astn member;
   slist_foreach(members, member) {

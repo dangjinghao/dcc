@@ -515,15 +515,13 @@ void tbc_union_deref_member() {
 }
 
 void tbc_union_struct_in_union() {
-  tbc_entry(
-      "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
-    void F(){\
-      union U u;\
-      u.s.a = 1;\
-      u.s.b = 2;\
-      u.s.fpd = 3;\
-      u.s.fp = (void*)0;\
-  }");
+  tbc_entry("void F(){\
+  union {int a;char b;struct {int a;char b;double fpd; short*fp;union {double d;float f;}u;}s;} u;\
+  u.s.a = 1;\
+  u.s.b = 2;\
+  u.s.fpd = 3;\
+  u.s.fp = (void*)0;\
+}");
 }
 
 void tbc_union_struct_ptr_in_union() {
