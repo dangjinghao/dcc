@@ -70,7 +70,7 @@ struct s{int a;char b;};
 - [ ] use chable in building symtab
 - [ ] QA scaffold
 - [ ] string reference table in builder
-- [ ] reorganize builder API again
+- [x] reorganize builder API again
 - [ ] {} initializer
   - [ ] struct/union init
 - [ ] sizeof constant expression

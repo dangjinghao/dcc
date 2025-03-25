@@ -176,13 +176,13 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
   astn rhs_base_type = slist_peek_head(&rhs->type_chain);
   // convert ptr to i64 if needed
   if (lhs_base_type->ctype.type == '*') {
-    lhs = build_type_convert_by_type_chain(b, lhs,
-                                build_type_chain_by_lit(TOK_LIT_ULONG));
+    lhs = build_type_convert_by_type_chain(
+        b, lhs, build_type_chain_by_lit(TOK_LIT_ULONG));
     lhs_base_type = slist_peek_head(&lhs->type_chain);
   }
   if (rhs_base_type->ctype.type == '*') {
-    rhs = build_type_convert_by_type_chain(b, rhs,
-                                build_type_chain_by_lit(TOK_LIT_ULONG));
+    rhs = build_type_convert_by_type_chain(
+        b, rhs, build_type_chain_by_lit(TOK_LIT_ULONG));
     rhs_base_type = slist_peek_head(&rhs->type_chain);
   }
 
@@ -212,37 +212,13 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
                          build_type_chain_by_lit(TOK_LIT_CHAR));
 }
 
-typed_value build_expr_binop_assign_cpy_struct_union(builder b,
-                                                     typed_value lhs_ptr,
-                                                     typed_value rhs_struct) {
-  astn rhs_base_type = slist_peek_head(&rhs_struct->type_chain);
-  slist lhs_points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &lhs_ptr->type_chain);
-  astn lhs_base_type = slist_peek_head(lhs_points_to_type_chain);
-
-  assert(lhs_base_type->type == ast_ctype && rhs_base_type->type == ast_ctype);
-  assert(g_is_struct_or_union_token(lhs_base_type->ctype.type) &&
-         g_is_struct_or_union_token(rhs_base_type->ctype.type));
-  // in fact the rhs_struct is a ptr llvm type, we just check that
-  assert(LLVMGetTypeKind(LLVMTypeOf(rhs_struct->v)) == LLVMPointerTypeKind);
-  LLVMTypeRef struct_or_union_type =
-      build_declaration_struct_or_union(b, rhs_base_type);
-  LLVMBuildMemCpy(b->builder, lhs_ptr->v, 1, rhs_struct->v, 1,
-                  LLVMSizeOf(struct_or_union_type));
-  return build_value_load(b, lhs_ptr);
-}
-
 typed_value build_expr_binop_assign(builder b, astn binop) {
   typed_value lhs = build_lvalue_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
   astn rhs_base_type = slist_peek_head(&rhs->type_chain);
   if (rhs_base_type->type == ast_ctype &&
       g_is_struct_or_union_token(rhs_base_type->ctype.type) &&
-      binop->binop.op == '=') {
-    return build_expr_binop_assign_cpy_struct_union(b, lhs, rhs);
-  } else if (rhs_base_type->type == ast_ctype &&
-             g_is_struct_or_union_token(rhs_base_type->ctype.type) &&
-             binop->binop.op != '=') {
+      binop->binop.op != '=') {
     log_panic("Unsupported self assign operation on struct or union type");
   }
   switch (binop->binop.op) {
@@ -357,11 +333,13 @@ typed_value build_expr_ternary(builder b, astn ternary) {
   } else if (promt_cmp < 0) {
     log_trace("casting true expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, true_block);
-    true_expr = build_type_convert_by_type_chain(b, true_expr, false_type_chain);
+    true_expr =
+        build_type_convert_by_type_chain(b, true_expr, false_type_chain);
   } else {
     log_trace("casting false expr in ternary in ternary special case");
     LLVMPositionBuilderAtEnd(b->builder, false_block);
-    false_expr = build_type_convert_by_type_chain(b, false_expr, true_type_chain);
+    false_expr =
+        build_type_convert_by_type_chain(b, false_expr, true_type_chain);
   }
   // add br to all branchs
   LLVMPositionBuilderAtEnd(b->builder, true_block);
@@ -371,10 +349,11 @@ typed_value build_expr_ternary(builder b, astn ternary) {
 
   // merge block, phi
   LLVMPositionBuilderAtEnd(b->builder, merge_block);
-  LLVMValueRef phi = LLVMBuildPhi(
-      b->builder,
-      build_type_ctype_convert_to_llvm(b, slist_peek_head(&true_expr->type_chain)),
-      "ternary_phi");
+  LLVMValueRef phi =
+      LLVMBuildPhi(b->builder,
+                   build_type_ctype_convert_to_llvm(
+                       b, slist_peek_head(&true_expr->type_chain)),
+                   "ternary_phi");
   LLVMAddIncoming(phi, (LLVMValueRef[]){true_expr->v, false_expr->v},
                   (LLVMBasicBlockRef[]){true_block, false_block}, 2);
   return typed_value_new(phi, &true_expr->type_chain);
@@ -601,14 +580,15 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
   // Get the value pointed to
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &expr->type_chain);
-  LLVMTypeRef points_to_type =
-      build_type_ctype_convert_to_llvm(b, slist_peek_head(points_to_type_chain));
+  LLVMTypeRef points_to_type = build_type_ctype_convert_to_llvm(
+      b, slist_peek_head(points_to_type_chain));
 
   // Load current value
   LLVMValueRef old = build_value_load(b, expr)->v;
   // Create the constant for incrementing (1)
   LLVMValueRef one;
   astn base_type = slist_peek_head(points_to_type_chain);
+  assert(base_type->type == ast_ctype);
   if (g_is_int_family_tok(base_type->ctype.type)) {
     one = LLVMConstInt(points_to_type, 1, false);
   } else if (base_type->ctype.type == '*') {
@@ -628,8 +608,9 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
       // pointer increment
       slist pointer_type_points_to_type_chain =
           build_type_get_points_to_type_chian(b, points_to_type_chain);
-      LLVMTypeRef pointer_points_to_base_type = build_type_ctype_convert_to_llvm(
-          b, slist_peek_head(pointer_type_points_to_type_chain));
+      LLVMTypeRef pointer_points_to_base_type =
+          build_type_ctype_convert_to_llvm(
+              b, slist_peek_head(pointer_type_points_to_type_chain));
 
       updated = LLVMBuildGEP2(b->builder, pointer_points_to_base_type, old,
                               &one, 1, "ptrinc");
@@ -646,8 +627,9 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
       // pointer decrement
       slist pointer_type_points_to_type_chain =
           build_type_get_points_to_type_chian(b, points_to_type_chain);
-      LLVMTypeRef pointer_points_to_base_type = build_type_ctype_convert_to_llvm(
-          b, slist_peek_head(pointer_type_points_to_type_chain));
+      LLVMTypeRef pointer_points_to_base_type =
+          build_type_ctype_convert_to_llvm(
+              b, slist_peek_head(pointer_type_points_to_type_chain));
       one = LLVMBuildNeg(b->builder, one, "negptrinc");
       updated = LLVMBuildGEP2(b->builder, pointer_points_to_base_type, old,
                               &one, 1, "ptrdec");
@@ -679,8 +661,8 @@ typed_value build_expr_unary_func_call(builder b, astn n) {
       func_params->type != ast_parameters) {
     log_panic("this expression is not callable");
   }
-  LLVMTypeRef ret_type =
-      build_type_ctype_convert_to_llvm(b, slist_peek_head(func_return_type_chain));
+  LLVMTypeRef ret_type = build_type_ctype_convert_to_llvm(
+      b, slist_peek_head(func_return_type_chain));
   astn first_param = slist_peek_head(&func_params->parameters.list);
   astn last_param = slist_peek_tail(&func_params->parameters.list);
   LLVMTypeRef func_type;

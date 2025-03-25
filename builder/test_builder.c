@@ -254,9 +254,9 @@ void tbc_logic() {
 void tbc_void_func_call() { tbc_entry("void F(){{{void f();f();}}}"); }
 
 void tbc_sum5050() {
-  tbc_entry(
-      "int F(){int sum = 0;for(int i = 0,j = 1,k;i <= 100.; i++){sum += i;}return "
-      "sum;}");
+  tbc_entry("int F(){int sum = 0;for(int i = 0,j = 1,k;i <= 100.; i++){sum += "
+            "i;}return "
+            "sum;}");
 }
 
 void tbc_for_noinc_init() {
@@ -469,10 +469,17 @@ void tbc_struct_copy() {
 void tbc_struct_copy_from_outer() {
   tbc_entry("struct S{int a;char b;double fpd; short*fp;};\
     double F(struct S*src){\
-      struct S s1,s2,s3,s4;\
-      s4 = s3 = s2 = s1 = *&src[1];\
+      struct S s1,s2,s3,s4 = *src;\
+      s3 = s2 = s1 = *&src[1];\
       *src = s4;\
       return src->fpd + s1.a + s2.b;\
+  }");
+}
+
+void tbc_struct_wrong_self_inc() {
+  tbc_entry("struct S{int a;char b;};\
+    int F(struct S *sp){\
+      (*sp)++;\
   }");
 }
 
@@ -480,7 +487,7 @@ void tbc_union_copy() {
   tbc_entry(
       "union U{int a;char b;struct S{int a;char b;double fpd; short*fp;} s;};\
     int F(){\
-      union U u1,u2;\
+      union U u1,u2 = u1;\
       u2 = u1 = u2;\
       struct S s;\
   }");
