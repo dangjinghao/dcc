@@ -321,16 +321,22 @@ typed_value build_declaration(builder b, astn n) {
     log_trace("declaration %s has been built", n->declaration.ident);
     return n->declaration.V;
   }
-  assert(n->declaration.storage_class != TOK_KW_TYPEDEF);
-  LLVMValueRef v;
 
-  if (g_get_function_params(n)) {
+  LLVMValueRef v;
+  if (n->declaration.storage_class == TOK_KW_TYPEDEF) {
+    log_debug("ignore the typedef declaration: %s", n->declaration.ident);
+    return NULL;
+  } else if (g_get_function_params(n)) {
     // function declaration or definition
     v = build_function_prototype(b, n);
   } else if (g_is_declaration_in_function_scope(n) &&
              n->declaration.storage_class != TOK_KW_EXTERN) {
     // variable in function
     v = build_variable_alloca(b, n);
+  } else if (n->declaration.storage_class == TOK_KW_EXTERN &&
+             g_is_declaration_in_function_scope(n)) {
+    // extern variable in function
+    BUILDING();
   } else {
     v = build_variable_global(b, n);
   }
@@ -367,10 +373,6 @@ void build_trans_unit(builder b, slist symtab) {
   astn n;
   slist_foreach(symtab, n) {
     assert(n->type == ast_declaration);
-    if (n->declaration.storage_class == TOK_KW_TYPEDEF) {
-      log_trace("skip the typedef declaration: %s", n->declaration.ident);
-      continue;
-    }
     build_declaration(b, n);
   }
 }

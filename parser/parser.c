@@ -425,8 +425,4 @@ bool parser_expr_check_const_int(astn expr) {
   return false;
 }
 
-slist parser_gen_symtab(parser parser) {
-  parser_symtab_remove_weak_symbols(&parser->symtab);
-  parser_symtab_reorder_strong_symbols(&parser->symtab);
-  return &parser->symtab;
-}
+slist parser_gen_symtab(parser parser) { return &parser->symtab; }

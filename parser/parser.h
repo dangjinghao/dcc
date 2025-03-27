@@ -11,10 +11,6 @@ typedef struct parser {
   struct slist idtab;
   // enum, struct, union
   struct slist tagtab;
-  // save weak and strong symbol, unnecessary to remove weak symbol.
-  // order: strong symbol --> weak symbol,
-  // this order is important, because we can only traverse the list from head to tail
-  // strong symbol with same ident will be found first, just like 'cover' the weak symbol
   struct slist symtab;
   // for break, iteration and switch statement will use this
   astn break_scope;
@@ -70,8 +66,6 @@ slist parse_type_name(parser parser, slist type_chain);
 astn parse_initializer(parser parser);
 sds parse_declaration_get_ident(astn n);
 
-slist parser_symtab_reorder_strong_symbols(slist symtab);
-void parser_symtab_remove_weak_symbols(slist symtab);
 void parser_symtab_add(parser parser, astn n);
 astn parser_symtab_find(slist symtab, sds id);
 #endif

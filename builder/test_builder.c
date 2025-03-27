@@ -417,11 +417,11 @@ void tbc_struct_lvalue_member() {
 }
 
 void tbc_struct_typedef() {
-  tbc_entry("typedef volatile long l_t;typedef struct S{int a;const l_t b;}S_t;\
+  tbc_entry("typedef volatile long l_t; typedef int I;typedef struct S{int a;const l_t b;}S_t;\
     int F(){\
-      S_t s;\
-      s.a = 1;\
-      s.b = 2;\
+      struct{ I i;l_t l; S_t st; } s;\
+      s.st.a = 1;\
+      s.st.b = 2;\
   }");
 }
 
@@ -533,4 +533,8 @@ void tbc_union_struct_ptr_in_union() {
       u->sp->fpd = 3;\
       u->sp->fp = (void*)0;\
   }");
+}
+
+void tbc_load_extern(){
+  tbc_entry("int F(){extern int v,v2;return v + v2 ;} int v;");
 }

@@ -9,7 +9,6 @@ INCS := libs lexer parser
 CFLAGS := -ggdb -Og -MMD -std=gnu2x -Wall -Wextra  $(addprefix -I,$(INCS)) $(shell llvm-config --cflags)
 CFLAGS += -Wno-stringop-truncation \
 		  -Wno-format-truncation \
-		  -Wno-unused-but-set-variable \
 		  -Wno-unused-parameter \
 		  -Wno-unused-function
 LDFLAGS := $(shell llvm-config --libs --ldflags)

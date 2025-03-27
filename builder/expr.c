@@ -6,7 +6,6 @@
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
-#include "parser.h"
 #include "slist/slist.h"
 #include "token.h"
 #include "typed_value/typed_value.h"
@@ -853,9 +852,9 @@ typed_value build_expr_primary(builder b, astn n) {
   }
 }
 
-typed_value build_load_declaration(builder b, astn n) {
+typed_value build_load_ref_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
-  auto var = build_declaration(b, n);
+  typed_value var = builder_relocate_declaration(b, n);
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &var->type_chain);
   astn points_to_base_type = slist_peek_head(points_to_type_chain);
@@ -867,7 +866,7 @@ typed_value build_load_declaration(builder b, astn n) {
   return build_value_load(b, var);
 }
 
-typed_value build_expr_enum(builder b, astn n) {
+typed_value build_expr_ref_enum(builder b, astn n) {
   assert(n->type == ast_enumerator);
   return typed_value_new(LLVMConstInt(LLVMInt32TypeInContext(b->context),
                                       n->enumerator.value, false),
@@ -877,32 +876,12 @@ typed_value build_expr_enum(builder b, astn n) {
 typed_value build_expr_ref(builder b, astn n) {
   switch (n->ref->type) {
   case ast_declaration:
-    return build_load_declaration(b, n->ref);
+    return build_load_ref_declaration(b, n->ref);
   case ast_enumerator:
-    return build_expr_enum(b, n->ref);
+    return build_expr_ref_enum(b, n->ref);
   default:
     log_panic("Unsupported ref type:%s", convert_repr_ast_type(n->ref->type));
   }
-}
-
-/**
- * @brief relocate the extern declaration, 
- * 
- * @param b 
- * @param n 
- * @return typed_value 
- */
-typed_value build_relocate_declaration(builder b, astn n) {
-  assert(n->type == ast_declaration);
-  if (n->declaration.storage_class == TOK_KW_EXTERN) {
-    // relocate extern declaration
-    astn exist = parser_symtab_find(b->symtab, parse_declaration_get_ident(n));
-    assert(exist);
-    n = exist;
-    log_trace("relocate extern declaration %s", n->declaration.ident);
-  }
-
-  return build_declaration(b, n);
 }
 
 typed_value build_expr_typecast(builder b, astn n) {
@@ -940,7 +919,7 @@ typed_value build_lvalue_expression(builder b, astn n) {
   switch (n->type) {
   case ast_ref: {
     assert(n->ref->type == ast_declaration);
-    return build_relocate_declaration(b, n->ref);
+    return builder_relocate_declaration(b, n->ref);
   }
   case ast_expr_unary: {
     switch (n->unary.op) {

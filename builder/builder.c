@@ -1,5 +1,6 @@
 #include "builder.h"
 #include "log/log.h"
+#include "parser.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
 #include <llvm-c/Core.h>
@@ -76,4 +77,24 @@ void builder_destroy(builder b) {
   LLVMDisposeModule(b->module);
   LLVMContextDispose(b->context);
   builder_label_list_free(b);
+}
+
+/**
+ * @brief relocate the extern declaration, 
+ * 
+ * @param b 
+ * @param n 
+ * @return typed_value 
+ */
+typed_value builder_relocate_declaration(builder b, astn n) {
+  assert(n->type == ast_declaration);
+  if (n->declaration.storage_class == TOK_KW_EXTERN) {
+    // relocate extern declaration
+    astn exist = parser_symtab_find(b->symtab, parse_declaration_get_ident(n));
+    assert(exist);
+    n = exist;
+    log_debug("relocate extern declaration %s", n->declaration.ident);
+  }
+
+  return build_declaration(b, n);
 }

@@ -90,19 +90,18 @@ static inline void *slist_peek_tail(slist list) {
 
 /* Remove and return the data from the head node. */
 static inline void *slist_pop_head(slist list) {
-  if (!slist_empty(list)) {
-    slist head = list->next;
-    list->next = head->next;
-    /* If this node was also the tail, reset tail to NULL. */
-    if (list->data == head) {
-      list->data = NULL;
-    }
-    void *data = head->data;
-    head->data = head->next = NULL; // for safety, remove in the future
-    SLIST_FREE(head);
-    return data;
+  if (slist_empty(list)) {
+    return NULL;
   }
-  return NULL;
+  slist head = list->next;
+  list->next = head->next;
+  /* If this node was also the tail, reset tail to NULL. */
+  if (list->data == head) {
+    list->data = NULL;
+  }
+  void *data = head->data;
+  SLIST_FREE(head);
+  return data;
 }
 
 /* Remove and return the data from the tail node. */
@@ -112,32 +111,24 @@ static inline void *slist_pop_tail(slist list) {
   }
 
   slist tail = (slist)list->data;
-  /* If there's only one node in the list, clear everything out. */
-  if (list->next == tail) {
-    list->next = NULL;
-    list->data = NULL;
-    void *data = tail->data;
-    tail->data = tail->next = NULL; // for safety, remove in the future
-    SLIST_FREE(tail);
-    return data;
-  }
-
-  /* Otherwise, find the node just before the tail. */
-  slist prev = list->next;
+  slist prev = list;
   while (prev->next != tail) {
     prev = prev->next;
   }
   prev->next = NULL;
-  list->data = prev;
+  // if there is only one node before remove, reset tail to NULL
+  list->data = prev == list ? NULL : prev;
 
   void *data = tail->data;
-  tail->data = tail->next = NULL; // for safety, remove in the future
   SLIST_FREE(tail);
   return data;
 }
 
 /* Free all nodes (except the head node itself), resetting head and tail. */
 static inline void slist_free(slist list) {
+  if (slist_empty(list)) {
+    return;
+  }
   slist node = list->next;
   while (node) {
     slist next = node->next;
@@ -150,6 +141,7 @@ static inline void slist_free(slist list) {
 
 /* Concatenate src list to dst list, emptying out src. */
 static inline void slist_concat(slist dst, slist src) {
+  assert(dst != src);
   if (slist_empty(src)) {
     return;
   }
@@ -180,23 +172,34 @@ static inline void slist_copy(slist dst, slist src) {
 
 static inline size_t slist_length(slist list) {
   int len = 0;
-  void *_;
+  [[gnu::unused]] void *_;
   slist_foreach(list, _) { len++; }
   return len;
 }
 
 static inline void slist_remove(slist list, void *data) {
-  for (slist p = list; p->next; p = p->next) {
-    if (p->next->data == data) {
-      slist tmp = p->next;
-      p->next = p->next->next;
-      if (tmp == list->data) {
-        list->data = NULL;
-        assert(p->next == NULL);
+  if (slist_empty(list)) {
+    return;
+  }
+  
+  slist prev = list;
+  slist curr = list->next;
+  
+  while (curr != NULL) {
+    if (curr->data == data) {
+      // Remove curr from the list
+      prev->next = curr->next;
+      
+      // Update tail pointer if removing the tail node
+      if (list->data == curr) {
+        list->data = prev == list ? NULL : prev;
       }
-      SLIST_FREE(tmp);
+      
+      SLIST_FREE(curr);
       return;
     }
+    prev = curr;
+    curr = curr->next;
   }
 }
 

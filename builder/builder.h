@@ -33,9 +33,12 @@ goto_label builder_label_find(builder b, sds name);
 void builder_label_list_free(builder b);
 void builder_label_list_check_undefined(builder b);
 goto_label builder_label_new(builder b, sds name);
+typed_value builder_relocate_declaration(builder b, astn n);
+
 slist build_type_chain_by_lit(enum tok_type type);
 slist build_type_chain_expr_primary(astn n);
-typed_value build_type_convert_by_type_chain(builder b, typed_value v, slist type_chain);
+typed_value build_type_convert_by_type_chain(builder b, typed_value v,
+                                             slist type_chain);
 int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type);
 
 dynarray build_function_parameters_type(builder b, astn params, dynarray arr);

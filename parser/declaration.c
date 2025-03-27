@@ -505,7 +505,10 @@ void parse_external_declaration(parser parser, slist block) {
   // e.g. int A,*B=0,(*C)(int,char); -> int A; int *B=0; int (*C)(int,char);
   astn init_declarator;
   if (g_is_init_declarator_firstset(parser)) {
-    init_declarator = parse_init_declarator(parser, decl_specs, false);
+    // in parse_init_declartor, we would modify the decl_specs->ctype.storage
+    // so we have to copy it to avoid the side effect
+    init_declarator =
+        parse_init_declarator(parser, ast_copy(decl_specs), false);
     assert(init_declarator->type == ast_declaration);
     slist_add_tail(block, init_declarator);
     if (g_is_function_definition(init_declarator)) {
@@ -518,6 +521,8 @@ void parse_external_declaration(parser parser, slist block) {
       assert(init_declarator->type == ast_declaration);
       slist_add_tail(block, init_declarator);
     }
+    // we have to free the decl_specs here because it is not used exactly
+    ast_free(decl_specs);
   } else {
     // struct or union declaration without identifier
     assert(decl_specs->type == ast_ctype &&
@@ -529,8 +534,6 @@ void parse_external_declaration(parser parser, slist block) {
     slist_add_tail(block, n);
   }
   parser_consume_with(parser, ';');
-
-  return;
 }
 
 astn parse_specifier_qualifiers(parser parser) {
