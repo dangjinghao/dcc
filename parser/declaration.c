@@ -437,7 +437,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     // we put this process in there because the later parser_declare_new_symbol needs the
     // extern to determine whether should it be added to the symtab.
     log_trace("add extern storage specifier to function declaration: %s",
-              n->declaration.ident);
+              parse_declaration_get_ident(n));
 
     n->declaration.storage_class = TOK_KW_EXTERN;
   }

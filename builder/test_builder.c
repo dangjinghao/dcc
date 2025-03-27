@@ -417,7 +417,8 @@ void tbc_struct_lvalue_member() {
 }
 
 void tbc_struct_typedef() {
-  tbc_entry("typedef volatile long l_t; typedef int I;typedef struct S{int a;const l_t b;}S_t;\
+  tbc_entry(
+      "typedef volatile long l_t; typedef int I;typedef struct S{int a;const l_t b;}S_t;\
     int F(){\
       struct{ I i;l_t l; S_t st; } s;\
       s.st.a = 1;\
@@ -535,6 +536,7 @@ void tbc_union_struct_ptr_in_union() {
   }");
 }
 
-void tbc_load_extern(){
-  tbc_entry("int F(){extern int v,v2;return v + v2 ;} int v;");
+void tbc_load_extern_sub_scope() {
+  tbc_entry("int F(){extern int v;static int v2;{extern int v,v2; v = 1;}return v "
+            "+ v2;} ");
 }

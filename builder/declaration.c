@@ -127,31 +127,15 @@ LLVMTypeRef build_declaration_variable_type(builder b, astn n) {
  */
 sds build_symbol_name(astn n) {
   assert(n->type == ast_declaration);
-  if (g_is_declaration_in_function_scope(n) && !g_is_function_declaration(n)) {
-    // !g_is_function_declaration(n) to avoid the function declaration in function scope
-    if (n->declaration.storage_class == TOK_KW_STATIC) {
-      // static function variable
-      assert(n->declaration.scope_ref->type == ast_declaration);
-      assert(n->declaration.scope_ref->declaration.ident);
-      return sdscatprintf(sdsempty(), STATIC_VAR_FMT, n->declaration.ident,
-                          n->declaration.uid);
-    } else {
-      // those variables in function scope would drop their name
-      return sdscatprintf(sdsempty(), VAR_FMT, n->declaration.ident,
-                          n->declaration.uid);
-    }
-  } else {
-    // global scope
-    if (n->declaration.storage_class == TOK_KW_STATIC) {
-      // static global variable
-      return sdscatprintf(sdsempty(), STATIC_VAR_FMT, n->declaration.ident,
-                          n->declaration.uid);
-    } else {
-      // extern or unknown storage class has the name same as its identifier
-      return sdsdup(n->declaration.ident);
-    }
+  if (n->declaration.storage_class == TOK_KW_EXTERN) {
+    return sdsdup(parse_declaration_get_ident(n));
+  } else if (n->declaration.storage_class == TOK_KW_STATIC) {
+    return sdscatprintf(sdsempty(), STATIC_VAR_FMT, parse_declaration_get_ident(n));
+  } else if (!g_is_declaration_in_function_scope(n)) {
+    return sdsdup(parse_declaration_get_ident(n));
   }
-  return NULL;
+  assert(g_is_declaration_in_function_scope(n));
+  return sdscatprintf(sdsempty(), VAR_FMT, parse_declaration_get_ident(n));
 }
 
 void build_variable_global_init(LLVMValueRef pv, astn n,
@@ -168,8 +152,13 @@ void build_variable_global_init(LLVMValueRef pv, astn n,
 LLVMValueRef build_variable_global(builder b, astn n) {
   assert(n->type == ast_declaration);
   sds sym_name = build_symbol_name(n);
+  LLVMValueRef pv;
+  if ((pv = LLVMGetNamedGlobal(b->module, sym_name))) {
+    log_debug("reuse the existing global variable: %s", sym_name);
+    return pv;
+  }
   LLVMTypeRef value_type = build_declaration_variable_type(b, n);
-  LLVMValueRef pv = LLVMAddGlobal(b->module, value_type, sym_name);
+  pv = LLVMAddGlobal(b->module, value_type, sym_name);
   sdsfree(sym_name);
   if (n->declaration.storage_class != TOK_KW_EXTERN) {
     build_variable_global_init(pv, n, value_type);
@@ -318,29 +307,26 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
 typed_value build_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   if (n->declaration.V) {
-    log_trace("declaration %s has been built", n->declaration.ident);
+    log_trace("declaration %s has been built", parse_declaration_get_ident(n));
     return n->declaration.V;
   }
 
   LLVMValueRef v;
   if (n->declaration.storage_class == TOK_KW_TYPEDEF) {
-    log_debug("ignore the typedef declaration: %s", n->declaration.ident);
+    log_debug("ignore the typedef declaration: %s", parse_declaration_get_ident(n));
     return NULL;
   } else if (g_get_function_params(n)) {
     // function declaration or definition
     v = build_function_prototype(b, n);
-  } else if (g_is_declaration_in_function_scope(n) &&
-             n->declaration.storage_class != TOK_KW_EXTERN) {
-    // variable in function
-    v = build_variable_alloca(b, n);
-  } else if (n->declaration.storage_class == TOK_KW_EXTERN &&
-             g_is_declaration_in_function_scope(n)) {
+  } else if (n->declaration.storage_class == TOK_KW_EXTERN ||
+             n->declaration.storage_class == TOK_KW_STATIC) {
     // extern variable in function
-    BUILDING();
+    v = build_variable_global(b, n);
+  } else if (g_is_declaration_in_function_scope(n)) {
+    v = build_variable_alloca(b, n);
   } else {
     v = build_variable_global(b, n);
   }
-
   // storage class setting
   switch (n->declaration.storage_class) {
   case TOK_KW_EXTERN:

@@ -67,7 +67,6 @@ struct s{int a;char b;};
   - [ ] array
 - [x] basic switch implementation
   - [ ] binary search optimization
-- [ ] use chable in building symtab
 - [ ] QA scaffold
 - [ ] string reference table in builder
 - [x] reorganize builder API again

@@ -152,26 +152,26 @@ bool parser_scope_is_current_global(parser parser) {
  */
 void parser_new_declaration(parser parser, astn n) {
   assert(n->type == ast_declaration);
-  if (n->declaration.ident == NULL) {
+  if (parse_declaration_get_ident(n) == NULL) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
   astn existing_symbol =
-      parser_scope_current_find_ident(n->declaration.ident, &parser->idtab);
+      parser_scope_current_find_ident(parse_declaration_get_ident(n), &parser->idtab);
   if (existing_symbol && n->declaration.storage_class == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
-              n->declaration.ident);
+              parse_declaration_get_ident(n));
     return;
   } else if (existing_symbol && n->declaration.storage_class != TOK_KW_EXTERN &&
              existing_symbol->declaration.storage_class != TOK_KW_EXTERN) {
-    compiler_error(parser->lexer, "redefined symbol %s", n->declaration.ident);
+    compiler_error(parser->lexer, "redefined symbol %s", parse_declaration_get_ident(n));
   }
 
   n->declaration.uid = parser_get_uid(parser);
   parser_scope_current_add_symbol(n, &parser->idtab);
-  if (parser_scope_is_current_global(parser) ||
-      n->declaration.storage_class == TOK_KW_EXTERN) {
-    // we need add the extern symbol which is defined in block scope to symtab
+  if (parser_scope_is_current_global(parser)) {
+    // we would not add the extern symbol which is defined in block scope to symtab
+    // just delay it to the build stage
     parser_symtab_add(parser, n);
   }
 }
