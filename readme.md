@@ -73,6 +73,7 @@ struct s{int a;char b;};
 - [ ] {} initializer
   - [ ] struct/union/array init
 - [ ] sizeof constant expression
+- [ ] incomplete type (void/struct dlclaration only/array declaration without array size )
 - [ ] node meta data
 - [ ] union
 - [ ] attribute

@@ -110,13 +110,12 @@ LLVMTypeRef build_declaration_struct_or_union(builder b, astn n) {
  */
 LLVMTypeRef build_declaration_variable_type(builder b, astn n) {
   assert(n->type == ast_declaration);
-  astn _t = g_get_declaration_base_type(n);
+  astn _t = build_type_chain_get_base_type(&n->declaration.type_chain);
   if (_t->type == ast_parameters) {
-    _t = g_get_declaration_function_return_base_type(n);
-  } else if (_t->type == ast_expr_unary) {
-    BUILDING();
+    _t = build_type_chain_get_function_return_base_type(
+        &n->declaration.type_chain);
   }
-  return build_type_ctype_convert_to_llvm(b, _t);
+  return build_type_base_type_convert_to_llvm(b, _t);
 }
 
 /**
@@ -130,7 +129,8 @@ sds build_symbol_name(astn n) {
   if (n->declaration.storage_class == TOK_KW_EXTERN) {
     return sdsdup(parse_declaration_get_ident(n));
   } else if (n->declaration.storage_class == TOK_KW_STATIC) {
-    return sdscatprintf(sdsempty(), STATIC_VAR_FMT, parse_declaration_get_ident(n));
+    return sdscatprintf(sdsempty(), STATIC_VAR_FMT,
+                        parse_declaration_get_ident(n));
   } else if (!g_is_declaration_in_function_scope(n)) {
     return sdsdup(parse_declaration_get_ident(n));
   }
@@ -207,8 +207,9 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
       // varargs is the special case that marks the end of the parameter list
       break;
     }
-    astn param_base_type = g_get_declaration_base_type(param_declaration);
-    LLVMTypeRef t = build_type_ctype_convert_to_llvm(b, param_base_type);
+    astn param_base_type = build_type_chain_get_base_type(
+        &param_declaration->declaration.type_chain);
+    LLVMTypeRef t = build_type_base_type_convert_to_llvm(b, param_base_type);
     dynarray_add(arr, &t);
   }
   return arr;
@@ -246,7 +247,8 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
         break;
       }
       // check whether the parameter declaration is struct or union, we don't support it right now
-      astn param_base_type = g_get_declaration_base_type(param_decl);
+      astn param_base_type =
+          build_type_chain_get_base_type(&param_decl->declaration.type_chain);
       if (param_base_type->type == ast_ctype &&
           g_is_struct_or_union_token(param_base_type->ctype.type)) {
         log_panic("Pass struct or union parameter by value is not supported "
@@ -277,7 +279,8 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
   }
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
   build_statement_block(b, body);
-  astn func_return_base_type = g_get_declaration_function_return_base_type(n);
+  astn func_return_base_type = build_type_chain_get_function_return_base_type(
+      &n->declaration.type_chain);
   if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(b->builder))) {
     // the last statement is terminator
     log_debug("the last statement is terminator, skip the default return");
@@ -292,7 +295,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
       log_panic("Return struct or union by value is not supported right now");
     }
     auto default_type =
-        build_type_ctype_convert_to_llvm(b, func_return_base_type);
+        build_type_base_type_convert_to_llvm(b, func_return_base_type);
     LLVMBuildRet(b->builder, LLVMConstNull(default_type));
   }
 }
@@ -313,7 +316,8 @@ typed_value build_declaration(builder b, astn n) {
 
   LLVMValueRef v;
   if (n->declaration.storage_class == TOK_KW_TYPEDEF) {
-    log_debug("ignore the typedef declaration: %s", parse_declaration_get_ident(n));
+    log_debug("ignore the typedef declaration: %s",
+              parse_declaration_get_ident(n));
     return NULL;
   } else if (g_get_function_params(n)) {
     // function declaration or definition

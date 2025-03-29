@@ -19,8 +19,8 @@
  */
 typed_value build_type_convert_by_type_chain(builder b, typed_value v,
                                              slist type_chain) {
-  astn base_type = slist_peek_head(&v->type_chain);
-  astn target_type = slist_peek_head(type_chain);
+  astn base_type = build_type_chain_get_base_type(&v->type_chain);
+  astn target_type = build_type_chain_get_base_type(type_chain);
   assert(base_type->type == ast_ctype);
   assert(target_type->type == ast_ctype);
 
@@ -28,16 +28,16 @@ typed_value build_type_convert_by_type_chain(builder b, typed_value v,
   if (base_type->ctype.type == from && target_type->ctype.type == to) {        \
     log_trace("cast " #from " to " #to);                                       \
     v->v = (BF)(b->builder, v->v,                                              \
-                build_type_ctype_convert_to_llvm(b, target_type), "cast");     \
+                build_type_base_type_convert_to_llvm(b, target_type), "cast"); \
     auto nv = typed_value_new(v->v, type_chain);                               \
     return nv;                                                                 \
   }
   // int -> int
   if (g_is_int_family_tok(base_type->ctype.type) &&
       g_is_int_family_tok(target_type->ctype.type)) {
-    v->v = LLVMBuildIntCast2(b->builder, v->v,
-                             build_type_ctype_convert_to_llvm(b, target_type),
-                             base_type->ctype.signint == TOK_KW_SIGNED, "cast");
+    v->v = LLVMBuildIntCast2(
+        b->builder, v->v, build_type_base_type_convert_to_llvm(b, target_type),
+        base_type->ctype.signint == TOK_KW_SIGNED, "cast");
     log_trace("cast type in int family");
     auto nv = typed_value_new(v->v, type_chain);
     return nv;
@@ -215,8 +215,8 @@ typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values) {
   slist lhs_type_chain = &values[0]->type_chain;
   slist rhs_type_chain = &values[1]->type_chain;
-  astn lhs_ty = slist_peek_head(lhs_type_chain);
-  astn rhs_ty = slist_peek_head(rhs_type_chain);
+  astn lhs_ty = build_type_chain_get_base_type(lhs_type_chain);
+  astn rhs_ty = build_type_chain_get_base_type(rhs_type_chain);
 
   int cmp = build_type_compare_promote_level(lhs_ty, rhs_ty);
   if (cmp == 0) {
@@ -310,7 +310,7 @@ LLVMTypeRef build_type_declaration_function_convert_to_llvm(builder b, astn n) {
   return func;
 }
 
-LLVMTypeRef build_type_ctype_convert_to_llvm(builder b, astn n) {
+LLVMTypeRef build_type_base_type_convert_to_llvm(builder b, astn n) {
   assert(n->type == ast_ctype);
   int t = n->ctype.type;
   auto c = b->context;
@@ -345,4 +345,18 @@ LLVMTypeRef build_type_ctype_convert_to_llvm(builder b, astn n) {
 
   log_panic("Unsupported base type:%s", convert_repr_token(t));
   return NULL;
+}
+
+astn build_type_chain_get_base_type(slist type_chain) {
+  return slist_peek_head(type_chain);
+}
+
+astn build_type_chain_get_function_return_base_type(slist type_chain) {
+  struct slist tmp;
+  slist_copy(&tmp, type_chain);
+  astn first = slist_pop_head(&tmp);
+  assert(first->type == ast_parameters);
+  astn result = build_type_chain_get_base_type(&tmp);
+  slist_free(&tmp);
+  return result;
 }

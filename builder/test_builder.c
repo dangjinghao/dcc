@@ -537,6 +537,6 @@ void tbc_union_struct_ptr_in_union() {
 }
 
 void tbc_load_extern_sub_scope() {
-  tbc_entry("int F(){extern int v;static int v2;{extern int v,v2; v = 1;}return v "
+  tbc_entry("extern int v;static int v2;int F(){{extern int v,v2; v = 1;}return v "
             "+ v2;} ");
 }
