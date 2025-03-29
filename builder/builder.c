@@ -93,9 +93,23 @@ typed_value builder_relocate_declaration(builder b, astn n) {
     astn exist = parser_symtab_find(b->symtab, parse_declaration_get_ident(n));
     if (exist) {
       n = exist;
-      log_debug("relocate extern declaration %s", parse_declaration_get_ident(n));
+      log_debug("relocate extern declaration %s",
+                parse_declaration_get_ident(n));
     }
   }
 
   return build_declaration(b, n);
+}
+
+void builder_set_llvm_align(builder b, LLVMValueRef p, LLVMTypeRef type) {
+  auto _t = LLVMGetTypeKind(type);
+  if (_t == LLVMArrayTypeKind) {
+    if (LLVMABISizeOfType(b->data_layout, type) >= 16) {
+      // if v is an array and current platform is x86_64, we should set the align to 16 if the array size >= 16 B
+      assert(strstr(LLVMGetTarget(b->module), "x86_64") != NULL);
+      log_trace("there is a variable with array type occurs more than 16 "
+                "bytes, align to 16");
+      LLVMSetAlignment(p, 16);
+    }
+  }
 }

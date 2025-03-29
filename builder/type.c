@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
+#include "parser.h"
 #include "slist/slist.h"
 #include "token.h"
 #include <llvm-c/Core.h>
@@ -247,9 +248,8 @@ slist build_type_get_points_to_type_chian(builder b, slist type_chain) {
   return points_to_type_chain;
 }
 
-slist build_type_function_return_type_chain(builder b, astn n) {
-  assert(n->type == ast_declaration);
-  slist return_type_chain = build_type_chain_copy(&n->declaration.type_chain);
+slist build_type_get_function_return_type_chain(builder b, slist type_chain) {
+  slist return_type_chain = build_type_chain_copy(type_chain);
   astn params = slist_pop_head(return_type_chain);
   assert(params->type == ast_parameters);
   return return_type_chain;
@@ -310,6 +310,28 @@ LLVMTypeRef build_type_declaration_function_convert_to_llvm(builder b, astn n) {
   return func;
 }
 
+LLVMTypeRef build_type_base_type_convert_to_llvm_array(builder b, astn n) {
+  assert(n->type == ast_ctype);
+  assert(n->ctype.type == '[');
+  astn arr_type_chain = n->ctype.user_defined_type;
+  assert(arr_type_chain->type == ast_parameters);
+  astn item_type = slist_peek_head(&arr_type_chain->parameters.list);
+  assert(item_type->type == ast_ctype);
+  assert(item_type->ctype.type != '[');
+  assert(item_type->ctype.type != TOK_KW_VOID);
+  LLVMTypeRef _type = build_type_base_type_convert_to_llvm(b, item_type);
+  slist_foreach(&arr_type_chain->parameters.list, item_type) {
+    if (item_type->type != ast_expr_unary) {
+      continue;
+    }
+    assert(item_type->type == ast_expr_unary);
+    assert(item_type->unary.op == '[');
+    long v = parser_expr_eval_const_int(item_type->unary.expr);
+    _type = LLVMArrayType2(_type, v);
+  }
+  return _type;
+}
+
 LLVMTypeRef build_type_base_type_convert_to_llvm(builder b, astn n) {
   assert(n->type == ast_ctype);
   int t = n->ctype.type;
@@ -339,6 +361,8 @@ LLVMTypeRef build_type_base_type_convert_to_llvm(builder b, astn n) {
   case TOK_KW_UNION:
   case TOK_KW_STRUCT:
     return build_declaration_struct_or_union(b, n);
+  case '[':
+    return build_type_base_type_convert_to_llvm_array(b, n);
   default:
     break;
   }
@@ -348,7 +372,27 @@ LLVMTypeRef build_type_base_type_convert_to_llvm(builder b, astn n) {
 }
 
 astn build_type_chain_get_base_type(slist type_chain) {
-  return slist_peek_head(type_chain);
+  astn first_node = slist_peek_head(type_chain);
+  if (first_node->type == ast_expr_unary) {
+    // special case: array type
+    astn arr_type = ast_new(ast_ctype);
+    arr_type->ctype.type = '[';
+    // create array type chain
+    astn arr_type_chain = ast_new(ast_parameters);
+    arr_type->ctype.user_defined_type = arr_type_chain;
+    astn d = NULL;
+    slist_foreach(type_chain, d) {
+      if (d->type != ast_expr_unary) {
+        break;
+      }
+      slist_add_head(&arr_type_chain->parameters.list, d);
+    }
+    assert(d);
+    slist_add_head(&arr_type_chain->parameters.list, d);
+
+    first_node = arr_type;
+  }
+  return first_node;
 }
 
 astn build_type_chain_get_function_return_base_type(slist type_chain) {

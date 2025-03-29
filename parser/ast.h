@@ -95,9 +95,8 @@ typedef struct astn {
       enum tok_type storage_class;
       /* the logical type chain of the declaration,
        * it contains those node type:
-       * ast_expr_unary is used for array declaration [<expr>],
        * ast_parameters is used for function parameters(<parameter-type-list>),
-       * ast_ctype
+       * ast_ctype: special case for array declaration: ctype.type = '[' and ctype.user_defined_type = ast_parameters
        */
       struct slist type_chain;
       typed_value V;

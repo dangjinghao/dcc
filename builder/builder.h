@@ -34,6 +34,7 @@ void builder_label_list_free(builder b);
 void builder_label_list_check_undefined(builder b);
 goto_label builder_label_new(builder b, sds name);
 typed_value builder_relocate_declaration(builder b, astn n);
+void builder_set_llvm_align(builder b, LLVMValueRef p, LLVMTypeRef type);
 
 slist build_type_chain_by_lit(enum tok_type type);
 slist build_type_chain_expr_primary(astn n);
@@ -78,7 +79,7 @@ astn build_type_chain_get_function_return_base_type(slist type_chain);
 LLVMTypeRef build_declaration_variable_type(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);
 slist build_type_get_points_to_type_chian(builder b, slist type_chain);
-slist build_type_function_return_type_chain(builder b, astn n);
+slist build_type_get_function_return_type_chain(builder b, slist type_chain);
 slist build_type_chain_add_pointer(builder b, slist type_chain);
 int build_type_struct_type_get_member(astn struct_type, sds name, astn *result);
 LLVMTypeRef build_declaration_struct_or_union(builder b, astn n);

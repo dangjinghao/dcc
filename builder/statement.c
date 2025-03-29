@@ -18,7 +18,8 @@ void build_statement_jump_return(builder b, astn n) {
   assert(func->type == ast_declaration);
   LLVMBasicBlockRef after_return =
       LLVMAppendBasicBlockInContext(b->context, b->fn, "after_return");
-  slist func_type_chain = build_type_function_return_type_chain(b, func);
+  slist func_type_chain =
+      build_type_get_function_return_type_chain(b, &func->declaration.type_chain);
   astn func_return_type = build_type_chain_get_base_type(func_type_chain);
   if ((!n->jump_statement.expr) &&
       func_return_type->ctype.type != TOK_KW_VOID) {

@@ -181,6 +181,7 @@ LLVMValueRef build_variable_alloca(builder b, astn n) {
     LLVMPositionBuilderAtEnd(b->builder, entry_block);
   }
   auto pv = LLVMBuildAlloca(b->builder, value_type, sym_name);
+  builder_set_llvm_align(b, pv, value_type);
   sdsfree(sym_name);
   LLVMPositionBuilderAtEnd(b->builder, current_block);
 

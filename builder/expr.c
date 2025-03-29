@@ -510,8 +510,8 @@ typed_value build_expr_unary_pos(builder b, astn n) {
   // create a temporary int type and its corresponsed type chain
   slist tmp_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
 
-  int cmp = build_type_compare_promote_level(expr_base_type,
-    build_type_chain_get_base_type(tmp_type_chain));
+  int cmp = build_type_compare_promote_level(
+      expr_base_type, build_type_chain_get_base_type(tmp_type_chain));
   if (cmp == -1) {
     log_trace("+ unary operator type promotion: tiny int -> int");
     typed_value v = build_type_convert_by_type_chain(b, expr, tmp_type_chain);
@@ -654,7 +654,7 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
 typed_value build_expr_unary_func_call(builder b, astn n) {
   // function call
   typed_value func_expr = build_expression(b, n->unary.expr);
-  // we could not use n and it's series API because the expr may be a temporary value
+  // we could not use build_type_get_function_return_type_chain because we should support func ptr call
   slist func_return_type_chain = build_type_chain_copy(&func_expr->type_chain);
   astn func_base_type = slist_pop_head(func_return_type_chain);
   astn func_params = slist_pop_head(func_return_type_chain);
@@ -695,7 +695,8 @@ typed_value build_expr_unary_func_call(builder b, astn n) {
     dynarray_add(&args, &arg_casted->v);
     arg_idx += 1;
   }
-  astn func_return_base_type = build_type_chain_get_base_type(func_return_type_chain);
+  astn func_return_base_type =
+      build_type_chain_get_base_type(func_return_type_chain);
   LLVMValueRef call = LLVMBuildCall2(
       b->builder, func_type, func_expr->v, args.data, args.used,
       func_return_base_type->ctype.type != TOK_KW_VOID ? "call_result" : "");
@@ -710,7 +711,8 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
   assert(member->type == ast_ident);
   slist points_to_struct_type_chain =
       build_type_get_points_to_type_chian(b, &struct_or_union_ptr->type_chain);
-  astn points_to_base_type = build_type_chain_get_base_type(points_to_struct_type_chain);
+  astn points_to_base_type =
+      build_type_chain_get_base_type(points_to_struct_type_chain);
   assert(points_to_base_type->type == ast_ctype);
   if (!g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
     log_panic("Only struct or union type can be used for . operation");
@@ -859,7 +861,8 @@ typed_value build_load_ref_declaration(builder b, astn n) {
   typed_value var = builder_relocate_declaration(b, n);
   slist points_to_type_chain =
       build_type_get_points_to_type_chian(b, &var->type_chain);
-  astn points_to_base_type = build_type_chain_get_base_type(points_to_type_chain);
+  astn points_to_base_type =
+      build_type_chain_get_base_type(points_to_type_chain);
   if (points_to_base_type->type == ast_parameters) {
     // try to load function declaration
     // the function symbol itself is a pointer

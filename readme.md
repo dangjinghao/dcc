@@ -65,6 +65,9 @@ struct s{int a;char b;};
   - [x] function call
   - [x] struct get member
   - [ ] array
+    - [ ] deref
+    - [ ] parameter pass
+    - [ ] multi-dim test
 - [x] basic switch implementation
   - [ ] binary search optimization
 - [ ] QA scaffold
@@ -73,7 +76,7 @@ struct s{int a;char b;};
 - [ ] {} initializer
   - [ ] struct/union/array init
 - [ ] sizeof constant expression
-- [ ] incomplete type (void/struct dlclaration only/array declaration without array size )
+- [ ] incomplete type (void/struct/union/enum dlclaration only/array declaration without array size)
 - [ ] node meta data
 - [ ] union
 - [ ] attribute

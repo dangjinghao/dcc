@@ -537,6 +537,19 @@ void tbc_union_struct_ptr_in_union() {
 }
 
 void tbc_load_extern_sub_scope() {
-  tbc_entry("extern int v;static int v2;int F(){{extern int v,v2; v = 1;}return v "
-            "+ v2;} ");
+  tbc_entry(
+      "extern int v;static int v2;int F(){{extern int v,v2; v = 1;}return v "
+      "+ v2;} ");
+}
+
+void tbc_array() {
+  tbc_entry("int F(){char arr[9][31][65];int arr_2[3];char arr_3[2];int "
+            "arr_4[4];char arr_5[15],arr_6[16];}");
+}
+
+void tbc_struct_arr_align() {
+  tbc_entry("\
+    struct S{ int a;char c;long v; int arr[17];};\
+    void F(){struct S s;char arr[2];}\
+");
 }
