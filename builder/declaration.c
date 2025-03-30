@@ -130,12 +130,13 @@ sds build_symbol_name(astn n) {
     return sdsdup(parse_declaration_get_ident(n));
   } else if (n->declaration.storage_class == TOK_KW_STATIC) {
     return sdscatprintf(sdsempty(), STATIC_VAR_FMT,
-                        parse_declaration_get_ident(n));
+                        parse_declaration_get_ident(n), n->declaration.uid);
   } else if (!g_is_declaration_in_function_scope(n)) {
     return sdsdup(parse_declaration_get_ident(n));
   }
   assert(g_is_declaration_in_function_scope(n));
-  return sdscatprintf(sdsempty(), VAR_FMT, parse_declaration_get_ident(n));
+  return sdscatprintf(sdsempty(), VAR_FMT, parse_declaration_get_ident(n),
+                      n->declaration.uid);
 }
 
 void build_variable_global_init(LLVMValueRef pv, astn n,

@@ -65,9 +65,11 @@ struct s{int a;char b;};
   - [x] function call
   - [x] struct get member
   - [ ] array
-    - [ ] deref
+    - [x] deref
+    - [x] multi-dim test
+    - [x] ptr assign
     - [ ] parameter pass
-    - [ ] multi-dim test
+- [ ] comments
 - [x] basic switch implementation
   - [ ] binary search optimization
 - [ ] QA scaffold

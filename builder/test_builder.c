@@ -543,7 +543,8 @@ void tbc_load_extern_sub_scope() {
 }
 
 void tbc_array() {
-  tbc_entry("int F(){char arr[9][31][65];int arr_2[3];char arr_3[2];int "
+  tbc_entry("int array[15];int F(){char arr[9][31][65];int arr_2[3];char "
+            "arr_3[2];int "
             "arr_4[4];char arr_5[15],arr_6[16];}");
 }
 
@@ -552,4 +553,23 @@ void tbc_struct_arr_align() {
     struct S{ int a;char c;long v; int arr[17];};\
     void F(){struct S s;char arr[2];}\
 ");
+}
+
+void tbc_array_item_assign() {
+  tbc_entry("extern int array[10];int main(){array[1] = 1;}\
+    ");
+}
+
+void tbc_multi_array_idx() {
+  tbc_entry("extern int array[10][5];int F(int i,int j){int k = "
+            "array[i][j]; return k;}");
+}
+
+void tbc_multi_array_assign_to_ptr() {
+  tbc_entry("extern int array[10][5];int F(int i,int j){int *p = "
+            "array[i]; p[j] = 1;}");
+}
+
+void tbc_multi_array_deref() {
+  tbc_entry("extern int array[10][5];int F(int i,int j){ return **array = i+j;}");
 }
