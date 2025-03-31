@@ -70,8 +70,11 @@ struct s{int a;char b;};
     - [x] ptr assign
     - [x] parameter pass
 - [x] basic switch implementation
-  - [ ] binary search optimization
-- [ ] comment functions and remove uesless functions
+  - [x] binary search optimization
+- [ ] refactor
+  - [ ] using hierarchical design
+  - [ ] comment functions
+  - [ ] remove uesless functions
 - [ ] QA scaffold
 - [ ] string reference table in builder
 - [x] reorganize builder API again

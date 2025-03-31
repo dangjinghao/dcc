@@ -331,6 +331,51 @@ void tbc_switch_return() {
             "-2;case 3:case 4:  return -5; default: return a;}}");
 }
 
+void tbc_switch_return_bsearch() {
+  tbc_entry("\
+    int F(int v){\
+    switch(v){\
+      case 4: return 4;\
+      case 6: return 6;\
+      case 8: return 8;\
+      case 2: return 2;\
+      case 1: return 1;\
+    }\
+    return v;\
+    }");
+}
+
+void tbc_switch_return_bsearch_default() {
+  tbc_entry("\
+    int F(int v){\
+    switch(v){\
+      case 4: return 4;\
+      case 6: return 6;\
+      case 8: return 8;\
+      case 2: return 2;\
+      case 1: return 1;\
+      default: break;\
+    }\
+    return v;\
+    }");
+}
+
+void tbc_switch_return_bsearch_1() {
+  tbc_entry("\
+    int F(int v){\
+    switch(v){\
+    case 4: return 4;\
+  }}");
+}
+
+void tbc_switch_return_bsearch_0() {
+  tbc_entry("\
+    int F(int v){\
+    switch(v){\
+      return 4;\
+  }}");
+}
+
 void tbc_switch_dup() {
   tbc_entry("int F(int a){switch(a){case 1: return -1;case 1: return 2;}}");
 }

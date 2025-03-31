@@ -329,6 +329,57 @@ void build_statement_if(builder b, astn n) {
   LLVMPositionBuilderAtEnd(b->builder, after_block);
 }
 
+static void build_statement_switch_algo_bsearch_traverse(
+    builder b, dynarray cases, long low, long high, typed_value cond_val,
+    LLVMBasicBlockRef _end) {
+  if (low > high) {
+    LLVMBuildBr(b->builder, _end);
+    return;
+  }
+  astn cond_val_base_type =
+      build_type_chain_get_base_type(&cond_val->type_chain);
+  long mid = low + (high - low) / 2;
+  astn *mid_case_ref = dynarray_get(cases, mid);
+  long midv = (*mid_case_ref)->labeled_statement.label_value->primary.v._int;
+  sds inst_name = sdscatprintf(sdsempty(), "case_eq_%ld", midv);
+  LLVMValueRef case_eq = LLVMBuildICmp(
+      b->builder, LLVMIntEQ, cond_val->v,
+      LLVMConstInt(build_type_base_type_convert_to_llvm(b, cond_val_base_type),
+                   midv, 1),
+      inst_name);
+  sdsclear(inst_name);
+  inst_name = sdscatprintf(inst_name, "case_eq_%ld_after", midv);
+  LLVMBasicBlockRef case_eq_after =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, inst_name);
+  LLVMBuildCondBr(b->builder, case_eq,
+                  (*mid_case_ref)->labeled_statement.start_block,
+                  case_eq_after);
+  LLVMPositionBuilderAtEnd(b->builder, case_eq_after);
+  sdsclear(inst_name);
+  inst_name = sdscatprintf(inst_name, "case_lt_%ld", midv);
+  LLVMValueRef case_lt = LLVMBuildICmp(
+      b->builder, LLVMIntSLT, cond_val->v,
+      LLVMConstInt(build_type_base_type_convert_to_llvm(b, cond_val_base_type),
+                   midv, 1),
+      inst_name);
+  sdsclear(inst_name);
+  inst_name = sdscatprintf(inst_name, "case_lt_%ld_after", midv);
+  LLVMBasicBlockRef case_lt_after =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, inst_name);
+  sdsclear(inst_name);
+  inst_name = sdscatprintf(inst_name, "case_gt_%ld_after", midv);
+  LLVMBasicBlockRef case_gt_after =
+      LLVMAppendBasicBlockInContext(b->context, b->fn, inst_name);
+  LLVMBuildCondBr(b->builder, case_lt, case_lt_after, case_gt_after);
+  LLVMPositionBuilderAtEnd(b->builder, case_lt_after);
+  build_statement_switch_algo_bsearch_traverse(b, cases, low, mid - 1, cond_val,
+                                               _end);
+  LLVMPositionBuilderAtEnd(b->builder, case_gt_after);
+  build_statement_switch_algo_bsearch_traverse(b, cases, mid + 1, high,
+                                               cond_val, _end);
+  sdsfree(inst_name);
+}
+
 static int build_statement_switch_case_ref_cmp(const void *a, const void *b) {
   astn *case_ref_a = (astn *)a;
   astn *case_ref_b = (astn *)b;
@@ -341,15 +392,30 @@ static int build_statement_switch_case_ref_cmp(const void *a, const void *b) {
   return case_v_a - case_v_b;
 }
 
-void build_statement_switch_allocate_algo(builder b, astn n,
-                                          LLVMBasicBlockRef switch_after) {
+static void
+build_statement_switch_algo_bsearch(builder b, astn n,
+                                    LLVMBasicBlockRef switch_after) {
+  typed_value cond_val = build_expression(b, n->_switch.cond);
+  qsort(n->_switch.case_refs.data, n->_switch.case_refs.used,
+        n->_switch.case_refs.item_size, build_statement_switch_case_ref_cmp);
+  // get end or default
+  astn _default = n->_switch.default_ref;
+  LLVMBasicBlockRef _end =
+      _default ? _default->labeled_statement.start_block : switch_after;
+  build_statement_switch_algo_bsearch_traverse(b, &n->_switch.case_refs, 0,
+                                               n->_switch.case_refs.used - 1,
+                                               cond_val, _end);
+}
+
+static void
+build_statement_switch_algo_ordered(builder b, astn n,
+                                    LLVMBasicBlockRef switch_after) {
   typed_value cond_val = build_expression(b, n->_switch.cond);
   astn cond_val_base_type =
       build_type_chain_get_base_type(&cond_val->type_chain);
-  astn *case_ref;
-  // sort case_refs, prepare for binary search
   qsort(n->_switch.case_refs.data, n->_switch.case_refs.used,
         n->_switch.case_refs.item_size, build_statement_switch_case_ref_cmp);
+  astn *case_ref;
   dynarray_foreach(&n->_switch.case_refs, case_ref) {
     assert((*case_ref)->labeled_statement.label_value->type ==
            ast_expr_primary);
@@ -389,8 +455,11 @@ void build_statement_switch(builder b, astn n) {
   build_statement(b, n->_switch.body);
   LLVMBuildBr(b->builder, switch_after);
   LLVMPositionBuilderAtEnd(b->builder, switch_cond);
-  // implement cond test and br in there
-  build_statement_switch_allocate_algo(b, n, switch_after);
+#ifdef USE_SWITCH_ALGO_BSEARCH
+  build_statement_switch_algo_bsearch(b, n, switch_after);
+#else
+  build_statement_switch_algo_ordered(b, n, switch_after);
+#endif
   LLVMPositionBuilderAtEnd(b->builder, switch_after);
 }
 void build_statement(builder b, astn n) {

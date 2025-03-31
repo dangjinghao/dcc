@@ -6,12 +6,19 @@ OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
 INCS := libs lexer parser 
 
-CFLAGS := -ggdb -Og -MMD -std=gnu2x -Wall -Wextra  $(addprefix -I,$(INCS)) $(shell llvm-config --cflags)
+FEATURES := USE_SWITCH_ALGO_BSEARCH
+
+CFLAGS := -ggdb -Og -MMD -std=gnu2x -Wall -Wextra \
+		$(addprefix -I,$(INCS)) \
+		$(shell llvm-config --cflags) \
+		$(addprefix -D,$(FEATURES)) \
+
 CFLAGS += -Wno-stringop-truncation \
 		  -Wno-format-truncation \
 		  -Wno-unused-parameter \
 		  -Wno-unused-function
 LDFLAGS := $(shell llvm-config --libs --ldflags)
+
 
 ARGS :=
 
