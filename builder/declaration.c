@@ -112,7 +112,7 @@ LLVMTypeRef build_declaration_variable_type(builder b, astn n) {
   assert(n->type == ast_declaration);
   astn _t = build_type_chain_get_base_type(&n->declaration.type_chain);
   if (_t->type == ast_parameters) {
-    _t = build_type_chain_get_function_return_base_type(
+    _t = build_type_chain_new_get_function_return_base_type(
         &n->declaration.type_chain);
   }
   return build_type_base_type_convert_to_llvm(b, _t);
@@ -194,7 +194,7 @@ LLVMValueRef build_variable_alloca(builder b, astn n) {
               LLVMGetValueName2(pv, &(size_t){}));
     auto v = build_expression(b, init->initializer.init);
     typed_value ptr = typed_value_new(
-        pv, build_type_chain_add_pointer(b, &n->declaration.type_chain));
+        pv, build_type_chain_new_add_pointer(b, &n->declaration.type_chain));
     build_value_store(b, v, ptr);
   }
 
@@ -211,7 +211,25 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
     }
     astn param_base_type = build_type_chain_get_base_type(
         &param_declaration->declaration.type_chain);
-    LLVMTypeRef t = build_type_base_type_convert_to_llvm(b, param_base_type);
+    LLVMTypeRef t;
+    if (param_base_type->type == ast_ctype &&
+        param_base_type->ctype.type == '[') {
+      // multi array type declaration in function parameter
+      // modify the base array type to pointer type
+      // pop the first array type and add pointer type
+      // and change the type chain
+
+      // pop the first array type
+      log_trace("convert array type to pointer type");
+      slist_pop_head(&param_declaration->declaration.type_chain);
+      param_declaration->declaration.type_chain =
+          *build_type_chain_new_add_pointer(
+              b, &param_declaration->declaration.type_chain);
+      param_base_type = build_type_chain_get_base_type(
+          &param_declaration->declaration.type_chain);
+    }
+    t = build_type_base_type_convert_to_llvm(b, param_base_type);
+
     dynarray_add(arr, &t);
   }
   return arr;
@@ -255,6 +273,10 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
           g_is_struct_or_union_token(param_base_type->ctype.type)) {
         log_panic("Pass struct or union parameter by value is not supported "
                   "right now");
+      } else if (param_base_type->type == ast_ctype &&
+                 param_base_type->ctype.type == '[') {
+        log_panic("array type parameter should be converted to pointer when "
+                  "building function prototype");
       }
       // Create an alloca for this parameter
       sds param_name = build_symbol_name(param_decl);
@@ -265,14 +287,14 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
       LLVMValueRef param = LLVMGetParam(v, param_idx);
       slist param_decl_type_chain = &param_decl->declaration.type_chain;
       typed_value ptr = typed_value_new(
-          alloca, build_type_chain_add_pointer(b, param_decl_type_chain));
+          alloca, build_type_chain_new_add_pointer(b, param_decl_type_chain));
       build_value_store(b, typed_value_new(param, param_decl_type_chain), ptr);
 
       // Save the alloca as the parameter's value
       assert(param_decl->declaration.V == NULL);
 
       slist ptr_type_chain =
-          build_type_chain_add_pointer(b, &param_decl->declaration.type_chain);
+          build_type_chain_new_add_pointer(b, param_decl_type_chain);
       param_decl->declaration.V = typed_value_new(alloca, ptr_type_chain);
 
       sdsfree(param_name);
@@ -281,8 +303,9 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
   }
   LLVMPositionBuilderAtEnd(b->builder, entry_block);
   build_statement_block(b, body);
-  astn func_return_base_type = build_type_chain_get_function_return_base_type(
-      &n->declaration.type_chain);
+  astn func_return_base_type =
+      build_type_chain_new_get_function_return_base_type(
+          &n->declaration.type_chain);
   if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(b->builder))) {
     // the last statement is terminator
     log_debug("the last statement is terminator, skip the default return");
@@ -346,7 +369,7 @@ typed_value build_declaration(builder b, astn n) {
     break;
   }
   slist ptr_type_chain =
-      build_type_chain_add_pointer(b, &n->declaration.type_chain);
+      build_type_chain_new_add_pointer(b, &n->declaration.type_chain);
   n->declaration.V = typed_value_new(v, ptr_type_chain);
   // we should build the function body after add it to n.declaration.V
   if (g_is_function_definition(n)) {

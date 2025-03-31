@@ -241,21 +241,25 @@ slist build_type_chain_copy(slist type_chain) {
   return new_type_chain;
 }
 
-slist build_type_get_points_to_type_chian(builder b, slist type_chain) {
+[[nodiscard]] slist
+build_type_chain_new_get_points_to_type_chian(builder b, slist type_chain) {
   slist points_to_type_chain = build_type_chain_copy(type_chain);
   astn ptr = slist_pop_head(points_to_type_chain);
   assert(ptr->ctype.type == '*');
   return points_to_type_chain;
 }
 
-slist build_type_get_function_return_type_chain(builder b, slist type_chain) {
+[[nodiscard]] slist
+build_type_chain_new_get_function_return_type_chain(builder b,
+                                                    slist type_chain) {
   slist return_type_chain = build_type_chain_copy(type_chain);
   astn params = slist_pop_head(return_type_chain);
   assert(params->type == ast_parameters);
   return return_type_chain;
 }
 
-slist build_type_chain_add_pointer(builder b, slist type_chain) {
+[[nodiscard]] slist build_type_chain_new_add_pointer(builder b,
+                                                     slist type_chain) {
   slist new_type_chain = build_type_chain_copy(type_chain);
   astn ptr = ast_new(ast_ctype);
   ptr->ctype.type = '*';
@@ -395,7 +399,8 @@ astn build_type_chain_get_base_type(slist type_chain) {
   return first_node;
 }
 
-astn build_type_chain_get_function_return_base_type(slist type_chain) {
+[[nodiscard]] astn
+build_type_chain_new_get_function_return_base_type(slist type_chain) {
   struct slist tmp;
   slist_copy(&tmp, type_chain);
   astn first = slist_pop_head(&tmp);

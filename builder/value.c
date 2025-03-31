@@ -46,7 +46,7 @@ void build_value_cpy_struct_or_union(builder b, typed_value lhs_ptr,
                                      typed_value rhs_struct) {
   astn rhs_base_type = build_type_chain_get_base_type(&rhs_struct->type_chain);
   slist lhs_points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &lhs_ptr->type_chain);
+      build_type_chain_new_get_points_to_type_chian(b, &lhs_ptr->type_chain);
   astn lhs_base_type = build_type_chain_get_base_type(lhs_points_to_type_chain);
 
   assert(lhs_base_type->type == ast_ctype && rhs_base_type->type == ast_ctype);
@@ -63,7 +63,7 @@ void build_value_cpy_struct_or_union(builder b, typed_value lhs_ptr,
 void build_value_store(builder b, typed_value v, typed_value ptr) {
   // get ptr points to type
   slist points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &ptr->type_chain);
+      build_type_chain_new_get_points_to_type_chian(b, &ptr->type_chain);
   astn points_to_base_type =
       build_type_chain_get_base_type(points_to_type_chain);
   // special case for struct or union
@@ -80,7 +80,7 @@ void build_value_store(builder b, typed_value v, typed_value ptr) {
 
 typed_value build_value_load(builder b, typed_value v) {
   slist points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &v->type_chain);
+      build_type_chain_new_get_points_to_type_chian(b, &v->type_chain);
   astn points_to_base_type =
       build_type_chain_get_base_type(points_to_type_chain);
   LLVMTypeRef points_to_type =
@@ -101,7 +101,7 @@ typed_value build_value_load(builder b, typed_value v) {
     // just like the struct or union type
     slist_pop_head(points_to_type_chain);
     points_to_type_chain =
-        build_type_chain_add_pointer(b, points_to_type_chain);
+        build_type_chain_new_add_pointer(b, points_to_type_chain);
     load = v->v;
   } else {
     load = LLVMBuildLoad2(b->builder, points_to_type, v->v, "load");

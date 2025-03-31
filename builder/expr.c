@@ -47,7 +47,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     LLVMValueRef sub = LLVMBuildSub(b->builder, lhs_int, rhs_int, "ptrsub");
     // sdiv
     slist item_type_chain =
-        build_type_get_points_to_type_chian(b, &lhs->type_chain);
+        build_type_chain_new_get_points_to_type_chian(b, &lhs->type_chain);
     astn item_base_type = build_type_chain_get_base_type(item_type_chain);
     LLVMValueRef size =
         LLVMConstInt(LLVMInt64TypeInContext(b->context),
@@ -72,7 +72,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     }
 
     slist item_type_chain =
-        build_type_get_points_to_type_chian(b, &ptr->type_chain);
+        build_type_chain_new_get_points_to_type_chian(b, &ptr->type_chain);
     LLVMTypeRef item_type = build_type_base_type_convert_to_llvm(
         b, build_type_chain_get_base_type(item_type_chain));
     // cast index to i64 if it is not
@@ -87,7 +87,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     // ptr - int
     // use getelementptr
     slist item_type_chain =
-        build_type_get_points_to_type_chian(b, &lhs->type_chain);
+        build_type_chain_new_get_points_to_type_chian(b, &lhs->type_chain);
     LLVMTypeRef item_type = build_type_base_type_convert_to_llvm(
         b, build_type_chain_get_base_type(item_type_chain));
     typed_value idx = rhs;
@@ -578,7 +578,7 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
   typed_value expr = build_lvalue_expression(b, n);
   // Get the value pointed to
   slist points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &expr->type_chain);
+      build_type_chain_new_get_points_to_type_chian(b, &expr->type_chain);
   LLVMTypeRef points_to_type = build_type_base_type_convert_to_llvm(
       b, build_type_chain_get_base_type(points_to_type_chain));
 
@@ -606,7 +606,8 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
     } else if (base_type->ctype.type == '*') {
       // pointer increment
       slist pointer_type_points_to_type_chain =
-          build_type_get_points_to_type_chian(b, points_to_type_chain);
+          build_type_chain_new_get_points_to_type_chian(b,
+                                                        points_to_type_chain);
       LLVMTypeRef pointer_points_to_base_type =
           build_type_base_type_convert_to_llvm(
               b, build_type_chain_get_base_type(
@@ -626,7 +627,8 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
     } else if (base_type->ctype.type == '*') {
       // pointer decrement
       slist pointer_type_points_to_type_chain =
-          build_type_get_points_to_type_chian(b, points_to_type_chain);
+          build_type_chain_new_get_points_to_type_chian(b,
+                                                        points_to_type_chain);
       LLVMTypeRef pointer_points_to_base_type =
           build_type_base_type_convert_to_llvm(
               b, build_type_chain_get_base_type(
@@ -710,7 +712,8 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
   astn member = n->unary.extdata;
   assert(member->type == ast_ident);
   slist points_to_struct_type_chain =
-      build_type_get_points_to_type_chian(b, &struct_or_union_ptr->type_chain);
+      build_type_chain_new_get_points_to_type_chian(
+          b, &struct_or_union_ptr->type_chain);
   astn points_to_base_type =
       build_type_chain_get_base_type(points_to_struct_type_chain);
   assert(points_to_base_type->type == ast_ctype);
@@ -731,13 +734,13 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
         struct_or_union_ptr->v, member_idx, "struct_gep");
     // add pointer to member type chain
     slist member_ptr_type_chain =
-        build_type_chain_add_pointer(b, member_type_chain);
+        build_type_chain_new_add_pointer(b, member_type_chain);
     // because gep computed the address of the member, we need to load it
     return typed_value_new(gep, member_ptr_type_chain);
   } else {
     // get union member: just return ptr directly and modify the type_chain
     slist member_ptr_type_chain =
-        build_type_chain_add_pointer(b, member_type_chain);
+        build_type_chain_new_add_pointer(b, member_type_chain);
     return typed_value_new(struct_or_union_ptr->v, member_ptr_type_chain);
   }
 }
@@ -860,7 +863,7 @@ typed_value build_load_ref_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   typed_value var = builder_relocate_declaration(b, n);
   slist points_to_type_chain =
-      build_type_get_points_to_type_chian(b, &var->type_chain);
+      build_type_chain_new_get_points_to_type_chian(b, &var->type_chain);
   astn points_to_base_type =
       build_type_chain_get_base_type(points_to_type_chain);
   if (points_to_base_type->type == ast_parameters) {

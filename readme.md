@@ -58,20 +58,20 @@ struct s{int a;char b;};
 - [x] iteration and switch mixture test
 - [x] copy/assign struct to other struct
 - [x] union support
-- [ ] expr
+- [x] expr
   - [x] unary/binop/logic-cmp variable test
   - [x] ternary
   - [x] unary expression array index
   - [x] function call
   - [x] struct get member
-  - [ ] array
+  - [x] array
     - [x] deref
     - [x] multi-dim test
     - [x] ptr assign
-    - [ ] parameter pass
-- [ ] comments
+    - [x] parameter pass
 - [x] basic switch implementation
   - [ ] binary search optimization
+- [ ] comment functions and remove uesless functions
 - [ ] QA scaffold
 - [ ] string reference table in builder
 - [x] reorganize builder API again

@@ -74,13 +74,18 @@ typed_value build_declaration(builder b, astn n);
 LLVMTypeRef build_type_declaration_function_convert_to_llvm(builder b, astn n);
 LLVMTypeRef build_type_base_type_convert_to_llvm(builder b, astn n);
 astn build_type_chain_get_base_type(slist type_chain);
-astn build_type_chain_get_function_return_base_type(slist type_chain);
+[[nodiscard]] astn
+build_type_chain_new_get_function_return_base_type(slist type_chain);
 
 LLVMTypeRef build_declaration_variable_type(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);
-slist build_type_get_points_to_type_chian(builder b, slist type_chain);
-slist build_type_get_function_return_type_chain(builder b, slist type_chain);
-slist build_type_chain_add_pointer(builder b, slist type_chain);
+[[nodiscard]] slist
+build_type_chain_new_get_points_to_type_chian(builder b, slist type_chain);
+[[nodiscard]] slist
+build_type_chain_new_get_function_return_type_chain(builder b,
+                                                    slist type_chain);
+[[nodiscard]] slist build_type_chain_new_add_pointer(builder b,
+                                                     slist type_chain);
 int build_type_struct_type_get_member(astn struct_type, sds name, astn *result);
 LLVMTypeRef build_declaration_struct_or_union(builder b, astn n);
 typed_value *build_type_2_values_type_upper_cast(builder b,

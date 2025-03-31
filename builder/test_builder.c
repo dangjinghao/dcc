@@ -571,5 +571,12 @@ void tbc_multi_array_assign_to_ptr() {
 }
 
 void tbc_multi_array_deref() {
-  tbc_entry("extern int array[10][5];int F(int i,int j){ return **array = i+j;}");
+  tbc_entry(
+      "extern int array[10][5];int F(int i,int j){ return **array = i+j;}");
+}
+
+void tbc_multi_array_param() {
+  tbc_entry("int F(int arr[10][5][3],int (*arr2)[2]){ \
+            int i = arr[1][2][2] + (*arr2)[1]; \
+            {int arr[10][5]; return i;}}");
 }
