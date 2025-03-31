@@ -83,8 +83,6 @@ typed_value build_value_load(builder b, typed_value v) {
       build_type_chain_new_get_points_to_type_chian(b, &v->type_chain);
   astn points_to_base_type =
       build_type_chain_get_base_type(points_to_type_chain);
-  LLVMTypeRef points_to_type =
-      build_type_base_type_convert_to_llvm(b, points_to_base_type);
   LLVMValueRef load;
   if (points_to_base_type->type == ast_ctype &&
       g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
@@ -103,7 +101,16 @@ typed_value build_value_load(builder b, typed_value v) {
     points_to_type_chain =
         build_type_chain_new_add_pointer(b, points_to_type_chain);
     load = v->v;
+  }
+  if (points_to_base_type->type == ast_parameters) {
+
+    log_trace("try to load function declaration, return the function "
+              "pointer directly");
+    load = v->v;
+    points_to_type_chain = &v->type_chain;
   } else {
+    LLVMTypeRef points_to_type =
+        build_type_base_type_convert_to_llvm(b, points_to_base_type);
     load = LLVMBuildLoad2(b->builder, points_to_type, v->v, "load");
   }
   return typed_value_new(load, points_to_type_chain);

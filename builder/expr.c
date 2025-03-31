@@ -862,15 +862,6 @@ typed_value build_expr_primary(builder b, astn n) {
 typed_value build_load_ref_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   typed_value var = builder_relocate_declaration(b, n);
-  slist points_to_type_chain =
-      build_type_chain_new_get_points_to_type_chian(b, &var->type_chain);
-  astn points_to_base_type =
-      build_type_chain_get_base_type(points_to_type_chain);
-  if (points_to_base_type->type == ast_parameters) {
-    // try to load function declaration
-    // the function symbol itself is a pointer
-    return typed_value_new(var->v, &var->type_chain);
-  }
   return build_value_load(b, var);
 }
 

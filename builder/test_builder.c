@@ -187,8 +187,12 @@ void tbc_ref_func() { tbc_entry("void F(int a, void*p){ p = F;}"); }
 
 void tbc_func_call() {
   tbc_entry("int add(int a, short b, double c){ return a + b + c;}"
-            "int F(){int (*call)(int a, short b, double c) = add;char a = 1,b "
-            "= 2; unsigned int c = 3; return call(a,b,c) * add(1,2,3);}");
+            "int F(){int (*call)(int a, short b, double c) = &*******&add;}");
+}
+
+void tbc_func_recurisve() {
+  tbc_entry("int F(int);int FF(){return F(1);}int F(int a){if(a == 0) return "
+            "0; void*p =  FF;return 1;}");
 }
 
 void tbc_func_uncallable() { tbc_entry("int F(){int a = 1; return a();}"); }

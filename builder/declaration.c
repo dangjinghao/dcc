@@ -375,11 +375,13 @@ typed_value build_declaration(builder b, astn n) {
   if (g_is_function_definition(n)) {
     // it may be used in defining a new function in a function scope
     LLVMValueRef prev_function = b->fn;
+    LLVMBasicBlockRef prev_block = LLVMGetInsertBlock(b->builder);
     b->fn = v;
     build_function_body(b, n, v);
     builder_label_list_check_undefined(b);
     builder_label_list_free(b);
     b->fn = prev_function;
+    LLVMPositionBuilderAtEnd(b->builder, prev_block);
   }
   return n->declaration.V;
 }
