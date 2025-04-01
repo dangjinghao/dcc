@@ -101,9 +101,7 @@ typed_value build_value_load(builder b, typed_value v) {
     points_to_type_chain =
         build_type_chain_new_add_pointer(b, points_to_type_chain);
     load = v->v;
-  }
-  if (points_to_base_type->type == ast_parameters) {
-
+  } else if (points_to_base_type->type == ast_parameters) {
     log_trace("try to load function declaration, return the function "
               "pointer directly");
     load = v->v;
