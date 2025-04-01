@@ -3,6 +3,7 @@
 #include "parser.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
+#include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Support.h>
 #include <llvm-c/TargetMachine.h>
@@ -14,6 +15,8 @@ const char *UNION_FMT = "union.%s.%ld";
 const char *VAR_FMT = "%s.%ld";
 const char *GOTO_BLK_FMT = "goto.%s";
 const char *CASE_BLK_FMT = "case.%ld";
+const char *CONST_STR_FMT = "const.str";
+
 builder builder_new(builder b, char *module_name, slist symtab) {
   b->context = LLVMContextCreate();
   b->module = LLVMModuleCreateWithNameInContext(module_name, b->context);
@@ -28,11 +31,12 @@ builder builder_new(builder b, char *module_name, slist symtab) {
   b->fn = NULL;
 
   slist_init(&b->labels);
+  slist_init(&b->strtab);
   return b;
 }
 
 goto_label builder_label_find(builder b, sds name) {
-  struct label *label;
+  struct goto_label *label;
   slist_foreach(&b->labels, label) {
     if (sdscmp(label->name, name) == 0) {
       return label;
@@ -42,7 +46,7 @@ goto_label builder_label_find(builder b, sds name) {
 }
 
 goto_label builder_label_new(builder b, sds name) {
-  goto_label l = calloc(1, sizeof(struct label));
+  goto_label l = calloc(1, sizeof(struct goto_label));
   sds block_name = sdscatfmt(sdsempty(), GOTO_BLK_FMT, name);
   l->name = sdsdup(name);
   l->block = LLVMAppendBasicBlockInContext(b->context, b->fn, block_name);
@@ -53,7 +57,7 @@ goto_label builder_label_new(builder b, sds name) {
 }
 
 void builder_label_list_check_undefined(builder b) {
-  struct label *label;
+  struct goto_label *label;
   slist_foreach(&b->labels, label) {
     if (!label->defined) {
       log_panic("label %s is undefined in function %s", label->name,
@@ -63,7 +67,7 @@ void builder_label_list_check_undefined(builder b) {
 }
 
 void builder_label_list_free(builder b) {
-  struct label *label;
+  struct goto_label *label;
   slist_foreach(&b->labels, label) {
     sdsfree(label->name);
     free(label);

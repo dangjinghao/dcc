@@ -5,7 +5,6 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
-#include "macro/macro.h"
 #include "slist/slist.h"
 #include "token.h"
 #include "typed_value/typed_value.h"
@@ -16,6 +15,23 @@ bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs) {
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
   if (lhs_base_type->ctype.type == '*' || rhs_base_type->ctype.type == '*') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @brief this function seems to be only used in literal string array index right now
+ * 
+ * @param lhs 
+ * @param rhs 
+ * @return true 
+ * @return false 
+ */
+bool build_expr_is_binop_with_array(typed_value lhs, typed_value rhs) {
+  astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
+  astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
+  if (lhs_base_type->ctype.type == '[' || rhs_base_type->ctype.type == '[') {
     return true;
   }
   return false;
@@ -105,6 +121,23 @@ FAIL:
             "<int> + <ptr-type>");
 }
 
+typed_value build_expr_binop_array(builder b, typed_value lhs, int op,
+                                   typed_value rhs) {
+  // just cast array to ptr
+  astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
+  if (lhs_base_type->ctype.type == '[') {
+    slist_pop_head(&lhs->type_chain);
+    slist type_chain = build_type_chain_new_add_pointer(b, &lhs->type_chain);
+    lhs = typed_value_new(lhs->v, type_chain);
+  } else {
+    slist_pop_head(&rhs->type_chain);
+    slist type_chain = build_type_chain_new_add_pointer(b, &rhs->type_chain);
+    rhs = typed_value_new(rhs->v, type_chain);
+  }
+  // just use the same logic as ptr
+  return build_expr_binop_ptr(b, lhs, op, rhs);
+}
+
 /**
  * @brief 
  * 
@@ -122,6 +155,10 @@ typed_value build_expr_binop_template(builder b, astn binop,
   if (build_expr_is_binop_with_ptr(lhs, rhs)) {
     log_trace("ptr operation detected in binop expression");
     return build_expr_binop_ptr(b, lhs, binop->binop.op, rhs);
+  } else if (build_expr_is_binop_with_array(lhs, rhs)) {
+    // looks like this branch is only used in literal string array index
+    log_trace("array operation detected in binop expression");
+    return build_expr_binop_array(b, lhs, binop->binop.op, rhs);
   }
   return build_value_expr_binop_template(b, lhs, rhs, llvm_build_f, f_names);
 }
@@ -818,6 +855,34 @@ typed_value build_expr_unary(builder b, astn n) {
   log_panic("Unsupported unary operation:%s", convert_repr_token(n->unary.op));
 }
 
+typed_value build_expr_literal_string(builder b, sds str) {
+  typedef struct strtab_item {
+    sds content;
+    typed_value v;
+  } *strtab_item;
+
+  strtab_item d;
+  slist_foreach(&b->strtab, d) {
+    if (!sdscmp(d->content, str)) {
+      log_trace("found string in strtab, reuse: %s", str);
+      return d->v;
+    }
+  }
+  LLVMValueRef v_str =
+      LLVMConstStringInContext(b->context, str, sdslen(str), false);
+  LLVMValueRef v = LLVMAddGlobal(b->module, LLVMTypeOf(v_str), CONST_STR_FMT);
+  LLVMSetLinkage(v, LLVMInternalLinkage);
+  LLVMSetInitializer(v, v_str);
+  slist type_chian = build_type_chain_string(sdslen(str));
+  typed_value tv = typed_value_new(v, type_chian);
+  strtab_item i = calloc(1, sizeof(struct strtab_item));
+  i->v = tv;
+  i->content = str;
+  log_trace("add string to strtab: %s", str);
+  slist_add_head(&b->strtab, i);
+  return tv;
+}
+
 typed_value build_expr_primary(builder b, astn n) {
   switch (n->primary.type) {
   case TOK_LIT_INT: {
@@ -853,7 +918,7 @@ typed_value build_expr_primary(builder b, astn n) {
                                         n->primary.v._char, true),
                            build_type_chain_expr_primary(n));
   case TOK_LIT_STRING:
-    BUILDING();
+    return build_expr_literal_string(b, n->primary.v._str);
   default:
     log_panic("Unexpected literal token");
   }

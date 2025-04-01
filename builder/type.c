@@ -4,7 +4,6 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
-#include "macro/macro.h"
 #include "parser.h"
 #include "slist/slist.h"
 #include "token.h"
@@ -152,15 +151,35 @@ slist build_type_chain_by_lit(enum tok_type type) {
   case TOK_LIT_CHAR:
     base_type->ctype.type = TOK_KW_CHAR;
     break;
-  case TOK_LIT_STRING:
-    BUILDING();
-    break;
   default:
     log_panic("Unexpected literal token");
     break;
   }
   slist_add_tail(type_chain, base_type);
   return type_chain;
+}
+
+slist build_type_chain_string(long len) {
+  slist char_type_chain = build_type_chain_by_lit(TOK_LIT_CHAR);
+  astn array_type = ast_new(ast_expr_unary);
+  array_type->unary.op = '[';
+  astn len_node = ast_new(ast_expr_primary);
+  len_node->primary.type = TOK_LIT_LONG;
+  len_node->primary.v._int = len;
+  array_type->unary.expr = len_node;
+  slist_add_head(char_type_chain, array_type);
+  return char_type_chain;
+}
+
+long build_type_chain_string_extract_len(slist type_chain) {
+  astn array_type = slist_peek_head(type_chain);
+  astn char_type = slist_peek_tail(type_chain);
+  assert(char_type->type == ast_ctype);
+  assert(char_type->ctype.type == TOK_KW_CHAR);
+  assert(array_type->type == ast_expr_unary);
+  assert(array_type->unary.op == '[');
+  astn len_node = array_type->unary.expr;
+  return parser_expr_eval_const_int(len_node);
 }
 
 slist build_type_chain_expr_primary(astn n) {

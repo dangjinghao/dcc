@@ -16,9 +16,10 @@ typedef struct builder {
   LLVMValueRef fn;
   // goto label
   struct slist labels;
+  struct slist strtab;
 } *builder;
 
-typedef struct label {
+typedef struct goto_label {
   bool defined;
   sds name;
   LLVMBasicBlockRef block;
@@ -37,6 +38,8 @@ typed_value builder_relocate_declaration(builder b, astn n);
 void builder_set_llvm_align(builder b, LLVMValueRef p, LLVMTypeRef type);
 
 slist build_type_chain_by_lit(enum tok_type type);
+slist build_type_chain_string(long len);
+long build_type_chain_string_extract_len(slist type_chain);
 slist build_type_chain_expr_primary(astn n);
 typed_value build_type_convert_by_type_chain(builder b, typed_value v,
                                              slist type_chain);
@@ -104,4 +107,5 @@ extern const char *UNION_FMT;
 extern const char *VAR_FMT;
 extern const char *GOTO_BLK_FMT;
 extern const char *CASE_BLK_FMT;
+extern const char *CONST_STR_FMT;
 #endif

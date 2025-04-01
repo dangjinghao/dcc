@@ -71,12 +71,15 @@ struct s{int a;char b;};
     - [x] parameter pass
 - [x] basic switch implementation
   - [x] binary search optimization
+- [x] string reference table in builder
+  - [x] assignment string to char ptr
+  - [ ] assignment string to char array
+    - [ ] length inference
 - [ ] refactor
   - [ ] using hierarchical design
   - [ ] comment functions
   - [ ] remove uesless functions
 - [ ] QA scaffold
-- [ ] string reference table in builder
 - [x] reorganize builder API again
 - [ ] {} initializer
   - [ ] struct/union/array init

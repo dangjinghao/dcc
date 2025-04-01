@@ -629,3 +629,16 @@ void tbc_multi_array_param() {
             int i = arr[1][2][2] + (*arr2)[1]; \
             {int arr[10][5]; return i;}}");
 }
+
+void tbc_lit_string_idx() { tbc_entry("int F(){return \"hello world\"[0];}"); }
+
+void tbc_string() {
+  tbc_entry("\
+    int F(){\
+      char* str = \"hello world\";\
+      char* str2 = \"hello world\";\
+      int off = \"hello\"[0] - 1[\"world\"];\
+      int off2 = str[2] - 3[str2];\
+      return off + off2;\
+    }");
+}
