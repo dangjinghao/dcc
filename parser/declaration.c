@@ -30,11 +30,6 @@ astn parse_translation_unit(parser parser) {
   return n;
 }
 
-static inline void parse_type_qualifier_set(struct ctype *tn,
-                                            enum type_qualifier qualifier) {
-  tn->qualifier |= qualifier;
-}
-
 astn parse_struct_declarator(parser parser, astn decl_specs) {
   assert(g_is_struct_declarator_firstset(parser));
   astn n = ast_new(ast_declaration);
@@ -194,8 +189,7 @@ astn parse_declaration_specifiers(parser parser) {
   struct ctype *tn = &n->ctype;
   while (g_is_declaration_specifier_firstset(parser)) {
     if (g_is_type_qualifier_firstset(parser)) {
-      parse_type_qualifier_set(
-          tn, convert_cast_token_to_qualifier(parser->current_token));
+      tn->qualifier |= convert_cast_token_to_qualifier(parser->current_token);
       parser_consume(parser);
     } else if (g_is_storage_class_specifier_firstset(parser)) {
       if (tn->storage != TOK_UNKNOWN) {
@@ -294,8 +288,8 @@ slist parse_pointers(parser parser, slist pointers) {
     astn p = ast_new(ast_ctype);
     p->ctype.type = '*';
     while (g_is_type_qualifier_firstset(parser)) {
-      parse_type_qualifier_set(
-          &p->ctype, convert_cast_token_to_qualifier(parser->current_token));
+      p->ctype.qualifier |=
+          convert_cast_token_to_qualifier(parser->current_token);
       parser_consume(parser);
     }
     slist_add_head(pointers, p);

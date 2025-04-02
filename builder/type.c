@@ -165,13 +165,13 @@ slist build_type_chain_string(long len) {
   array_type->unary.op = '[';
   astn len_node = ast_new(ast_expr_primary);
   len_node->primary.type = TOK_LIT_LONG;
-  len_node->primary.v._int = len;
+  len_node->primary.v._int = len + 1; // +1 for '\0'
   array_type->unary.expr = len_node;
   slist_add_head(char_type_chain, array_type);
   return char_type_chain;
 }
 
-long build_type_chain_string_extract_len(slist type_chain) {
+long build_type_chain_string_get_len(slist type_chain) {
   astn array_type = slist_peek_head(type_chain);
   astn char_type = slist_peek_tail(type_chain);
   assert(char_type->type == ast_ctype);
@@ -427,4 +427,15 @@ build_type_chain_new_get_function_return_base_type(slist type_chain) {
   astn result = build_type_chain_get_base_type(&tmp);
   slist_free(&tmp);
   return result;
+}
+
+bool build_type_chain_is_str(slist type_chain) {
+  astn first = slist_peek_head(type_chain);
+  if (first->type == ast_expr_unary && first->unary.op == '[') {
+    astn last = slist_peek_tail(type_chain);
+    if (last->type == ast_ctype && last->ctype.type == TOK_KW_CHAR) {
+      return true;
+    }
+  }
+  return false;
 }

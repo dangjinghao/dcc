@@ -167,6 +167,31 @@ LLVMValueRef build_variable_global(builder b, astn n) {
   return pv;
 }
 
+void build_variable_alloca_init(builder b, LLVMValueRef pv, astn n) {
+  astn init = n->declaration.extdata;
+  assert(init->type == ast_initializer);
+  log_trace("alloca variable %s has initializer",
+            LLVMGetValueName2(pv, &(size_t){}));
+  typed_value v;
+  if (init->initializer.init->type == ast_initializer_list) {
+    log_panic("initializer is a list");
+  } else {
+    v = build_expression(b, init->initializer.init);
+  }
+  if (build_type_chain_is_str(&v->type_chain)) {
+    // initializer is a string, call memcpy
+    log_debug("initializer is a string, use memcpy");
+    LLVMValueRef str_len =
+        LLVMConstInt(LLVMInt64TypeInContext(b->context),
+                     build_type_chain_string_get_len(&v->type_chain), false);
+    LLVMBuildMemCpy(b->builder, pv, 1, v->v, 1, str_len);
+  } else {
+    typed_value ptr = typed_value_new(
+        pv, build_type_chain_new_add_pointer(b, &n->declaration.type_chain));
+    build_value_store(b, v, ptr);
+  }
+}
+
 LLVMValueRef build_variable_alloca(builder b, astn n) {
   assert(n->type == ast_declaration);
   sds sym_name = build_symbol_name(n);
@@ -188,14 +213,7 @@ LLVMValueRef build_variable_alloca(builder b, astn n) {
 
   // initialize the alloca variable
   if (n->declaration.extdata) {
-    astn init = n->declaration.extdata;
-    assert(init->type == ast_initializer);
-    log_trace("alloca variable %s has initializer",
-              LLVMGetValueName2(pv, &(size_t){}));
-    auto v = build_expression(b, init->initializer.init);
-    typed_value ptr = typed_value_new(
-        pv, build_type_chain_new_add_pointer(b, &n->declaration.type_chain));
-    build_value_store(b, v, ptr);
+    build_variable_alloca_init(b, pv, n);
   }
 
   return pv;

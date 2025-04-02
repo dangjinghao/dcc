@@ -72,8 +72,8 @@ struct s{int a;char b;};
 - [x] basic switch implementation
   - [x] binary search optimization
 - [x] string reference table in builder
-  - [x] assignment string to char ptr
-  - [ ] assignment string to char array
+  - [x] assign string to char ptr
+  - [x] char array initialize with string
     - [ ] length inference
 - [ ] refactor
   - [ ] using hierarchical design
@@ -110,3 +110,8 @@ $(SHORT_NAME)_$(same as above)
 ### Short Name Table
 
 `parser/grammar.h` ： `g`
+
+## BUGS
+
+- assign array to array would not leads to panic
+  - fix by using type checker

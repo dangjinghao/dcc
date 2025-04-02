@@ -642,3 +642,18 @@ void tbc_string() {
       return off + off2;\
     }");
 }
+void tbc_init_with_string() {
+  tbc_entry("\
+    int F(){\
+      char str[16] = \"hello world\";\
+      char str2[16] = \"hello world\";\
+    }");
+}
+
+void tbc_assign_with_string() {
+  tbc_entry("\
+    int F(){\
+      char str[16];\
+      str = \"hello world\";\
+    }");
+}

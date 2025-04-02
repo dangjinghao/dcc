@@ -39,7 +39,7 @@ void builder_set_llvm_align(builder b, LLVMValueRef p, LLVMTypeRef type);
 
 slist build_type_chain_by_lit(enum tok_type type);
 slist build_type_chain_string(long len);
-long build_type_chain_string_extract_len(slist type_chain);
+long build_type_chain_string_get_len(slist type_chain);
 slist build_type_chain_expr_primary(astn n);
 typed_value build_type_convert_by_type_chain(builder b, typed_value v,
                                              slist type_chain);
@@ -79,6 +79,7 @@ LLVMTypeRef build_type_base_type_convert_to_llvm(builder b, astn n);
 astn build_type_chain_get_base_type(slist type_chain);
 [[nodiscard]] astn
 build_type_chain_new_get_function_return_base_type(slist type_chain);
+bool build_type_chain_is_str(slist type_chain);
 
 LLVMTypeRef build_declaration_variable_type(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);
