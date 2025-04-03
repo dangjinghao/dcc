@@ -81,7 +81,8 @@ astn build_type_chain_get_base_type(slist type_chain);
 build_type_chain_new_get_function_return_base_type(slist type_chain);
 bool build_type_chain_is_str(slist type_chain);
 bool build_type_base_type_is_indexable(astn base_type);
-slist build_type_chain_indexable_implict_cast_inplace(builder b, slist type_chain);
+[[nodiscard]] slist
+build_type_chain_inplace_cast_indexable_implict(builder b, slist type_chain);
 
 LLVMTypeRef build_declaration_variable_type(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);

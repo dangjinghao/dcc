@@ -236,6 +236,11 @@ typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values) {
   slist lhs_type_chain = &values[0]->type_chain;
   slist rhs_type_chain = &values[1]->type_chain;
+  lhs_type_chain =
+      build_type_chain_inplace_cast_indexable_implict(b, lhs_type_chain);
+  rhs_type_chain =
+      build_type_chain_inplace_cast_indexable_implict(b, rhs_type_chain);
+
   astn lhs_ty = build_type_chain_get_base_type(lhs_type_chain);
   astn rhs_ty = build_type_chain_get_base_type(rhs_type_chain);
 
@@ -265,7 +270,8 @@ slist build_type_chain_copy(slist type_chain) {
 build_type_chain_new_get_points_to_type_chian(builder b, slist type_chain) {
   slist points_to_type_chain = build_type_chain_copy(type_chain);
   astn ptr = slist_pop_head(points_to_type_chain);
-  assert(build_type_base_type_is_indexable(ptr));
+  assert((ptr->type == ast_ctype && ptr->ctype.type == '*') ||
+         (ptr->type == ast_expr_unary && ptr->unary.op == '['));
   return points_to_type_chain;
 }
 
@@ -455,8 +461,8 @@ bool build_type_base_type_is_indexable(astn base_type) {
   return false;
 }
 
-slist build_type_chain_indexable_implict_cast_inplace(builder b,
-                                                      slist type_chain) {
+[[nodiscard]] slist
+build_type_chain_inplace_cast_indexable_implict(builder b, slist type_chain) {
   astn base_type = build_type_chain_get_base_type(type_chain);
   assert(base_type->type == ast_ctype);
   if (base_type->ctype.type == '[') {

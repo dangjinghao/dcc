@@ -18,7 +18,7 @@ LLVMValueRef build_value_cmp0(builder b, typed_value v, LLVMIntPredicate iPred,
         LLVMConstInt(build_type_base_type_convert_to_llvm(b, base_type), 0,
                      false),
         label);
-  } else if (build_type_base_type_is_indexable(base_type)) {
+  } else if (base_type->ctype.type == '*') {
     return LLVMBuildICmp(
         b->builder, iPred, v->v,
         LLVMConstPointerNull(
@@ -97,9 +97,8 @@ typed_value build_value_load(builder b, typed_value v) {
     // pop the first array type and add pointer type
     // and return the pointer directly,
     // just like the struct or union type
-    slist_pop_head(points_to_type_chain);
-    points_to_type_chain =
-        build_type_chain_new_add_pointer(b, points_to_type_chain);
+    points_to_type_chain = build_type_chain_inplace_cast_indexable_implict(
+        b, points_to_type_chain);
     load = v->v;
   } else if (points_to_base_type->type == ast_parameters) {
     log_trace("try to load function declaration, return the function "

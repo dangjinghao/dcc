@@ -178,7 +178,10 @@ void build_variable_alloca_init(builder b, LLVMValueRef pv, astn n) {
   } else {
     v = build_expression(b, init->initializer.init);
   }
-  if (build_type_chain_is_str(&v->type_chain)) {
+  astn target_base_type =
+      build_type_chain_get_base_type(&n->declaration.type_chain);
+  if (build_type_chain_is_str(&v->type_chain) &&
+      target_base_type->ctype.type == '[') {
     // initializer is a string, call memcpy
     log_debug("initializer is a string, use memcpy");
     LLVMValueRef str_len =
@@ -234,14 +237,8 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
         param_base_type->ctype.type == '[') {
       // multi array type declaration in function parameter
       // modify the base array type to pointer type
-      // pop the first array type and add pointer type
-      // and change the type chain
-
-      // pop the first array type
-      log_trace("convert array type to pointer type");
-      slist_pop_head(&param_declaration->declaration.type_chain);
       param_declaration->declaration.type_chain =
-          *build_type_chain_new_add_pointer(
+          *build_type_chain_inplace_cast_indexable_implict(
               b, &param_declaration->declaration.type_chain);
       param_base_type = build_type_chain_get_base_type(
           &param_declaration->declaration.type_chain);

@@ -668,6 +668,21 @@ void tbc_struct_self_ref() {
 ");
 }
 
+void tbc_ternary_str_ptr_arr() {
+  tbc_entry("\
+    int F(){\
+      char str[16] = \"hello world\";\
+      char* str2 = \"hello world\";\
+  }");
+}
+
+void tbc_ternary_string_ptr() {
+  tbc_entry("\
+    int F(int c){\
+      char* str = c ? (\"hello\" + 1) : \"world\";\
+  }");
+}
+
 void tbc_from_stdin() {
   struct lexer lexer;
   lexer_new_from_fp(&lexer, stdin);
