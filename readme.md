@@ -76,12 +76,13 @@ struct s{int a;char b;};
   - [x] char array initialize with string
     - [ ] length inference
 - [x] string array, ptr integration in type cast
-- [ ] ptr to struct/union(any type) - ptr
+- [ ] struct array test
+- [ ] ptr to struct/union(any complex type) - ptr
+- [ ] QA scaffold
 - [ ] refactor
   - [ ] using hierarchical design
   - [ ] comment functions
   - [ ] remove uesless functions
-- [ ] QA scaffold
 - [ ] Array initializer must be an initializer list or string literal
 - [ ] {} initializer
   - [ ] struct/union/array init

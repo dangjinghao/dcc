@@ -236,7 +236,7 @@ dynarray build_function_parameters_type(builder b, astn params, dynarray arr) {
     if (param_base_type->type == ast_ctype &&
         param_base_type->ctype.type == '[') {
       // multi array type declaration in function parameter
-      // modify the base array type to pointer type
+      // **inplace modify** the first array type to pointer type
       param_declaration->declaration.type_chain =
           *build_type_chain_inplace_cast_indexable_implict(
               b, &param_declaration->declaration.type_chain);
@@ -288,11 +288,9 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
           g_is_struct_or_union_token(param_base_type->ctype.type)) {
         log_panic("Pass struct or union parameter by value is not supported "
                   "right now");
-      } else if (param_base_type->type == ast_ctype &&
-                 param_base_type->ctype.type == '[') {
-        log_panic("array type parameter should be converted to pointer when "
-                  "building function prototype");
       }
+      assert(!(param_base_type->type == ast_ctype &&
+               param_base_type->ctype.type == '['));
       // Create an alloca for this parameter
       sds param_name = build_symbol_name(param_decl);
       LLVMTypeRef param_type = build_declaration_variable_type(b, param_decl);

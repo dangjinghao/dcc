@@ -11,28 +11,11 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
-bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs) {
+bool build_expr_is_binop_with_indexable(typed_value lhs, typed_value rhs) {
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
   if (build_type_base_type_is_indexable(lhs_base_type) ||
       build_type_base_type_is_indexable(rhs_base_type)) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * @brief this function seems to be only used in literal string array index right now
- * 
- * @param lhs 
- * @param rhs 
- * @return true 
- * @return false 
- */
-bool build_expr_is_binop_with_array(typed_value lhs, typed_value rhs) {
-  astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
-  astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
-  if (lhs_base_type->ctype.type == '[' || rhs_base_type->ctype.type == '[') {
     return true;
   }
   return false;
@@ -50,6 +33,12 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
   if (op != '+' && op != '-') {
     goto FAIL;
   }
+  slist lhs_type_chain =
+      build_type_chain_inplace_cast_indexable_implict(b, &lhs->type_chain);
+  slist rhs_type_chain =
+      build_type_chain_inplace_cast_indexable_implict(b, &rhs->type_chain);
+  lhs = typed_value_new(lhs->v, lhs_type_chain);
+  rhs = typed_value_new(rhs->v, rhs_type_chain);
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
   if (lhs_base_type->ctype.type == '*' && rhs_base_type->ctype.type == '*' &&
@@ -63,6 +52,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     // sub
     LLVMValueRef sub = LLVMBuildSub(b->builder, lhs_int, rhs_int, "ptrsub");
     // sdiv
+    // do not implicit cast here, because the ptr to array - ptr should be supported
     slist item_type_chain =
         build_type_chain_new_get_points_to_type_chian(b, &lhs->type_chain);
     astn item_base_type = build_type_chain_get_base_type(item_type_chain);
@@ -136,7 +126,7 @@ typed_value build_expr_binop_template(builder b, astn binop,
                                       char *f_names[2]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
-  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
+  if (build_expr_is_binop_with_indexable(lhs, rhs)) {
     log_trace("ptr operation detected in binop expression");
     return build_expr_binop_ptr(b, lhs, binop->binop.op, rhs);
   }
@@ -188,6 +178,10 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
                                        char *pred_names[3]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  lhs = typed_value_new(lhs->v, build_type_chain_inplace_cast_indexable_implict(
+                                    b, &lhs->type_chain));
+  rhs = typed_value_new(rhs->v, build_type_chain_inplace_cast_indexable_implict(
+                                    b, &rhs->type_chain));
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
   // convert ptr to i64 if needed
@@ -231,6 +225,9 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
 typed_value build_expr_binop_assign(builder b, astn binop) {
   typed_value lhs = build_lvalue_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  rhs = typed_value_new(rhs->v, build_type_chain_inplace_cast_indexable_implict(
+                                    b, &rhs->type_chain));
+
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
   if (rhs_base_type->type == ast_ctype &&
       g_is_struct_or_union_token(rhs_base_type->ctype.type) &&
@@ -742,6 +739,7 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
   typed_value struct_or_union_ptr = build_lvalue_expression(b, n->unary.expr);
   astn member = n->unary.extdata;
   assert(member->type == ast_ident);
+  // FIXME: I'm not sure if it is necessary to use build_type_chain_inplace_cast_indexable_implict
   slist points_to_struct_type_chain =
       build_type_chain_new_get_points_to_type_chian(
           b, &struct_or_union_ptr->type_chain);

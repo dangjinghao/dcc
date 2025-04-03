@@ -68,7 +68,7 @@ typed_value build_value_expr_binop_bit_template(builder b, typed_value lhs,
 typed_value build_value_expr_binop_div(builder b, typed_value lhs,
                                        typed_value rhs);
 
-bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs);
+bool build_expr_is_binop_with_indexable(typed_value lhs, typed_value rhs);
 typed_value build_lvalue_expression(builder b, astn n);
 typed_value build_expr_binop(builder b, astn n);
 typed_value build_expression(builder b, astn n);

@@ -11,6 +11,8 @@
 
 LLVMValueRef build_value_cmp0(builder b, typed_value v, LLVMIntPredicate iPred,
                               LLVMRealPredicate fPred, const char *label) {
+  v = typed_value_new(
+      v->v, build_type_chain_inplace_cast_indexable_implict(b, &v->type_chain));
   astn base_type = build_type_chain_get_base_type(&v->type_chain);
   if (g_is_int_family_tok(base_type->ctype.type)) {
     return LLVMBuildICmp(
@@ -44,6 +46,9 @@ LLVMValueRef build_value_ne0(builder b, typed_value v) {
 
 void build_value_cpy_struct_or_union(builder b, typed_value lhs_ptr,
                                      typed_value rhs_struct) {
+  astn lhs_ptr_base_type = build_type_chain_get_base_type(&lhs_ptr->type_chain);
+  assert(lhs_ptr_base_type->type == ast_ctype &&
+         lhs_ptr_base_type->ctype.type == '*');
   astn rhs_base_type = build_type_chain_get_base_type(&rhs_struct->type_chain);
   slist lhs_points_to_type_chain =
       build_type_chain_new_get_points_to_type_chian(b, &lhs_ptr->type_chain);
@@ -117,10 +122,7 @@ typed_value build_value_expr_binop_template(builder b, typed_value lhs,
                                             typed_value rhs,
                                             llvm_func_t llvm_build_f[2],
                                             char *f_names[2]) {
-  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
-    log_panic("Ptr should not be used in there, it should be processed in "
-              "build_expr_binop");
-  }
+  assert(!build_expr_is_binop_with_indexable(lhs, rhs));
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   astn base_type = build_type_chain_get_base_type(&exprs[0]->type_chain);
@@ -139,10 +141,8 @@ typed_value build_value_expr_binop_template(builder b, typed_value lhs,
 
 typed_value build_value_expr_binop_div(builder b, typed_value lhs,
                                        typed_value rhs) {
-  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
-    log_panic("Ptr should not be used in there, it should be processed in "
-              "build_expr_binop");
-  }
+  assert(!build_expr_is_binop_with_indexable(lhs, rhs));
+
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   astn base_type = build_type_chain_get_base_type(&exprs[0]->type_chain);
@@ -170,10 +170,7 @@ typed_value build_value_expr_binop_su_template(builder b, typed_value lhs,
                                                typed_value rhs,
                                                llvm_func_t llvm_build_f[2],
                                                char *f_names[2]) {
-  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
-    log_panic("Ptr should not be used in this binop, it should be processed in "
-              "build_expr_binop");
-  }
+  assert(!build_expr_is_binop_with_indexable(lhs, rhs));
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
 
@@ -199,10 +196,8 @@ typed_value build_value_expr_binop_bit_template(builder b, typed_value lhs,
                                                 typed_value rhs,
                                                 llvm_func_t llvm_build_f,
                                                 char *f_name) {
-  if (build_expr_is_binop_with_ptr(lhs, rhs)) {
-    log_panic("Ptr should not be used in there, it should be processed in "
-              "build_expr_binop");
-  }
+  assert(!build_expr_is_binop_with_indexable(lhs, rhs));
+
   typed_value *exprs =
       build_type_2_values_type_upper_cast(b, (typed_value[]){lhs, rhs});
   // only int family is allowed
