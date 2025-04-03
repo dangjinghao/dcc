@@ -683,9 +683,49 @@ void tbc_ternary_string_ptr() {
   }");
 }
 
+void tbc_ternary_string_assign() {
+  tbc_entry("\
+    int F(int c){\
+      char* str = \"hi\";\
+      str = \"hi\";\
+  }");
+}
+
 void tbc_from_stdin() {
   struct lexer lexer;
   lexer_new_from_fp(&lexer, stdin);
   process_trans_unit(&lexer);
   lexer_destroy(&lexer);
+}
+
+void tbc_va_printf() {
+  tbc_entry("\
+    int printf(const char* fmt,...);\
+    int main(){\
+      char str[20] = \"hello world\";\
+      char c = 'a';\
+      short s = 1;\
+      int i = 1;\
+      long l = 1;\
+      float f = 1.0;\
+      double d = 1.0;\
+      printf(\"%s %s %c %hd %d %ld %f %lf\", str, \"hello literal string\" ,c, s, i, l, f, d);\
+  }");
+}
+
+void tbc_ptrtoptr_sub() {
+  tbc_entry("\
+    int F(){\
+      int**p = 0,**p2;\
+      p - p2;\
+  }");
+}
+
+void tbc_ptrto_struct_sub(){
+  tbc_entry("\
+    union S{int a;char b;};\
+    int F(){\
+      struct S*p = 0,**p2;\
+      p - p2;\
+  }");
 }

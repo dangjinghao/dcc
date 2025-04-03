@@ -116,21 +116,24 @@ char *lexer_token_get_str(int type) {
   return lexer_token_get_str_in(type, NULL);
 }
 
-size_t lexer_token_get_sizeof(enum tok_type t) {
+size_t lexer_token_get_sizeof(int t) {
   switch (t) {
-  case TOK_KW_INT:
-    return sizeof(int);
   case TOK_KW_VOID:
   case TOK_KW_CHAR:
     return sizeof(char);
+  case TOK_KW_SHORT:
+    return sizeof(short);
+  case TOK_KW_LONG:
+    return sizeof(long);
+  case TOK_KW_ENUM:
+  case TOK_KW_INT:
+    return sizeof(int);
   case TOK_KW_FLOAT:
     return sizeof(float);
   case TOK_KW_DOUBLE:
     return sizeof(double);
-  case TOK_KW_LONG:
-    return sizeof(long);
-  case TOK_KW_SHORT:
-    return sizeof(short);
+  case '*':
+    return sizeof(void *);
   default:
     log_panic("unsupported type: %s", convert_repr_token(t));
   }

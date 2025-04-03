@@ -90,5 +90,5 @@ enum tok_type lexer_token_get_token_in(char *str,
 char *lexer_token_get_str_in(enum tok_type type,
                              struct lexer_token_table_entry *table);
 char *lexer_token_get_str(int type);
-size_t lexer_token_get_sizeof(enum tok_type t);
+size_t lexer_token_get_sizeof(int t);
 #endif

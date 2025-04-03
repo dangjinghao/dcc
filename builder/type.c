@@ -4,9 +4,11 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
+#include "macro/macro.h"
 #include "parser.h"
 #include "slist/slist.h"
 #include "token.h"
+#include "typed_value/typed_value.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 /**
@@ -472,4 +474,40 @@ build_type_chain_inplace_cast_indexable_implict(builder b, slist type_chain) {
     type_chain = build_type_chain_new_add_pointer(b, type_chain);
   }
   return type_chain;
+}
+
+typed_value build_type_va_args_promote(builder b, typed_value value) {
+  slist type_chain = &value->type_chain;
+  type_chain = build_type_chain_inplace_cast_indexable_implict(b, type_chain);
+  astn base_type = build_type_chain_get_base_type(type_chain);
+  // get sizeof base type
+  assert(base_type->type == ast_ctype);
+  size_t size = build_type_sizeof_base_type(b, base_type);
+  typed_value v = NULL;
+  if (size < sizeof(int) && g_is_int_family_tok(base_type->ctype.type)) {
+    // int family type which small than int, promote to int
+    log_trace("tiny int va -> int va");
+    slist tmp_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
+    v = build_type_convert_by_type_chain(b, value, tmp_type_chain);
+  } else if (size < sizeof(double) &&
+             g_is_fp_family_tok(base_type->ctype.type)) {
+    // fp family type which small than double, promote to double
+    log_trace("tiny fp va -> double va");
+    slist tmp_type_chain = build_type_chain_by_lit(TOK_LIT_DOUBLE);
+    v = build_type_convert_by_type_chain(b, value, tmp_type_chain);
+  } else {
+    v = value;
+  }
+  return v;
+}
+
+size_t build_type_sizeof_base_type(builder b, astn base_type) {
+  assert(base_type->type == ast_ctype);
+  if (base_type->ctype.type == TOK_KW_STRUCT ||
+      base_type->ctype.type == TOK_KW_UNION) {
+    BUILDING();
+  } else if (base_type->ctype.type == '[') {
+    BUILDING();
+  }
+  return lexer_token_get_sizeof(base_type->ctype.type);
 }

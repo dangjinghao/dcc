@@ -68,7 +68,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     astn item_base_type = build_type_chain_get_base_type(item_type_chain);
     LLVMValueRef size =
         LLVMConstInt(LLVMInt64TypeInContext(b->context),
-                     lexer_token_get_sizeof(item_base_type->ctype.type), false);
+                     build_type_sizeof_base_type(b, item_base_type), false);
     LLVMValueRef result =
         LLVMBuildSDiv(b->builder, sub, size, "ptr_item_size_sdiv");
     return typed_value_new(result, item_type_chain);
@@ -708,13 +708,24 @@ typed_value build_expr_unary_func_call(builder b, astn n) {
   struct dynarray args;
   dynarray_default(&args, sizeof(LLVMValueRef));
   astn arg;
+  bool is_va = false;
   slist_foreach(&n->unary.extdata->arguments.list, arg) {
-    astn corresponsed_param =
-        slist_get(&func_params->parameters.list, arg_idx)->data;
-    typed_value arg_expr = build_expression(b, arg);
-    typed_value arg_casted = build_type_convert_by_type_chain(
-        b, arg_expr, &corresponsed_param->declaration.type_chain);
-    dynarray_add(&args, &arg_casted->v);
+    typed_value arg_eval = build_expression(b, arg);
+    if (is_va) {
+      arg_eval = build_type_va_args_promote(b, arg_eval);
+    } else {
+      astn corresponsed_param =
+          slist_get(&func_params->parameters.list, arg_idx)->data;
+      if (g_is_varargs_param(corresponsed_param)) {
+        is_va = true;
+        arg_eval = build_type_va_args_promote(b, arg_eval);
+        log_trace("va args function detected");
+      } else {
+        arg_eval = build_type_convert_by_type_chain(
+            b, arg_eval, &corresponsed_param->declaration.type_chain);
+      }
+    }
+    dynarray_add(&args, &arg_eval->v);
     arg_idx += 1;
   }
   astn func_return_base_type =

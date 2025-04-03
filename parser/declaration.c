@@ -64,6 +64,7 @@ slist parse_struct_declaration(parser parser, slist member_declarations) {
 astn parse_struct_or_union_specifier(parser parser) {
   assert(g_is_struct_or_union_specifier(parser));
   astn n = ast_new(ast_struct_or_union_declaration);
+  n->struct_or_union_declaration.type = parser->current_token;
   parser_consume(parser);
   if (parser->current_token == TOK_IDENT) {
     n->struct_or_union_declaration.ident = parser->lexer->lex_token._ident;
@@ -91,6 +92,11 @@ astn parse_struct_or_union_specifier(parser parser) {
                                            &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
+                     n->struct_or_union_declaration.ident);
+    }
+    if (ref->struct_or_union_declaration.type !=
+        n->struct_or_union_declaration.type) {
+      compiler_error(parser->lexer, "struct/union type mismatch: %s",
                      n->struct_or_union_declaration.ident);
     }
     ast_free(n);

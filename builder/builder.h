@@ -83,6 +83,8 @@ bool build_type_chain_is_str(slist type_chain);
 bool build_type_base_type_is_indexable(astn base_type);
 [[nodiscard]] slist
 build_type_chain_inplace_cast_indexable_implict(builder b, slist type_chain);
+typed_value build_type_va_args_promote(builder b, typed_value value);
+size_t build_type_sizeof_base_type(builder b, astn base_type);
 
 LLVMTypeRef build_declaration_variable_type(builder b, astn n);
 slist build_type_chain_copy(slist type_chain);

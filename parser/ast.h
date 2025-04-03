@@ -102,6 +102,8 @@ typedef struct astn {
       typed_value V;
     } declaration;
     struct struct_or_union_declaration {
+      // struct or union
+      enum tok_type type;
       sds ident;
       // if ident is empty, it is an anonymous struct/union,
       // do not allocate the uid for it
