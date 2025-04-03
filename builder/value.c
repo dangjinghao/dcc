@@ -18,7 +18,7 @@ LLVMValueRef build_value_cmp0(builder b, typed_value v, LLVMIntPredicate iPred,
         LLVMConstInt(build_type_base_type_convert_to_llvm(b, base_type), 0,
                      false),
         label);
-  } else if (base_type->ctype.type == '*') {
+  } else if (build_type_base_type_is_indexable(base_type)) {
     return LLVMBuildICmp(
         b->builder, iPred, v->v,
         LLVMConstPointerNull(

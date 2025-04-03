@@ -201,7 +201,8 @@ int build_type_compare_promote_level(astn lhs_base_type, astn rhs_base_type) {
       [TOK_KW_INT - __TOK_KW_START] = 2,   [TOK_KW_LONG - __TOK_KW_START] = 3,
       [TOK_KW_FLOAT - __TOK_KW_START] = 4, [TOK_KW_DOUBLE - __TOK_KW_START] = 5,
   };
-  if (lhs_base_type->ctype.type == '*' && rhs_base_type->ctype.type == '*') {
+  if (build_type_base_type_is_indexable(lhs_base_type) &&
+      build_type_base_type_is_indexable(rhs_base_type)) {
     return 0;
   }
   assert(g_is_numeric_tok(lhs_base_type->ctype.type));
@@ -264,7 +265,7 @@ slist build_type_chain_copy(slist type_chain) {
 build_type_chain_new_get_points_to_type_chian(builder b, slist type_chain) {
   slist points_to_type_chain = build_type_chain_copy(type_chain);
   astn ptr = slist_pop_head(points_to_type_chain);
-  assert(ptr->ctype.type == '*');
+  assert(build_type_base_type_is_indexable(ptr));
   return points_to_type_chain;
 }
 
@@ -438,4 +439,31 @@ bool build_type_chain_is_str(slist type_chain) {
     }
   }
   return false;
+}
+/**
+ * @brief pointer or array type is indexable
+ * 
+ * @param n 
+ * @return true 
+ * @return false 
+ */
+bool build_type_base_type_is_indexable(astn base_type) {
+  assert(base_type->type == ast_ctype);
+  if (base_type->ctype.type == '*' || base_type->ctype.type == '[') {
+    return true;
+  }
+  return false;
+}
+
+slist build_type_chain_indexable_implict_cast_inplace(builder b,
+                                                      slist type_chain) {
+  astn base_type = build_type_chain_get_base_type(type_chain);
+  assert(base_type->type == ast_ctype);
+  if (base_type->ctype.type == '[') {
+    // pop the first array type
+    log_trace("implict converting array type to pointer type");
+    slist_pop_head(type_chain);
+    type_chain = build_type_chain_new_add_pointer(b, type_chain);
+  }
+  return type_chain;
 }

@@ -14,7 +14,7 @@
 bool build_expr_is_binop_with_ptr(typed_value lhs, typed_value rhs) {
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
-  if (lhs_base_type->ctype.type == '*' || rhs_base_type->ctype.type == '*') {
+  if (build_type_base_type_is_indexable(lhs_base_type) || build_type_base_type_is_indexable(rhs_base_type)) {
     return true;
   }
   return false;
@@ -51,7 +51,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
   }
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
-  if (lhs_base_type->ctype.type == '*' && rhs_base_type->ctype.type == '*' &&
+  if (build_type_base_type_is_indexable(lhs_base_type) && build_type_base_type_is_indexable(rhs_base_type) &&
       op == '-') {
     // ptr - ptr
     // convert to int
@@ -98,7 +98,7 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     LLVMValueRef result = LLVMBuildGEP2(b->builder, item_type, ptr->v,
                                         &index->v, 1, "ptr_plus_int");
     return typed_value_new(result, &ptr->type_chain);
-  } else if (lhs_base_type->ctype.type == '*' &&
+  } else if (build_type_base_type_is_indexable(lhs_base_type) &&
              g_is_int_family_tok(rhs_base_type->ctype.type) && op == '-') {
     // ptr - int
     // use getelementptr
@@ -121,23 +121,6 @@ FAIL:
             "<int> + <ptr-type>");
 }
 
-typed_value build_expr_binop_array(builder b, typed_value lhs, int op,
-                                   typed_value rhs) {
-  // just cast array to ptr
-  astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
-  if (lhs_base_type->ctype.type == '[') {
-    slist_pop_head(&lhs->type_chain);
-    slist type_chain = build_type_chain_new_add_pointer(b, &lhs->type_chain);
-    lhs = typed_value_new(lhs->v, type_chain);
-  } else {
-    slist_pop_head(&rhs->type_chain);
-    slist type_chain = build_type_chain_new_add_pointer(b, &rhs->type_chain);
-    rhs = typed_value_new(rhs->v, type_chain);
-  }
-  // just use the same logic as ptr
-  return build_expr_binop_ptr(b, lhs, op, rhs);
-}
-
 /**
  * @brief 
  * 
@@ -155,10 +138,6 @@ typed_value build_expr_binop_template(builder b, astn binop,
   if (build_expr_is_binop_with_ptr(lhs, rhs)) {
     log_trace("ptr operation detected in binop expression");
     return build_expr_binop_ptr(b, lhs, binop->binop.op, rhs);
-  } else if (build_expr_is_binop_with_array(lhs, rhs)) {
-    // looks like this branch is only used in literal string array index
-    log_trace("array operation detected in binop expression");
-    return build_expr_binop_array(b, lhs, binop->binop.op, rhs);
   }
   return build_value_expr_binop_template(b, lhs, rhs, llvm_build_f, f_names);
 }
@@ -211,12 +190,12 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
   astn lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   astn rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
   // convert ptr to i64 if needed
-  if (lhs_base_type->ctype.type == '*') {
+  if (build_type_base_type_is_indexable(lhs_base_type)) {
     lhs = build_type_convert_by_type_chain(
         b, lhs, build_type_chain_by_lit(TOK_LIT_ULONG));
     lhs_base_type = build_type_chain_get_base_type(&lhs->type_chain);
   }
-  if (rhs_base_type->ctype.type == '*') {
+  if (build_type_base_type_is_indexable(rhs_base_type)) {
     rhs = build_type_convert_by_type_chain(
         b, rhs, build_type_chain_by_lit(TOK_LIT_ULONG));
     rhs_base_type = build_type_chain_get_base_type(&rhs->type_chain);
@@ -261,7 +240,7 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
   case TOK_SYM_SELF_ADD: {
     typed_value lhs_load = build_value_load(b, lhs);
     astn load_base_type = build_type_chain_get_base_type(&lhs_load->type_chain);
-    if (load_base_type->ctype.type == '*') {
+    if (build_type_base_type_is_indexable(load_base_type)) {
       log_trace("ptr operation detected in += expression");
       rhs = build_expr_binop_ptr(b, lhs_load, '+', rhs);
     } else {
@@ -274,7 +253,7 @@ typed_value build_expr_binop_assign(builder b, astn binop) {
   case TOK_SYM_SELF_SUB: {
     typed_value lhs_load = build_value_load(b, lhs);
     astn load_base_type = build_type_chain_get_base_type(&lhs_load->type_chain);
-    if (load_base_type->ctype.type == '*') {
+    if (build_type_base_type_is_indexable(load_base_type)) {
       log_trace("ptr operation detected in -=  expression");
       rhs = build_expr_binop_ptr(b, lhs_load, '-', rhs);
     } else {
@@ -627,7 +606,7 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
   assert(base_type->type == ast_ctype);
   if (g_is_int_family_tok(base_type->ctype.type)) {
     one = LLVMConstInt(points_to_type, 1, false);
-  } else if (base_type->ctype.type == '*') {
+  } else if (build_type_base_type_is_indexable(base_type)) {
     one = LLVMConstInt(LLVMInt64TypeInContext(b->context), 1, false);
   } else if (g_is_fp_family_tok(base_type->ctype.type)) {
     one = LLVMConstReal(points_to_type, 1.0);
@@ -640,7 +619,7 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
     // Calculate the new value with increment
     if (g_is_int_family_tok(base_type->ctype.type)) {
       updated = LLVMBuildAdd(b->builder, old, one, "inc1");
-    } else if (base_type->ctype.type == '*') {
+    } else if (build_type_base_type_is_indexable(base_type)) {
       // pointer increment
       slist pointer_type_points_to_type_chain =
           build_type_chain_new_get_points_to_type_chian(b,
@@ -661,7 +640,7 @@ typed_value build_expr_unary_self_inc(builder b, astn n, enum tok_type t,
     // Calculate the new value with decrement
     if (g_is_int_family_tok(base_type->ctype.type)) {
       updated = LLVMBuildSub(b->builder, old, one, "dec1");
-    } else if (base_type->ctype.type == '*') {
+    } else if (build_type_base_type_is_indexable(base_type)) {
       // pointer decrement
       slist pointer_type_points_to_type_chain =
           build_type_chain_new_get_points_to_type_chian(b,
