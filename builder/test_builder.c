@@ -657,3 +657,20 @@ void tbc_assign_with_string() {
       str = \"hello world\";\
     }");
 }
+
+void tbc_struct_self_ref() {
+  tbc_entry("\
+    typedef struct Node {\
+        int data;\
+        struct Node* next;\
+    } Node;\
+    Node n;\
+");
+}
+
+void tbc_from_stdin() {
+  struct lexer lexer;
+  lexer_new_from_fp(&lexer, stdin);
+  process_trans_unit(&lexer);
+  lexer_destroy(&lexer);
+}

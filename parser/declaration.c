@@ -71,14 +71,15 @@ astn parse_struct_or_union_specifier(parser parser) {
   }
   if (parser->current_token == '{') {
     parser_consume(parser);
+    // forward add to tag table for avoiding self ref in member
+    if (n->struct_or_union_declaration.ident) {
+      parser_new_tag(parser, n);
+    }
     while (g_is_struct_declaration_firstset(parser)) {
       parse_struct_declaration(
           parser, &n->struct_or_union_declaration.member_declarations);
     }
     parser_consume_with(parser, '}');
-    if (n->struct_or_union_declaration.ident) {
-      parser_new_tag(parser, n);
-    }
     log_debug("add uid to struct declaration")
   } else {
     // struct declaration, check if it existing
