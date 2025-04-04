@@ -319,6 +319,11 @@ void tbc_enum() {
   tbc_entry("enum E{A = 1,B = 2,C = 4};int F(){enum E e = A|B|C;return e;}");
 }
 
+void tbc_enum_typedef() {
+  tbc_entry("typedef enum E{A = 1,B = 2,C = 4} E_t;E_t F(){E_t e = A|B|C; E_t* "
+            "e2; return e;}");
+}
+
 void tbc_switch_default() {
   tbc_entry("int F(){int a = 1;switch(a){int a = 0;default: a = 4;case 1: a = "
             "1;case 3: a = 3;case 2: a = "
@@ -465,13 +470,24 @@ void tbc_struct_lvalue_member() {
   }");
 }
 
-void tbc_struct_typedef() {
+void tbc_typedef_in_struct() {
   tbc_entry(
       "typedef volatile long l_t; typedef int I;typedef struct S{int a;const l_t b;}S_t;\
     int F(){\
       struct{ I i;l_t l; S_t st; } s;\
       s.st.a = 1;\
       s.st.b = 2;\
+  }");
+}
+
+void tbc_struct_typedef() {
+  tbc_entry("typedef struct S{int a;char b;}s_t;\
+      s_t s;\
+      s_t s1;\
+      s_t s2;\
+      s_t* F(){\
+      s.a = 1;\
+      s.b = 2;\
   }");
 }
 
@@ -728,15 +744,6 @@ void tbc_ptrto_struct_sub() {
       struct S*p = 0,**p2;\
       p - p2;\
   }");
-}
-
-void tbc_enum_typedef() {
-  tbc_entry("\
-     enum S{a,b} Ev;\
-     int main(){\
-     Ev = 1;\
-    }\
-      ");
 }
 
 void tbc_struct_array() {

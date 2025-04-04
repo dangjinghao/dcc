@@ -80,7 +80,8 @@ struct s{int a;char b;};
 - [x] ptr to struct/union(any complex type) - ptr
 - [ ] {} initializer
   - [ ] struct/union/array init
-  - [ ] Array initializer must be an initializer list or string literal- [ ] type unfold redefine bug
+  - [ ] Array initializer must be an initializer list or string literal
+- [ ] type unfold redefine bug
   - [ ] drop extdata?
 - [ ] QA scaffold
 - [ ] refactor

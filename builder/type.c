@@ -514,13 +514,8 @@ size_t build_type_abi_sizeof_base_type(builder b, astn base_type) {
   assert(base_type->type == ast_ctype);
   if (base_type->ctype.type == TOK_KW_STRUCT ||
       base_type->ctype.type == TOK_KW_UNION) {
-        astn v = base_type->ctype.user_defined_type;
-        if(v->type == ast_ref) {
-          v = v->ref;
-        }
-    return LLVMABISizeOfType(
-        b->data_layout,
-        v->struct_or_union_declaration.V);
+    return LLVMABISizeOfType(b->data_layout,
+                             build_declaration_struct_or_union(b, base_type));
   } else if (base_type->ctype.type == '[') {
     // array type
     return LLVMABISizeOfType(

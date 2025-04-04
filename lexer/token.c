@@ -44,9 +44,9 @@ struct lexer_token_table_entry lexer_token_multi_char_sym_table[] = {
     {.str = ">=", .type = TOK_SYM_GEQ},
     {.str = "==", .type = TOK_SYM_EQ},
     {.str = "!=", .type = TOK_SYM_NEQ},
-    {.str = ">>=", .type = TOK_SYM_SELF_RSHIFT},
+    {.str = ">>=", .type = TOK_SYM_SELF_RSHIFT}, // important
     {.str = ">>", .type = TOK_SYM_RSHIFT},
-    {.str = "<<=", .type = TOK_SYM_SELF_LSHIFT},
+    {.str = "<<=", .type = TOK_SYM_SELF_LSHIFT}, // important
     {.str = "<<", .type = TOK_SYM_LSHIFT},
     {.str = "+=", .type = TOK_SYM_SELF_ADD},
     {.str = "-=", .type = TOK_SYM_SELF_SUB},
