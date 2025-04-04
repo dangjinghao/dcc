@@ -25,7 +25,14 @@ typed_value build_type_convert_by_type_chain(builder b, typed_value v,
   astn target_type = build_type_chain_get_base_type(type_chain);
   assert(base_type->type == ast_ctype);
   assert(target_type->type == ast_ctype);
-
+  if (base_type->ctype.type == TOK_KW_ENUM) {
+    log_trace("cast base_type enum to int");
+    base_type = slist_peek_head(build_type_chain_by_lit(TOK_LIT_INT));
+  }
+  if (target_type->ctype.type == TOK_KW_ENUM) {
+    log_trace("cast target_type int to enum");
+    target_type = slist_peek_head(build_type_chain_by_lit(TOK_LIT_INT));
+  }
 #define CONVERT_CASE(from, to, BF)                                             \
   if (base_type->ctype.type == from && target_type->ctype.type == to) {        \
     log_trace("cast " #from " to " #to);                                       \
