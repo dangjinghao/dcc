@@ -122,7 +122,9 @@ astn parse_enumerator(parser parser, slist enumerators, long *enum_counter) {
   }
   *enum_counter += 1;
   slist_add_tail(enumerators, n);
-  parser_new_enumerator(parser, n);
+  // because the enumerator would be added to tab, if we freee the enumeration related with this,
+  // it would cause the enumerator to be freed
+  parser_new_enumerator(parser, ast_copy(n));
   return n;
 }
 

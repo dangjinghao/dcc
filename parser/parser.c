@@ -156,15 +156,16 @@ void parser_new_declaration(parser parser, astn n) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
-  astn existing_symbol =
-      parser_scope_current_find_ident(parse_declaration_get_ident(n), &parser->idtab);
+  astn existing_symbol = parser_scope_current_find_ident(
+      parse_declaration_get_ident(n), &parser->idtab);
   if (existing_symbol && n->declaration.storage_class == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
               parse_declaration_get_ident(n));
     return;
   } else if (existing_symbol && n->declaration.storage_class != TOK_KW_EXTERN &&
              existing_symbol->declaration.storage_class != TOK_KW_EXTERN) {
-    compiler_error(parser->lexer, "redefined symbol %s", parse_declaration_get_ident(n));
+    compiler_error(parser->lexer, "redefined symbol %s",
+                   parse_declaration_get_ident(n));
   }
 
   n->declaration.uid = parser_get_uid(parser);

@@ -721,11 +721,20 @@ void tbc_ptrtoptr_sub() {
   }");
 }
 
-void tbc_ptrto_struct_sub(){
+void tbc_ptrto_struct_sub() {
   tbc_entry("\
     union S{int a;char b;};\
     int F(){\
       struct S*p = 0,**p2;\
       p - p2;\
   }");
+}
+
+void tbc_enum_typedef() {
+  tbc_entry("\
+     enum S{a,b} Ev;\
+     int main(){\
+     Ev = 1;\
+    }\
+      ");
 }

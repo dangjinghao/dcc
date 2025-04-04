@@ -108,6 +108,7 @@ astn ast_copy(astn n) {
     break;
   }
   case ast_struct_or_union_declaration: {
+    new->struct_or_union_declaration.type = n->struct_or_union_declaration.type;
     new->struct_or_union_declaration.ident =
         n->struct_or_union_declaration.ident
             ? sdsdup(n->struct_or_union_declaration.ident)
@@ -116,7 +117,8 @@ astn ast_copy(astn n) {
     astn ref;
     slist_foreach(&n->struct_or_union_declaration.member_declarations, ref) {
       astn copy = ast_copy(ref);
-      slist_add_tail(&new->struct_or_union_declaration.member_declarations, copy);
+      slist_add_tail(&new->struct_or_union_declaration.member_declarations,
+                     copy);
     }
     break;
   }
