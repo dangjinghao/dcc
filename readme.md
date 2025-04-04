@@ -76,16 +76,18 @@ struct s{int a;char b;};
   - [x] char array initialize with string
     - [ ] length inference
 - [x] string array, ptr integration in type cast
-- [ ] struct array test
-- [ ] ptr to struct/union(any complex type) - ptr
+- [x] struct array test
+- [x] ptr to struct/union(any complex type) - ptr
+- [ ] {} initializer
+  - [ ] struct/union/array init
+  - [ ] Array initializer must be an initializer list or string literal- [ ] type unfold redefine bug
+  - [ ] drop extdata?
 - [ ] QA scaffold
 - [ ] refactor
   - [ ] using hierarchical design
   - [ ] comment functions
   - [ ] remove uesless functions
-- [ ] Array initializer must be an initializer list or string literal
-- [ ] {} initializer
-  - [ ] struct/union/array init
+
 - [ ] sizeof constant expression
 - [ ] incomplete type (void/struct/union/enum dlclaration only/array declaration without array size)
 - [ ] node meta data

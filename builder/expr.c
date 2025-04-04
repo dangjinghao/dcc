@@ -56,9 +56,9 @@ typed_value build_expr_binop_ptr(builder b, typed_value lhs, int op,
     slist item_type_chain =
         build_type_chain_new_get_points_to_type_chian(b, &lhs->type_chain);
     astn item_base_type = build_type_chain_get_base_type(item_type_chain);
+    size_t abi_size = build_type_abi_sizeof_base_type(b, item_base_type);
     LLVMValueRef size =
-        LLVMConstInt(LLVMInt64TypeInContext(b->context),
-                     build_type_sizeof_base_type(b, item_base_type), false);
+        LLVMConstInt(LLVMInt64TypeInContext(b->context), abi_size, false);
     LLVMValueRef result =
         LLVMBuildSDiv(b->builder, sub, size, "ptr_item_size_sdiv");
     return typed_value_new(result, item_type_chain);

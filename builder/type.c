@@ -4,11 +4,11 @@
 #include "grammar.h"
 #include "lexer.h"
 #include "log/log.h"
-#include "macro/macro.h"
 #include "parser.h"
 #include "slist/slist.h"
 #include "token.h"
 #include "typed_value/typed_value.h"
+#include <llvm-c-19/llvm-c/Target.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 /**
@@ -489,7 +489,9 @@ typed_value build_type_va_args_promote(builder b, typed_value value) {
   astn base_type = build_type_chain_get_base_type(type_chain);
   // get sizeof base type
   assert(base_type->type == ast_ctype);
-  size_t size = build_type_sizeof_base_type(b, base_type);
+  assert(base_type->ctype.type != TOK_KW_STRUCT &&
+         base_type->ctype.type != TOK_KW_UNION && base_type->ctype.type != '[');
+  size_t size = build_type_abi_sizeof_base_type(b, base_type);
   typed_value v = NULL;
   if (size < sizeof(int) && g_is_int_family_tok(base_type->ctype.type)) {
     // int family type which small than int, promote to int
@@ -508,13 +510,22 @@ typed_value build_type_va_args_promote(builder b, typed_value value) {
   return v;
 }
 
-size_t build_type_sizeof_base_type(builder b, astn base_type) {
+size_t build_type_abi_sizeof_base_type(builder b, astn base_type) {
   assert(base_type->type == ast_ctype);
   if (base_type->ctype.type == TOK_KW_STRUCT ||
       base_type->ctype.type == TOK_KW_UNION) {
-    BUILDING();
+        astn v = base_type->ctype.user_defined_type;
+        if(v->type == ast_ref) {
+          v = v->ref;
+        }
+    return LLVMABISizeOfType(
+        b->data_layout,
+        v->struct_or_union_declaration.V);
   } else if (base_type->ctype.type == '[') {
-    BUILDING();
+    // array type
+    return LLVMABISizeOfType(
+        b->data_layout,
+        build_type_base_type_convert_to_llvm_array(b, base_type));
   }
   return lexer_token_get_sizeof(base_type->ctype.type);
 }

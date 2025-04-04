@@ -738,3 +738,41 @@ void tbc_enum_typedef() {
     }\
       ");
 }
+
+void tbc_struct_array() {
+  tbc_entry("\
+    struct S{int a;char b;};\
+    int main(){\
+      struct S arr[10];\
+      struct S s = arr[0];\
+      s.a = 1;\
+      s.b = 2;\
+      arr[1] = s;\
+    }\
+    ");
+}
+
+void tbc_struct_array_ptr() {
+  tbc_entry("\
+    struct S{int a;char b;};\
+    int main(){\
+      struct S arr[10],*arrp = arr + 1;\
+      struct S s = arr[0];\
+      s.a = 1;\
+      s.b = 2;\
+      int size = arrp - arr;\
+    }\
+    ");
+}
+void tbc_union_array_ptr() {
+  tbc_entry("\
+    union S{int a;char b;};\
+    int main(){\
+      union S arr[10],*arrp = arr + 1;\
+      union S s = arr[0];\
+      s.a = 1;\
+      s.b = 2;\
+      int size = arrp - arr;\
+    }\
+    ");
+}
