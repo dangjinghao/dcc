@@ -10,3 +10,6 @@
 [submodule "libs/dynarray"]
 	path = libs/dynarray
 	url = mygit:djh/dynarray
+[submodule "libs/slist"]
+	path = libs/slist
+	url = mygit:djh/slist
