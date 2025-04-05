@@ -750,7 +750,7 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
     log_panic("Only struct or union type can be used for . operation");
   }
   astn member_declaration;
-  int member_idx = build_type_struct_type_get_member(
+  int member_idx = build_type_struct_type_get_by_name(
       points_to_base_type, member->ident, &member_declaration);
   if (member_idx < 0) {
     log_panic("Member %s not found in struct or union", member->ident);

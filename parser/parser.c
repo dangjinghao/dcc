@@ -66,9 +66,10 @@ int parser_consume_with(parser parser, int token) {
   if (parser->current_token == token) {
     return parser_consume(parser);
   }
-  compiler_error(parser->lexer, "Expected token %s, got %s",
-                 lexer_token_get_str(token),
-                 lexer_token_get_str(parser->current_token));
+  char str1[16], str2[16];
+  strcpy(str1, lexer_token_get_str(token));
+  strcpy(str2, lexer_token_get_str(parser->current_token));
+  compiler_error(parser->lexer, "Expected token `%s`, got `%s`", str1, str2);
   return 0;
 }
 

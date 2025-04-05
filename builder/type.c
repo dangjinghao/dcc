@@ -302,8 +302,8 @@ build_type_chain_new_get_function_return_type_chain(builder b,
   return new_type_chain;
 }
 
-int build_type_struct_type_get_member(astn struct_type, sds name,
-                                      astn *result) {
+int build_type_struct_type_get_by_name(astn struct_type, sds name,
+                                       astn *result) {
   assert(struct_type->type == ast_ctype);
   assert(g_is_struct_or_union_token(struct_type->ctype.type));
   astn struct_declaration = struct_type->ctype.user_defined_type;
@@ -327,6 +327,30 @@ int build_type_struct_type_get_member(astn struct_type, sds name,
     index += 1;
   }
   return -1;
+}
+
+sds build_type_struct_type_get_member_by_id(astn struct_type, int index,
+                                            astn *result) {
+  assert(struct_type->type == ast_ctype);
+  assert(g_is_struct_or_union_token(struct_type->ctype.type));
+  astn struct_declaration = struct_type->ctype.user_defined_type;
+  if (struct_declaration->type == ast_ref) {
+    struct_declaration = struct_declaration->ref;
+  }
+  assert(struct_declaration->type == ast_struct_or_union_declaration);
+  slist members =
+      &struct_declaration->struct_or_union_declaration.member_declarations;
+  int i = 0;
+  astn member;
+  slist_foreach(members, member) {
+    assert(member->type == ast_declaration);
+    if (i == index) {
+      *result = member;
+      return member->declaration.ident;
+    }
+    i += 1;
+  }
+  return NULL;
 }
 
 LLVMTypeRef build_type_declaration_function_convert_to_llvm(builder b, astn n) {

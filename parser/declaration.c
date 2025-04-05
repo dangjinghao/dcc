@@ -202,10 +202,13 @@ astn parse_declaration_specifiers(parser parser) {
       parser_consume(parser);
     } else if (g_is_storage_class_specifier_firstset(parser)) {
       if (tn->storage != TOK_UNKNOWN) {
+        char str1[16];
+        strcpy(str1, lexer_token_get_str(tn->storage));
+        char str2[16];
+        strcpy(str2, lexer_token_get_str(parser->current_token));
         compiler_error(parser->lexer,
-                       "storage class specifier redefined: %s -> %s",
-                       lexer_token_get_str(tn->storage),
-                       lexer_token_get_str(parser->current_token));
+                       "storage class specifier redefined: %s -> %s", str1,
+                       str2);
       }
       tn->storage = parser->current_token;
       parser_consume(parser);
@@ -248,6 +251,8 @@ astn parse_declaration_specifiers(parser parser) {
   }
   return n;
 }
+
+static astn parse_initializer_body(parser parser);
 /**
  * @brief consume the final optional `,`, even though it is not in the <initializer-list> procedure
  * 
@@ -258,7 +263,7 @@ astn parse_initializer_list(parser parser) {
   assert(g_is_initializer_list_firstset(parser));
   astn n = ast_new(ast_initializer_list);
   while (g_is_initializer_firstset(parser)) {
-    slist_add_tail(&n->initializer_list.list, parse_initializer(parser));
+    slist_add_tail(&n->initializer_list.list, parse_initializer_body(parser));
     if (parser->current_token == ',') {
       parser_consume(parser);
     } else {
@@ -267,18 +272,20 @@ astn parse_initializer_list(parser parser) {
   }
   return n;
 }
-
+static astn parse_initializer_body(parser parser) {
+  if (parser->current_token == '{') {
+    parser_consume(parser);
+    astn result = parse_initializer_list(parser);
+    parser_consume_with(parser, '}');
+    return result;
+  } else {
+    return parse_expr_assign(parser);
+  }
+}
 astn parse_initializer(parser parser) {
   assert(g_is_initializer_firstset(parser));
   astn n = ast_new(ast_initializer);
-  if (parser->current_token == '{') {
-    parser_consume(parser);
-    n->initializer.init = parse_initializer_list(parser);
-    parser_consume_with(parser, '}');
-  } else {
-    n->initializer.init = parse_expr_assign(parser);
-  }
-
+  n->initializer.init = parse_initializer_body(parser);
   return n;
 }
 

@@ -167,19 +167,61 @@ LLVMValueRef build_variable_global(builder b, astn n) {
   return pv;
 }
 
-void build_variable_alloca_init(builder b, LLVMValueRef pv, astn n) {
-  astn init = n->declaration.extdata;
-  assert(init->type == ast_initializer);
-  log_trace("alloca variable %s has initializer",
-            LLVMGetValueName2(pv, &(size_t){}));
-  typed_value v;
-  if (init->initializer.init->type == ast_initializer_list) {
-    log_panic("initializer is a list");
-  } else {
-    v = build_expression(b, init->initializer.init);
+static void build_variable_alloca_init_recurisve(builder b, LLVMValueRef pv,
+                                                 astn init,
+                                                 slist target_type_chain);
+static void build_variable_alloca_init_recurisve_expr_init_list(
+    builder b, LLVMValueRef pv, astn init, slist target_type_chain) {
+  astn target_base_type = build_type_chain_get_base_type(target_type_chain);
+  astn d;
+  size_t i = 0;
+  slist gep_target_type_chain = target_type_chain;
+  slist_foreach(&init->initializer_list.list, d) {
+    // GEP
+    log_trace("build initializer list %zu", i);
+    LLVMValueRef index =
+        LLVMConstInt(LLVMInt64TypeInContext(b->context), i, false);
+    LLVMValueRef gep;
+    // if it is array, use gep
+    // if it is struct, use struct gep
+    // btw, update the gep_target_type_chain
+    if (target_base_type->type == ast_ctype &&
+        target_base_type->ctype.type == '[') {
+      // array
+      log_trace("build array initializer");
+      gep_target_type_chain =
+          build_type_chain_new_get_points_to_type_chian(b, target_type_chain);
+      astn item_base_type =
+          build_type_chain_get_base_type(gep_target_type_chain);
+      gep = LLVMBuildGEP2(
+          b->builder, build_type_base_type_convert_to_llvm(b, item_base_type),
+          pv, &index, 1, "initrgep");
+
+    } else if (target_base_type->type == ast_ctype &&
+               (target_base_type->ctype.type == TOK_KW_STRUCT)) {
+      // struct or union
+      log_trace("build struct initializer");
+      gep = LLVMBuildStructGEP2(
+          b->builder, build_declaration_struct_or_union(b, target_base_type),
+          pv, i, "initrstructgep");
+      astn result;
+      build_type_struct_type_get_member_by_id(target_base_type, i, &result);
+      assert(result->type == ast_declaration);
+      gep_target_type_chain = &result->declaration.type_chain;
+    } else {
+      log_panic("Unsupported this type with initializer list");
+    }
+    build_variable_alloca_init_recurisve(b, gep, d, gep_target_type_chain);
+    i++;
   }
-  astn target_base_type =
-      build_type_chain_get_base_type(&n->declaration.type_chain);
+}
+
+static void build_variable_alloca_init_recurisve_expr(builder b,
+                                                      LLVMValueRef pv,
+                                                      astn init,
+                                                      slist target_type_chain) {
+  astn target_base_type = build_type_chain_get_base_type(target_type_chain);
+  typed_value v = build_expression(b, init);
   if (build_type_chain_is_str(&v->type_chain) &&
       target_base_type->ctype.type == '[') {
     // initializer is a string, call memcpy
@@ -190,9 +232,41 @@ void build_variable_alloca_init(builder b, LLVMValueRef pv, astn n) {
     LLVMBuildMemCpy(b->builder, pv, 1, v->v, 1, str_len);
   } else {
     typed_value ptr = typed_value_new(
-        pv, build_type_chain_new_add_pointer(b, &n->declaration.type_chain));
+        pv, build_type_chain_new_add_pointer(b, target_type_chain));
     build_value_store(b, v, ptr);
   }
+}
+
+static void build_variable_alloca_init_recurisve(builder b, LLVMValueRef pv,
+                                                 astn init,
+                                                 slist target_type_chain) {
+  if (init->type == ast_initializer_list) {
+    return build_variable_alloca_init_recurisve_expr_init_list(
+        b, pv, init, target_type_chain);
+  } else {
+    return build_variable_alloca_init_recurisve_expr(b, pv, init,
+                                                     target_type_chain);
+  }
+}
+
+void build_variable_alloca_init(builder b, LLVMValueRef pv, astn n) {
+  astn init = n->declaration.extdata;
+  assert(init->type == ast_initializer);
+  log_trace("alloca variable %s has initializer",
+            LLVMGetValueName2(pv, &(size_t){}));
+  if (init->initializer.init->type == ast_initializer_list) {
+    astn target_base_type =
+        build_type_chain_get_base_type(&n->declaration.type_chain);
+    // init with ConstNull
+    log_trace("initializer is a list, use memset");
+    LLVMValueRef empty_value = LLVMConstNull(LLVMInt8TypeInContext(b->context));
+    LLVMBuildMemSet(
+        b->builder, pv, empty_value,
+        LLVMSizeOf(build_type_base_type_convert_to_llvm(b, target_base_type)),
+        1);
+  }
+  return build_variable_alloca_init_recurisve(b, pv, init->initializer.init,
+                                              &n->declaration.type_chain);
 }
 
 LLVMValueRef build_variable_alloca(builder b, astn n) {

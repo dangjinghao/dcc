@@ -1,5 +1,16 @@
 # DCC
 
+a simple C89 compiler, emits to llvm ir.
+
+## Feature
+
+- declaration at anywhere is allowed. (C99)
+- declaration at `for` statement `init` scope. (C99)
+
+## Hint
+
+- **maybe we can more dependent on LLVM so that we can reduce the complexity of designation.**
+
 - The parser would not generate a AST which 100% corresponding to the source code, to reduce the complexity of codegen/build process.
   - We call this AST `reduced AST`.
   - `int i,j,k = 10;` -> `int i;int j; int k = 10;`
@@ -78,17 +89,14 @@ struct s{int a;char b;};
 - [x] string array, ptr integration in type cast
 - [x] struct array test
 - [x] ptr to struct/union(any complex type) - ptr
-- [ ] {} initializer
-  - [ ] struct/union/array init
-  - [ ] Array initializer must be an initializer list or string literal
+- [x] {} initializer
+  - [x] struct/array init
 - [ ] type unfold redefine bug
-  - [ ] drop extdata?
 - [ ] QA scaffold
 - [ ] refactor
   - [ ] using hierarchical design
   - [ ] comment functions
   - [ ] remove uesless functions
-
 - [ ] sizeof constant expression
 - [ ] incomplete type (void/struct/union/enum dlclaration only/array declaration without array size)
 - [ ] node meta data
@@ -120,4 +128,5 @@ $(SHORT_NAME)_$(same as above)
 ## BUGS
 
 - assign array to array would not leads to panic
-  - fix by using type checker
+  - fix by using type checker?
+- assign typedef advanced type (struct/union) may leads to redefined struct declaration

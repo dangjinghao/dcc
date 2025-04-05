@@ -329,8 +329,8 @@ static inline bool g_is_assignment_expression_firstset(parser parser) {
  * @return false 
  */
 static inline bool g_is_initializer_firstset(parser parser) {
-  return g_is_assignment_expression_firstset(parser) ||
-         parser->current_token == '{';
+  return parser->current_token == '{' ||
+         g_is_assignment_expression_firstset(parser);
 }
 
 /**

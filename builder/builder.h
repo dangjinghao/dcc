@@ -95,7 +95,9 @@ build_type_chain_new_get_function_return_type_chain(builder b,
                                                     slist type_chain);
 [[nodiscard]] slist build_type_chain_new_add_pointer(builder b,
                                                      slist type_chain);
-int build_type_struct_type_get_member(astn struct_type, sds name, astn *result);
+int build_type_struct_type_get_by_name(astn struct_type, sds name, astn *result);
+sds build_type_struct_type_get_member_by_id(astn struct_type, int index,
+                                           astn *result);
 LLVMTypeRef build_declaration_struct_or_union(builder b, astn n);
 typed_value *build_type_2_values_type_upper_cast(builder b,
                                                  typed_value *values);

@@ -783,3 +783,32 @@ void tbc_union_array_ptr() {
     }\
     ");
 }
+
+void tbc_init_list() {
+  tbc_entry("\
+    int F(){\
+      int arr[3][3] = {{1,2,3},{4,1},{2}};\
+      int sum = 0;\
+      for(int i = 0;i < 3;i++){\
+        for(int j = 0;j < 3;j++){\
+          sum += arr[i][j];\
+        }\
+      }\
+      return sum;\
+  }");
+}
+
+void tbc_init_struct() {
+  tbc_entry("\
+    int printf(const char* fmt,...);\
+    struct S{int a;char b;double ds[5];char str[20];};\
+    int main(){\
+      struct S s = {1,2,{0.,1.1,2.2,3.3,4.4},\"hello world\"};\
+      double sum = 0;\
+      for(int i = 0;i < 5;i++){\
+        sum += s.ds[i];\
+      }\
+      sum += s.a + s.b;\
+      printf(\"%s %lf\n\",s.str,sum);\
+  }");
+}
