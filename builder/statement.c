@@ -144,7 +144,7 @@ void build_statement_labeled_goto(builder b, astn n) {
   goto_label l = builder_label_find(b, ident->ident);
   if (l) {
     if (l->defined) {
-      log_panic("label %s already defined", ident->ident);
+      log_panic("label %s has been defined", ident->ident);
     }
   } else {
     l = builder_label_new(b, ident->ident);

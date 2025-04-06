@@ -22,9 +22,10 @@ LDFLAGS := $(shell llvm-config --libs --ldflags)
 
 ARGS :=
 
+build: $(TARGET)
+
 -include $(DEPS)
 
-build: $(TARGET)
 
 %.o:%.c makefile
 	@echo "$(<) --> $(@)" >&2

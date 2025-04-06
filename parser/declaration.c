@@ -70,6 +70,7 @@ astn parse_struct_or_union_specifier(parser parser) {
     n->struct_or_union_declaration.ident = parser->lexer->lex_token._ident;
     parser_consume(parser);
   }
+  astn ref;
   if (parser->current_token == '{') {
     parser_consume(parser);
     // forward add to tag table for avoiding self ref in member
@@ -81,15 +82,16 @@ astn parse_struct_or_union_specifier(parser parser) {
           parser, &n->struct_or_union_declaration.member_declarations);
     }
     parser_consume_with(parser, '}');
-    log_debug("add uid to struct declaration")
+    log_debug("add uid to struct declaration");
+    ref = n;
   } else {
     // struct declaration, check if it existing
     if (!n->struct_or_union_declaration.ident) {
       compiler_error(parser->lexer,
                      "struct/union declaration without an identifier");
     }
-    astn ref = parser_scope_all_find_ident(n->struct_or_union_declaration.ident,
-                                           &parser->tagtab);
+    ref = parser_scope_all_find_ident(n->struct_or_union_declaration.ident,
+                                      &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined struct/union declaration: %s",
                      n->struct_or_union_declaration.ident);
@@ -100,9 +102,9 @@ astn parse_struct_or_union_specifier(parser parser) {
                      n->struct_or_union_declaration.ident);
     }
     ast_free(n);
-    n = ast_new(ast_ref);
-    n->ref = ref;
   }
+  n = ast_new(ast_ref);
+  n->ref = ref;
   return n;
 }
 

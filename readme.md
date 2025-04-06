@@ -2,10 +2,18 @@
 
 a simple C89 compiler, emits to llvm ir.
 
-## Feature
+## Features
 
+- Almost C89 features
 - declaration at anywhere is allowed. (C99)
 - declaration at `for` statement `init` scope. (C99)
+
+### Unsupport Features
+
+- bitfield
+- struct/union pass to or return from function by value
+- global variable initialization with value
+- sizeof operator
 
 ## Hint
 
@@ -14,6 +22,7 @@ a simple C89 compiler, emits to llvm ir.
 - The parser would not generate a AST which 100% corresponding to the source code, to reduce the complexity of codegen/build process.
   - We call this AST `reduced AST`.
   - `int i,j,k = 10;` -> `int i;int j; int k = 10;`
+  - `struct STU {<xxx>} stu1;` -> `struct STU {<xxx>}; struct STU stu1;`
 - The `extern` declaration in block scope would be ignored in build stage
 - We don't have to move the static declaration to global scope, llvm supports add extern symbol to global scope  
 - We **WOULD NOT FREE** the memory in builder stage.
@@ -92,13 +101,13 @@ struct s{int a;char b;};
 - [x] {} initializer
   - [x] struct/array init
 - [ ] 89-parse () error
+- [ ] sizeof constant expression
 - [ ] type unfold redefine bug
 - [ ] QA scaffold
 - [ ] refactor
   - [ ] using hierarchical design
   - [ ] comment functions
   - [ ] remove uesless functions
-- [ ] sizeof constant expression
 - [ ] incomplete type (void/struct/union/enum dlclaration only/array declaration without array size)
 - [ ] node meta data
 - [ ] union
@@ -124,7 +133,7 @@ $(SHORT_NAME)_$(same as above)
 
 ### Short Name Table
 
-`parser/grammar.h` ： `g`
+`parser/grammar.h` :  `g`
 
 ## BUGS
 

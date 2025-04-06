@@ -805,3 +805,17 @@ void tbc_init_struct() {
       printf(\"%s %lf\n\",s.str,sum);\
   }");
 }
+
+void tbc_struct_ptr() {
+  tbc_entry("\
+    struct S\
+    {\
+      int a;\
+      int b;\
+      int c;\
+    } bolshevic;\
+    int main(){\
+      struct S *SS;\
+    }\
+ ");
+}

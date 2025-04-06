@@ -25,6 +25,7 @@ dynarray build_declaration_type_struct_member(builder b, astn n, dynarray arr) {
         build_declaration_variable_type(b, struct_member_declaration);
     if (struct_member_declaration->declaration.extdata) {
       log_panic("Unsupported struct member declaration with bitfield");
+      BUILDING();
     }
     dynarray_add(arr, &t);
   }
@@ -42,6 +43,7 @@ dynarray build_declaration_type_union_member(builder b, astn n, dynarray arr) {
         build_declaration_variable_type(b, union_member_declaration);
     if (union_member_declaration->declaration.extdata) {
       log_panic("Unsupported union member declaration with bitfield");
+      BUILDING();
     }
     if (max_size_type == NULL) {
       max_size_type = t;
@@ -139,7 +141,7 @@ sds build_symbol_name(astn n) {
                       n->declaration.uid);
 }
 
-void build_variable_global_init(LLVMValueRef pv, astn n,
+void build_variable_global_init(builder b, LLVMValueRef pv, astn n,
                                 LLVMTypeRef value_type) {
   if (!n->declaration.extdata) {
     log_debug("no initializer for %s, use default",
@@ -162,7 +164,7 @@ LLVMValueRef build_variable_global(builder b, astn n) {
   pv = LLVMAddGlobal(b->module, value_type, sym_name);
   sdsfree(sym_name);
   if (n->declaration.storage_class != TOK_KW_EXTERN) {
-    build_variable_global_init(pv, n, value_type);
+    build_variable_global_init(b, pv, n, value_type);
   }
   return pv;
 }
@@ -362,6 +364,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
           g_is_struct_or_union_token(param_base_type->ctype.type)) {
         log_panic("Pass struct or union parameter by value is not supported "
                   "right now");
+        BUILDING();
       }
       assert(!(param_base_type->type == ast_ctype &&
                param_base_type->ctype.type == '['));
@@ -405,6 +408,7 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
   } else {
     if (g_is_struct_or_union_token(func_return_base_type->ctype.type)) {
       log_panic("Return struct or union by value is not supported right now");
+      BUILDING();
     }
     auto default_type =
         build_type_base_type_convert_to_llvm(b, func_return_base_type);

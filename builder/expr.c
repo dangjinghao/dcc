@@ -747,7 +747,7 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
       build_type_chain_get_base_type(points_to_struct_type_chain);
   assert(points_to_base_type->type == ast_ctype);
   if (!g_is_struct_or_union_token(points_to_base_type->ctype.type)) {
-    log_panic("Only struct or union type can be used for . operation");
+    log_panic("Only struct or union type can be used for get member operation");
   }
   astn member_declaration;
   int member_idx = build_type_struct_type_get_by_name(
@@ -1018,5 +1018,5 @@ typed_value build_lvalue_expression(builder b, astn n) {
   }
   default:
   }
-  log_panic("lvalue expression expected");
+  log_panic("Unexpected type of lvalue expression.");
 }
