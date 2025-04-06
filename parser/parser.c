@@ -284,9 +284,9 @@ long parser_expr_eval_const_int(astn expr) {
     case TOK_LIT_CHAR:
       return expr->primary.v._char;
     default:
-      log_panic(
-          "unexpected primary type when evaluating constant int expression: %s",
-          lexer_token_get_str(expr->primary.type));
+      log_panic("unexpected primary type when evaluating constant int "
+                "expression: %s",
+                lexer_token_get_str(expr->primary.type));
     }
   }
   case ast_expr_binop: {

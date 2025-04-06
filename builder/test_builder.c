@@ -806,7 +806,7 @@ void tbc_init_struct() {
   }");
 }
 
-void tbc_struct_ptr() {
+void tbc_struct_double_decl_ptr() {
   tbc_entry("\
     struct S\
     {\
@@ -816,6 +816,20 @@ void tbc_struct_ptr() {
     } bolshevic;\
     int main(){\
       struct S *SS;\
+    }\
+ ");
+}
+
+void tbc_enum_double_decl_ptr() {
+  tbc_entry("\
+    enum S\
+    {\
+      a,\
+      b,\
+      c\
+    } bolshevic;\
+    int main(){\
+      enum S *SS;\
     }\
  ");
 }

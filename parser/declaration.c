@@ -138,6 +138,7 @@ astn parse_enumeration(parser parser) {
     n->enumeration.ident = parser->lexer->lex_token._ident;
     parser_consume(parser);
   }
+  astn ref;
   if (parser->current_token == '{') {
     parser_consume(parser);
     long enum_counter = 0;
@@ -153,21 +154,21 @@ astn parse_enumeration(parser parser) {
     if (n->enumeration.ident) {
       parser_new_tag(parser, n);
     }
+    ref = n;
   } else {
     if (!n->enumeration.ident) {
       compiler_error(parser->lexer,
                      "enumeration declaration without an identifier");
     }
-    astn ref =
-        parser_scope_all_find_ident(n->enumeration.ident, &parser->tagtab);
+    ref = parser_scope_all_find_ident(n->enumeration.ident, &parser->tagtab);
     if (!ref) {
       compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
                      n->enumeration.ident);
     }
     ast_free(n);
-    n = ast_new(ast_ref);
-    n->ref = ref;
   }
+  n = ast_new(ast_ref);
+  n->ref = ref;
   return n;
 }
 

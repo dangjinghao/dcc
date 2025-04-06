@@ -11,9 +11,15 @@ a simple C89 compiler, emits to llvm ir.
 ### Unsupport Features
 
 - bitfield
+  - I'm not good at align or something, so looks like I cannot solve this right now.
 - struct/union pass to or return from function by value
+  - same as before.
 - global variable initialization with value
+  - planned
 - sizeof operator
+  - planned
+- incomplete type
+  - planned
 
 ## Hint
 
@@ -22,7 +28,7 @@ a simple C89 compiler, emits to llvm ir.
 - The parser would not generate a AST which 100% corresponding to the source code, to reduce the complexity of codegen/build process.
   - We call this AST `reduced AST`.
   - `int i,j,k = 10;` -> `int i;int j; int k = 10;`
-  - `struct STU {<xxx>} stu1;` -> `struct STU {<xxx>}; struct STU stu1;`
+  - `struct/union/enum STU {<xxx>} stu1;` -> `struct/union/enum STU {<xxx>}; struct/union/enum STU stu1;`
 - The `extern` declaration in block scope would be ignored in build stage
 - We don't have to move the static declaration to global scope, llvm supports add extern symbol to global scope  
 - We **WOULD NOT FREE** the memory in builder stage.
