@@ -91,6 +91,7 @@ struct s{int a;char b;};
 - [x] ptr to struct/union(any complex type) - ptr
 - [x] {} initializer
   - [x] struct/array init
+- [ ] 89-parse () error
 - [ ] type unfold redefine bug
 - [ ] QA scaffold
 - [ ] refactor

@@ -1,7 +1,7 @@
 MAKEFLAGS ?= -j $(shell nproc)
 
 TARGET := dcc
-SRCS := $(shell find . -name "*.c" ! -name "test*")
+SRCS := $(shell find . -name "*.c" |grep -v "test")
 OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
 INCS := libs lexer parser 
@@ -24,8 +24,7 @@ ARGS :=
 
 -include $(DEPS)
 
-run: $(TARGET)
-	./$(TARGET) $(ARGS)
+build: $(TARGET)
 
 %.o:%.c makefile
 	@echo "$(<) --> $(@)" >&2
@@ -35,7 +34,6 @@ $(TARGET): $(OBJS) makefile
 	@echo "linking..." >&2
 	@$(CC) $(OBJS) -o $(@) $(LDFLAGS)
 
-build: $(TARGET)
 
 gdb: $(TARGET)
 	@gdb $(TARGET)
@@ -67,4 +65,5 @@ test: $(OBJS) makefile $(TEST_FILE_OBJ)
 		$(RUN) ./test.out ; \
 	fi
 
+	
 .PHONY: run gdb clean test

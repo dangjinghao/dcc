@@ -9,7 +9,7 @@
 
 [[gnu::constructor]] void init() {
   log_color_enable(true);
-  log_set_level(LOG_LEVEL_TRACE);
+  log_set_level(LOG_LEVEL_INFO);
   log_trace("test_builder init");
 }
 
@@ -705,13 +705,6 @@ void tbc_ternary_string_assign() {
       char* str = \"hi\";\
       str = \"hi\";\
   }");
-}
-
-void tbc_from_stdin() {
-  struct lexer lexer;
-  lexer_new_from_fp(&lexer, stdin);
-  process_trans_unit(&lexer);
-  lexer_destroy(&lexer);
 }
 
 void tbc_va_printf() {

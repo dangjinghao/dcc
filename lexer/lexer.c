@@ -159,6 +159,10 @@ int lexer_get_next_number(struct lexer *lexer, bool decimal_only) {
         number = sdscatlen(number, "x", 1);
         lexer_consume(lexer);
         base = 16;
+      } else if (lexer_peek(lexer) == 'b') {
+        number = sdscatlen(number, "b", 1);
+        lexer_consume(lexer);
+        base = 2;
       } else if (lexer_is_oct_digit(lexer_peek(lexer))) {
         base = 8;
       }
