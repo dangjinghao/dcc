@@ -7,6 +7,7 @@ a simple C89 compiler, emits to llvm ir.
 - Almost C89 features
 - declaration at anywhere is allowed. (C99)
 - declaration at `for` statement `init` scope. (C99)
+- In fact we doesn't support `long long int` type, it is same as `long int` same as `long`.
 
 ### Unsupport Features
 
@@ -106,8 +107,9 @@ struct s{int a;char b;};
 - [x] ptr to struct/union(any complex type) - ptr
 - [x] {} initializer
   - [x] struct/array init
+- [ ] 72 long long int support
 - [ ] remove uid, I don't think it is necessary.
-- [ ] 89-parse () error
+- [ ] 89 gnu `({})` ext
 - [ ] sizeof constant expression
 - [ ] type unfold redefine bug
 - [ ] QA scaffold

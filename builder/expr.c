@@ -777,6 +777,20 @@ typed_value build_expr_unary_get_member_ptr(builder b, astn n) {
 typed_value build_expr_unary_get_member(builder b, astn n) {
   return build_value_load(b, build_expr_unary_get_member_ptr(b, n));
 }
+
+typed_value build_expr_unary_sizeof(builder b, astn n) {
+  if (n->type == ast_declaration) {
+    astn base_type = build_type_chain_get_base_type(&n->declaration.type_chain);
+
+    LLVMTypeRef size_type = LLVMInt64TypeInContext(b->context);
+    LLVMValueRef size_value = LLVMConstInt(
+        size_type, build_type_abi_sizeof_base_type(b, base_type), false);
+    return typed_value_new(size_value, build_type_chain_by_lit(TOK_LIT_ULONG));
+  } else {
+    BUILDING();
+  }
+}
+
 typed_value build_expr_unary(builder b, astn n) {
   if (!n->unary.postfix) {
     // suffix
@@ -798,7 +812,7 @@ typed_value build_expr_unary(builder b, astn n) {
       return build_expr_unary_self_inc(b, n->unary.expr, n->unary.op,
                                        n->unary.postfix);
     case TOK_KW_SIZEOF:
-      break;
+      return build_expr_unary_sizeof(b, n->unary.expr);
     }
   } else {
     switch (n->unary.op) {

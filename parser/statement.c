@@ -230,7 +230,6 @@ astn parse_statement_labeled(parser p) {
     if (p->current_token == ':') {
       parser_consume(p);
       parser_destory(&backup);
-      break;
     } else {
       // failed to parse label, restore parser state
       ast_free(label);

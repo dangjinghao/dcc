@@ -263,7 +263,7 @@ static inline bool g_is_init_declarator_firstset(parser parser) {
 static inline bool g_is_primary_expression_firstset(parser parser) {
   return parser->current_token == TOK_IDENT || parser->current_token == '(' ||
          (parser->current_token > __TOK_LIT_START &&
-          parser->current_token < TOK_SYM_LEQ);
+          parser->current_token < __TOK_LIT_END);
 }
 
 /**

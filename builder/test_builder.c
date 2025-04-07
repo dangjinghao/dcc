@@ -843,6 +843,14 @@ void tbc_enum_incomplete_decl_typedef() {
             "I F2(){return A+B;}");
 }
 
-void tbc_int_const_global_variable(){
+void tbc_int_const_global_variable() {
   tbc_entry("int a = 1; int b = 2314; int F(){return a+b;}");
+}
+
+void tbc_sizeof() {
+  tbc_entry("int F(){\
+    int a = 1;\
+    int b = sizeof(void*);\
+  }\
+  ");
 }

@@ -201,12 +201,6 @@ astn parse_declaration_specifiers(parser parser) {
       tn->storage = parser->current_token;
       parser_consume(parser);
     } else {
-      if (tn->type != TOK_UNKNOWN) {
-        // tn->type != TOK_UNKNOWN is used to solve this problem: typedef int A; A A;
-        // if we don't use this flag, A would be recognized as a type specifier twice
-        // it's unexpected situation
-        break;
-      }
       assert(g_is_type_specifier_firstset(parser));
       if (g_is_typedef_name_firstset(parser)) {
         tn->type = TOK_KW_TYPEDEF;

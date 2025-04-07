@@ -48,8 +48,7 @@ astn parse_expr_primary(parser parser) {
     break;
   case TOK_IDENT: {
     node = parse_expr_ident(parser);
-    astn ref_id =
-        parser_scope_all_find_ident(node->ident, &parser->idtab);
+    astn ref_id = parser_scope_all_find_ident(node->ident, &parser->idtab);
     if (!ref_id) {
       compiler_error(parser->lexer, "Undefined identifier %s", node->ident);
     }
@@ -183,13 +182,27 @@ astn parse_expr_unary_prefix(parser parser) {
     break;
   }
   case TOK_KW_SIZEOF: {
-    if (g_is_type_name_firstset(parser)) {
-      astn declaration = ast_new(ast_declaration);
-      parse_type_name(parser, &declaration->declaration.type_chain);
-      node->unary.expr = declaration;
-    } else {
-      node->unary.expr = parse_expr_unary(parser);
+    if (parser->current_token == '(') {
+      // sizeof (<type-name>)
+      struct parser snapshot;
+      parser_new_snapshot(&snapshot, parser);
+      parser_consume(parser);
+      if (g_is_type_name_firstset(parser)) {
+        astn declaration = ast_new(ast_declaration);
+        parse_type_name(parser, &declaration->declaration.type_chain);
+        node->unary.expr = declaration;
+        parser_consume_with(parser, ')');
+        parser_destory(&snapshot);
+        break;
+      } else {
+        // sizeof (<cast-expr>) -> sizeof <cast-expr>
+        parser_restore(parser, &snapshot);
+      }
     }
+
+    // sizeof <expr>
+    node->unary.expr = parse_expr_unary_cast(parser);
+
     break;
   }
   default: {
