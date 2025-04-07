@@ -842,3 +842,7 @@ void tbc_enum_incomplete_decl_typedef() {
   tbc_entry("typedef enum E I; I V1; enum E {A = 3,B,C}; I F(){return V1 = A;} "
             "I F2(){return A+B;}");
 }
+
+void tbc_int_const_global_variable(){
+  tbc_entry("int a = 1; int b = 2314; int F(){return a+b;}");
+}

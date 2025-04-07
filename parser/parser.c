@@ -388,7 +388,7 @@ long parser_expr_eval_const_int(astn expr) {
         "unexpected ast node type when checking constant int expression: %s",
         convert_repr_ast_type(expr->type));
   }
-  return false;
+  return 0;
 }
 
 bool parser_expr_check_const_int(astn expr) {

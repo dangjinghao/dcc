@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "log/log.h"
 #include "macro/macro.h"
+#include "parser.h"
 #include "sds/sds.h"
 #include "slist/slist.h"
 #include "token.h"
@@ -148,7 +149,26 @@ void build_variable_global_init(builder b, LLVMValueRef pv, astn n,
               LLVMGetValueName2(pv, &(size_t){}));
     LLVMSetInitializer(pv, LLVMConstNull(value_type));
   } else {
-    BUILDING();
+    astn init = n->declaration.extdata;
+    assert(init->type == ast_initializer);
+    if (init->initializer.init->type == ast_initializer_list) {
+      BUILDING();
+    }
+    astn base_type = build_type_chain_get_base_type(&n->declaration.type_chain);
+    assert(base_type->type == ast_ctype);
+    if (g_is_int_family_tok(base_type->ctype.type)) {
+      log_trace(
+          "try to eval the global variable constant long int type initializer");
+      assert(parser_expr_check_const_int(init->initializer.init));
+      long v = parser_expr_eval_const_int(init->initializer.init);
+      LLVMTypeRef llvm_type =
+          build_type_base_type_convert_to_llvm(b, base_type);
+      LLVMValueRef const_value =
+          LLVMConstInt(llvm_type, v, base_type->ctype.signint == TOK_KW_SIGNED);
+      LLVMSetInitializer(pv, const_value);
+    } else {
+      BUILDING();
+    }
   }
 }
 
