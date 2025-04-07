@@ -37,7 +37,7 @@ void parser_pop_scope(parser parser);
 void parser_push_scope(parser parser);
 astn parser_lookup_typedef(parser parser, sds ident);
 bool parser_scope_is_current_global(parser parser);
-void parser_new_tag(parser parser, astn n);
+astn parser_new_tag(parser parser, astn n);
 void parser_new_declaration(parser parser, astn n);
 void parser_new_enumerator(parser parser, astn n);
 bool parser_expr_check_const_int(astn expr);
@@ -64,7 +64,7 @@ astn parse_translation_unit(parser parser);
 astn parse_statement_compound(parser parser);
 slist parse_type_name(parser parser, slist type_chain);
 astn parse_initializer(parser parser);
-sds parse_declaration_get_ident(astn n);
+sds parser_declaration_get_ident(astn n);
 
 void parser_symtab_add(parser parser, astn n);
 astn parser_symtab_find(slist symtab, sds id);

@@ -106,6 +106,7 @@ struct s{int a;char b;};
 - [x] ptr to struct/union(any complex type) - ptr
 - [x] {} initializer
   - [x] struct/array init
+- [ ] remove uid, I don't think it is necessary.
 - [ ] 89-parse () error
 - [ ] sizeof constant expression
 - [ ] type unfold redefine bug

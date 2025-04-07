@@ -218,9 +218,9 @@ sds convert_repr_jsonify_ast(astn n, sds buf, bool shallow) {
                          convert_repr_token(n->declaration.storage_class));
       buf = sdscat(buf, ",");
     }
-    if (parse_declaration_get_ident(n)) {
+    if (parser_declaration_get_ident(n)) {
       buf = sdscatprintf(buf, "{\"name\":\"<id> %s.%ld\"},",
-                         parse_declaration_get_ident(n), n->declaration.uid);
+                         parser_declaration_get_ident(n), n->declaration.uid);
     } else {
       buf = sdscatprintf(buf, "{\"name\":\"<empty-id>\"},");
     }

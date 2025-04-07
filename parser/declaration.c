@@ -138,7 +138,6 @@ astn parse_enumeration(parser parser) {
     n->enumeration.ident = parser->lexer->lex_token._ident;
     parser_consume(parser);
   }
-  astn ref;
   if (parser->current_token == '{') {
     parser_consume(parser);
     long enum_counter = 0;
@@ -151,22 +150,8 @@ astn parse_enumeration(parser parser) {
       }
     }
     parser_consume_with(parser, '}');
-    if (n->enumeration.ident) {
-      parser_new_tag(parser, n);
-    }
-    ref = n;
-  } else {
-    if (!n->enumeration.ident) {
-      compiler_error(parser->lexer,
-                     "enumeration declaration without an identifier");
-    }
-    ref = parser_scope_all_find_ident(n->enumeration.ident, &parser->tagtab);
-    if (!ref) {
-      compiler_error(parser->lexer, "Undefined enumeration declaration: %s",
-                     n->enumeration.ident);
-    }
-    ast_free(n);
   }
+  astn ref = parser_new_tag(parser, n);
   n = ast_new(ast_ref);
   n->ref = ref;
   return n;
@@ -450,7 +435,7 @@ astn parse_init_declarator(parser parser, astn decl_specs,
     // we put this process in there because the later parser_declare_new_symbol needs the
     // extern to determine whether should it be added to the symtab.
     log_trace("add extern storage specifier to function declaration: %s",
-              parse_declaration_get_ident(n));
+              parser_declaration_get_ident(n));
 
     n->declaration.storage_class = TOK_KW_EXTERN;
   }
@@ -576,7 +561,7 @@ slist parse_type_name(parser parser, slist type_chain) {
   return type_chain;
 }
 
-sds parse_declaration_get_ident(astn n) {
+sds parser_declaration_get_ident(astn n) {
   switch (n->type) {
   case ast_declaration:
     return n->declaration.ident;

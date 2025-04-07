@@ -129,15 +129,15 @@ LLVMTypeRef build_declaration_variable_type(builder b, astn n) {
 sds build_symbol_name(astn n) {
   assert(n->type == ast_declaration);
   if (n->declaration.storage_class == TOK_KW_EXTERN) {
-    return sdsdup(parse_declaration_get_ident(n));
+    return sdsdup(parser_declaration_get_ident(n));
   } else if (n->declaration.storage_class == TOK_KW_STATIC) {
     return sdscatprintf(sdsempty(), STATIC_VAR_FMT,
-                        parse_declaration_get_ident(n), n->declaration.uid);
+                        parser_declaration_get_ident(n), n->declaration.uid);
   } else if (!g_is_declaration_in_function_scope(n)) {
-    return sdsdup(parse_declaration_get_ident(n));
+    return sdsdup(parser_declaration_get_ident(n));
   }
   assert(g_is_declaration_in_function_scope(n));
-  return sdscatprintf(sdsempty(), VAR_FMT, parse_declaration_get_ident(n),
+  return sdscatprintf(sdsempty(), VAR_FMT, parser_declaration_get_ident(n),
                       n->declaration.uid);
 }
 
@@ -426,14 +426,14 @@ void build_function_body(builder b, astn n, LLVMValueRef v) {
 typed_value build_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   if (n->declaration.V) {
-    log_trace("declaration %s has been built", parse_declaration_get_ident(n));
+    log_trace("declaration %s has been built", parser_declaration_get_ident(n));
     return n->declaration.V;
   }
 
   LLVMValueRef v;
   if (n->declaration.storage_class == TOK_KW_TYPEDEF) {
     log_debug("ignore the typedef declaration: %s",
-              parse_declaration_get_ident(n));
+              parser_declaration_get_ident(n));
     return NULL;
   } else if (g_get_function_params(n)) {
     // function declaration or definition

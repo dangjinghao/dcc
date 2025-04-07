@@ -833,3 +833,12 @@ void tbc_enum_double_decl_ptr() {
     }\
  ");
 }
+
+void tbc_enum_incomplete_decl() {
+  tbc_entry("enum E; enum E V1; enum E {A = 3,B,C}; int main(){V1 = A;}");
+}
+
+void tbc_enum_incomplete_decl_typedef() {
+  tbc_entry("typedef enum E I; I V1; enum E {A = 3,B,C}; I F(){return V1 = A;} "
+            "I F2(){return A+B;}");
+}

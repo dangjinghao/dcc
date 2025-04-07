@@ -90,7 +90,7 @@ void parser_pop_scope(parser parser) {
 }
 
 static inline astn parser_astn_ident_cmp(astn data, sds ident) {
-  if (0 == sdscmp(parse_declaration_get_ident(data), ident)) {
+  if (0 == sdscmp(parser_declaration_get_ident(data), ident)) {
     return data;
   }
   return NULL;
@@ -126,7 +126,7 @@ astn parser_scope_current_find_ident(sds ident, slist tab) {
 
 void parser_scope_current_add_symbol(astn n, slist tab) {
   log_debug("add declaration %s to current scope",
-            parse_declaration_get_ident(n));
+            parser_declaration_get_ident(n));
   slist_add_head(tab, n);
 }
 
@@ -153,20 +153,20 @@ bool parser_scope_is_current_global(parser parser) {
  */
 void parser_new_declaration(parser parser, astn n) {
   assert(n->type == ast_declaration);
-  if (parse_declaration_get_ident(n) == NULL) {
+  if (parser_declaration_get_ident(n) == NULL) {
     log_debug("this is an abstract declarator, skipping declaration");
     return;
   }
   astn existing_symbol = parser_scope_current_find_ident(
-      parse_declaration_get_ident(n), &parser->idtab);
+      parser_declaration_get_ident(n), &parser->idtab);
   if (existing_symbol && n->declaration.storage_class == TOK_KW_EXTERN) {
     log_debug("multiple extern declaration, do nothing: %s",
-              parse_declaration_get_ident(n));
+              parser_declaration_get_ident(n));
     return;
   } else if (existing_symbol && n->declaration.storage_class != TOK_KW_EXTERN &&
              existing_symbol->declaration.storage_class != TOK_KW_EXTERN) {
     compiler_error(parser->lexer, "redefined symbol %s",
-                   parse_declaration_get_ident(n));
+                   parser_declaration_get_ident(n));
   }
 
   n->declaration.uid = parser_get_uid(parser);
@@ -204,35 +204,52 @@ void parser_new_enumerator(parser parser, astn enumerator) {
  * @param parser 
  * @param n 
  */
-void parser_new_tag(parser parser, astn n) {
+astn parser_new_tag(parser parser, astn n) {
+
+  // find exists same name tag
+  sds id = parser_declaration_get_ident(n);
+  if (!id) {
+    log_debug("this new tag doesn't have an ident, skip new");
+    return n;
+  }
+  astn existing_tag = parser_scope_current_find_ident(id, &parser->tagtab);
+  assert(!existing_tag || (existing_tag->type == n->type));
+
+  if (!existing_tag) {
+    // add it to table because same ident name doesn't exist
+    if (n->type == ast_struct_or_union_declaration) {
+      n->struct_or_union_declaration.uid = parser_get_uid(parser);
+    } else {
+      n->enumeration.uid = parser_get_uid(parser);
+    }
+    parser_scope_current_add_symbol(n, &parser->tagtab);
+    return n;
+  }
+  // tag is existing
   if (n->type == ast_struct_or_union_declaration) {
-    if (n->struct_or_union_declaration.ident == NULL) {
-      log_debug("this is an abstract struct declarator, skipping declaration");
-      return;
-    }
-    astn existing_tag = parser_scope_current_find_ident(
-        n->struct_or_union_declaration.ident, &parser->tagtab);
-    if (existing_tag) {
-      compiler_error(parser->lexer, "redefined  tag with identifier %s",
-                     n->struct_or_union_declaration.ident);
-    }
-    n->struct_or_union_declaration.uid = parser_get_uid(parser);
+    compiler_error(parser->lexer, "redefined  tag with identifier %s",
+                   n->struct_or_union_declaration.ident);
+
   } else {
     assert(n->type == ast_enumeration);
-    if (n->enumeration.ident == NULL) {
-      log_debug("this is an abstract enumeration, skipping declaration");
-      return;
+    if (slist_empty(&n->enumeration.enumerators)) {
+      return existing_tag;
+    } else if (slist_empty(&existing_tag->enumeration.enumerators)) {
+      log_debug("redefine a weak tag with enumerators, move enumerators to "
+                "this tag:%s",
+                n->enumeration.ident);
+      existing_tag->enumeration.enumerators = n->enumeration.enumerators;
+      slist_init(&n->enumeration.enumerators);
+      ast_free(n);
+      return existing_tag;
+    } else {
+      assert(!slist_empty(&existing_tag->enumeration.enumerators) &&
+             !slist_empty(&n->enumeration.enumerators));
+      log_panic("try to redefine enumeration with same ident: %s",
+                n->enumeration.ident);
     }
-    astn existing_tag =
-        parser_scope_current_find_ident(n->enumeration.ident, &parser->tagtab);
-    if (existing_tag) {
-      compiler_error(parser->lexer, "redefined tag with identifier %s",
-                     n->enumeration.ident);
-    }
-    n->enumeration.uid = parser_get_uid(parser);
   }
-
-  parser_scope_current_add_symbol(n, &parser->tagtab);
+  log_panic("unexpected path");
 }
 
 size_t parser_get_uid(parser parser) {

@@ -94,11 +94,11 @@ typed_value builder_relocate_declaration(builder b, astn n) {
   assert(n->type == ast_declaration);
   if (n->declaration.storage_class == TOK_KW_EXTERN) {
     // relocate extern declaration
-    astn exist = parser_symtab_find(b->symtab, parse_declaration_get_ident(n));
+    astn exist = parser_symtab_find(b->symtab, parser_declaration_get_ident(n));
     if (exist) {
       n = exist;
       log_debug("relocate extern declaration %s",
-                parse_declaration_get_ident(n));
+                parser_declaration_get_ident(n));
     }
   }
 
