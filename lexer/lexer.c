@@ -206,8 +206,8 @@ int lexer_get_next_number(struct lexer *lexer, bool decimal_only) {
       lexer_consume(lexer);
     }
   }
-  bool has_u, has_l, has_f;
-  has_u = has_l = has_f = false;
+  bool has_u, has_l, has_ll, has_f;
+  has_ll = has_u = has_l = has_f = false;
   while (strchr("ulf", tolower(c = lexer_peek(lexer)))) {
     switch (tolower(c)) {
     case 'u':
@@ -217,10 +217,13 @@ int lexer_get_next_number(struct lexer *lexer, bool decimal_only) {
       has_u = true;
       break;
     case 'l':
-      if (has_l) {
+      if (has_ll) {
         compiler_error(lexer, "Repeated number suffix: %c", c);
+      } else if (has_l) {
+        has_ll = true;
+      } else {
+        has_l = true;
       }
-      has_l = true;
       break;
     case 'f':
       if (has_f) {
@@ -239,6 +242,8 @@ int lexer_get_next_number(struct lexer *lexer, bool decimal_only) {
   } else if (has_u) {
     lexer->lex_token._uint = strtoul(number, NULL, base);
   } else if (has_l) {
+    static_assert(sizeof(long long) == sizeof(long),
+                  "long long lexer is not compatible with long");
     lexer->lex_token._int = strtol(number, NULL, base);
   } else {
     lexer->lex_token._int = strtol(number, NULL, base);
