@@ -548,3 +548,135 @@ size_t build_type_abi_sizeof_base_type(builder b, astn base_type) {
   }
   return lexer_token_get_sizeof(base_type->ctype.type);
 }
+
+slist builder_type_expr_static_infer(builder b, astn expr) {
+  if (expr->type == ast_ref) {
+    expr = expr->ref;
+  }
+  switch (expr->type) {
+  case ast_enumerator: {
+    return build_type_chain_by_lit(TOK_KW_INT);
+  }
+  case ast_expr_primary: {
+    return build_type_chain_by_lit(expr->primary.type);
+  }
+  case ast_expr_binop: {
+    // TODO: speical case for >> and <<, lhs is important, the finnal result type is
+    // the same as lhs
+    // and other binop speical 
+    slist lhs_type_chain = builder_type_expr_static_infer(b, expr->binop.lhs);
+    slist rhs_type_chain = builder_type_expr_static_infer(b, expr->binop.rhs);
+    lhs_type_chain =
+        build_type_chain_inplace_cast_indexable_implict(b, lhs_type_chain);
+    rhs_type_chain =
+        build_type_chain_inplace_cast_indexable_implict(b, rhs_type_chain);
+    lhs_type_chain = build_type_chain_tiny_int_promote(b, lhs_type_chain);
+    rhs_type_chain = build_type_chain_tiny_int_promote(b, rhs_type_chain);
+    // upper cast
+    astn lhs_base_type = build_type_chain_get_base_type(lhs_type_chain);
+    astn rhs_base_type = build_type_chain_get_base_type(rhs_type_chain);
+    int cmp = build_type_compare_promote_level(lhs_base_type, rhs_base_type);
+    if (cmp == 0) {
+      return lhs_type_chain;
+    } else if (cmp > 0) {
+      return lhs_type_chain;
+    } else {
+      return rhs_type_chain;
+    }
+  }
+  case ast_expr_ternary: {
+    slist lhs_type_chain = builder_type_expr_static_infer(b, expr->ternary._t);
+    slist rhs_type_chain = builder_type_expr_static_infer(b, expr->ternary._t);
+    lhs_type_chain =
+        build_type_chain_inplace_cast_indexable_implict(b, lhs_type_chain);
+    rhs_type_chain =
+        build_type_chain_inplace_cast_indexable_implict(b, rhs_type_chain);
+    lhs_type_chain = build_type_chain_tiny_int_promote(b, lhs_type_chain);
+    rhs_type_chain = build_type_chain_tiny_int_promote(b, rhs_type_chain);
+    // upper cast
+    astn lhs_base_type = build_type_chain_get_base_type(lhs_type_chain);
+    astn rhs_base_type = build_type_chain_get_base_type(rhs_type_chain);
+    int cmp = build_type_compare_promote_level(lhs_base_type, rhs_base_type);
+    if (cmp == 0) {
+      return lhs_type_chain;
+    } else if (cmp > 0) {
+      return lhs_type_chain;
+    } else {
+      return rhs_type_chain;
+    }
+  }
+  case ast_expr_unary: {
+    slist type_chain = builder_type_expr_static_infer(b, expr->unary.expr);
+    astn base_type = build_type_chain_get_base_type(type_chain);
+    switch (expr->unary.op) {
+    case '+':
+    case '!':
+    case '-':
+    case '~': {
+      size_t base_type_sz = build_type_abi_sizeof_base_type(b, base_type);
+      slist int_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
+      size_t int_sz =
+          build_type_abi_sizeof_base_type(b, slist_peek_head(int_type_chain));
+      if (base_type_sz < int_sz) {
+        return int_type_chain;
+      }
+      return type_chain;
+    }
+    case TOK_KW_SIZEOF:
+      return build_type_chain_by_lit(TOK_LIT_ULONG);
+    case '&': {
+      return build_type_chain_new_add_pointer(b, type_chain);
+    }
+    case '[':
+    case '.':
+      BUILDING();
+    default:
+      log_panic(
+          "unexpected unary type when evaluating constant int expression: %s",
+          lexer_token_get_str(expr->unary.op));
+    }
+  }
+  case ast_expr_typecast: {
+    return build_type_chain_copy(&expr->typecast.type_chain);
+  }
+  case ast_declaration: {
+    return build_type_chain_copy(&expr->declaration.type_chain);
+  }
+  default:
+    log_panic(
+        "unexpected ast node type when checking constant int expression: %s",
+        convert_repr_ast_type(expr->type));
+  }
+  return 0;
+}
+
+typed_value build_type_tiny_int_promote(builder b, typed_value tv) {
+  astn expr_base_type = build_type_chain_get_base_type(&tv->type_chain);
+  if (!g_is_int_family_tok(expr_base_type->ctype.type)) {
+    return tv;
+  }
+  // create a temporary int type and its corresponsed type chain
+  slist tmp_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
+  int cmp = build_type_compare_promote_level(
+      expr_base_type, build_type_chain_get_base_type(tmp_type_chain));
+  if (cmp == -1) {
+    log_trace("+ unary operator type promotion: tiny int -> int");
+    tv = build_type_convert_by_type_chain(b, tv, tmp_type_chain);
+  }
+  return tv;
+}
+
+slist build_type_chain_tiny_int_promote(builder b, slist type_chain) {
+  astn base_type = build_type_chain_get_base_type(type_chain);
+  if (!g_is_int_family_tok(base_type->ctype.type)) {
+    return type_chain;
+  }
+  // create a temporary int type and its corresponsed type chain
+  slist tmp_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
+  int cmp = build_type_compare_promote_level(
+      base_type, build_type_chain_get_base_type(tmp_type_chain));
+  if (cmp == -1) {
+    type_chain = tmp_type_chain;
+  }
+  return type_chain;
+}

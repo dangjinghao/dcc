@@ -130,12 +130,18 @@ typed_value build_expr_binop_template(builder b, astn binop,
     log_trace("ptr operation detected in binop expression");
     return build_expr_binop_ptr(b, lhs, binop->binop.op, rhs);
   }
+  // tiny int promote
+  lhs = build_type_tiny_int_promote(b, lhs);
+  rhs = build_type_tiny_int_promote(b, rhs);
   return build_value_expr_binop_template(b, lhs, rhs, llvm_build_f, f_names);
 }
 
 typed_value build_expr_binop_div(builder b, astn binop) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  // tiny int promote
+  lhs = build_type_tiny_int_promote(b, lhs);
+  rhs = build_type_tiny_int_promote(b, rhs);
   return build_value_expr_binop_div(b, lhs, rhs);
 }
 
@@ -153,6 +159,9 @@ typed_value build_expr_binop_su_template(builder b, astn binop,
                                          char *f_names[2]) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  // tiny int promote
+  lhs = build_type_tiny_int_promote(b, lhs);
+  rhs = build_type_tiny_int_promote(b, rhs);
   return build_value_expr_binop_su_template(b, lhs, rhs, llvm_build_f, f_names);
 }
 
@@ -161,6 +170,9 @@ typed_value build_expr_binop_bit_template(builder b, astn binop,
                                           char *f_name) {
   typed_value lhs = build_expression(b, binop->binop.lhs);
   typed_value rhs = build_expression(b, binop->binop.rhs);
+  // tiny int promote
+  lhs = build_type_tiny_int_promote(b, lhs);
+  rhs = build_type_tiny_int_promote(b, rhs);
   return build_value_expr_binop_bit_template(b, lhs, rhs, llvm_build_f, f_name);
 }
 
@@ -215,11 +227,11 @@ typed_value build_expr_binop_logic_cmp(builder b, astn binop, int preds[3],
     log_panic("Unsupported type in logic compare operation:%s",
               convert_repr_ast_type(lhs_base_type->ctype.type));
   }
-  // convert i1 to i8
+  // convert i1 to i32(int)
   return typed_value_new(LLVMBuildZExt(b->builder, result,
-                                       LLVMInt8TypeInContext(b->context),
+                                       LLVMInt32TypeInContext(b->context),
                                        "zext_logic_cmp"),
-                         build_type_chain_by_lit(TOK_LIT_CHAR));
+                         build_type_chain_by_lit(TOK_LIT_INT));
 }
 
 typed_value build_expr_binop_assign(builder b, astn binop) {
@@ -326,11 +338,13 @@ typed_value build_expr_ternary(builder b, astn ternary) {
   // true block
   LLVMPositionBuilderAtEnd(b->builder, true_block);
   typed_value true_expr = build_expression(b, ternary->ternary._t);
+  true_expr = build_type_tiny_int_promote(b, true_expr);
   // update true block which maybe updated by sub-expression
   true_block = LLVMGetInsertBlock(b->builder);
   // false block
   LLVMPositionBuilderAtEnd(b->builder, false_block);
   typed_value false_expr = build_expression(b, ternary->ternary._f);
+  false_expr = build_type_tiny_int_promote(b, false_expr);
   // update false block which maybe updated by sub-expression
   false_block = LLVMGetInsertBlock(b->builder);
 
@@ -517,29 +531,20 @@ typed_value build_expr_binop(builder b, astn n) {
 
 typed_value build_expr_unary_pos(builder b, astn n) {
   typed_value expr = build_expression(b, n);
+  expr = build_type_tiny_int_promote(b, expr);
   // panic if the type is not numeric
   astn base_type = build_type_chain_get_base_type(&expr->type_chain);
   if (!g_is_numeric_tok(base_type->ctype.type)) {
     log_panic("Unary positive operation is only allowed on numeric types");
-  }
-  // tiny int -> int
-  astn expr_base_type = build_type_chain_get_base_type(&expr->type_chain);
-  // create a temporary int type and its corresponsed type chain
-  slist tmp_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
-
-  int cmp = build_type_compare_promote_level(
-      expr_base_type, build_type_chain_get_base_type(tmp_type_chain));
-  if (cmp == -1) {
-    log_trace("+ unary operator type promotion: tiny int -> int");
-    typed_value v = build_type_convert_by_type_chain(b, expr, tmp_type_chain);
-    return v;
   }
   return expr;
 }
 
 typed_value build_expr_unary_not(builder b, astn n) {
 
-  auto eq0 = build_value_eq0(b, build_expression(b, n));
+  typed_value expr = build_expression(b, n);
+  expr = build_type_tiny_int_promote(b, expr);
+  auto eq0 = build_value_eq0(b, expr);
   auto zext = LLVMBuildZExt(b->builder, eq0, LLVMInt8TypeInContext(b->context),
                             "zext_unary_not");
   return typed_value_new(zext, build_type_chain_by_lit(TOK_LIT_CHAR));
@@ -547,8 +552,8 @@ typed_value build_expr_unary_not(builder b, astn n) {
 
 typed_value build_expr_unary_neg(builder b, astn n) {
   typed_value expr = build_expression(b, n);
+  expr = build_type_tiny_int_promote(b, expr);
   astn base_type = build_type_chain_get_base_type(&expr->type_chain);
-
   if (g_is_int_family_tok(base_type->ctype.type)) {
     return typed_value_new(LLVMBuildNeg(b->builder, expr->v, "neg"),
                            &expr->type_chain);
@@ -561,6 +566,7 @@ typed_value build_expr_unary_neg(builder b, astn n) {
 
 typed_value build_expr_unary_bit_not(builder b, astn n) {
   typed_value expr = build_expression(b, n);
+  expr = build_type_tiny_int_promote(b, expr);
   // bit not
   astn base_type = build_type_chain_get_base_type(&expr->type_chain);
   if (!g_is_int_family_tok(base_type->ctype.type)) {
@@ -573,6 +579,7 @@ typed_value build_expr_unary_bit_not(builder b, astn n) {
 typed_value build_expr_unary_deref(builder b, astn n) {
   // deref
   typed_value expr = build_expression(b, n);
+  expr = build_type_tiny_int_promote(b, expr);
   // check if the type is a pointer
   astn base_type = build_type_chain_get_base_type(&expr->type_chain);
   if (!build_type_base_type_is_indexable(base_type)) {
@@ -787,7 +794,12 @@ typed_value build_expr_unary_sizeof(builder b, astn n) {
         size_type, build_type_abi_sizeof_base_type(b, base_type), false);
     return typed_value_new(size_value, build_type_chain_by_lit(TOK_LIT_ULONG));
   } else {
-    BUILDING();
+    slist type_chain_sizeof = builder_type_expr_static_infer(b, n);
+    astn base_type = build_type_chain_get_base_type(type_chain_sizeof);
+    size_t size = build_type_abi_sizeof_base_type(b, base_type);
+    LLVMTypeRef size_type = LLVMInt64TypeInContext(b->context);
+    LLVMValueRef size_value = LLVMConstInt(size_type, size, false);
+    return typed_value_new(size_value, build_type_chain_by_lit(TOK_LIT_ULONG));
   }
 }
 
@@ -979,6 +991,9 @@ typed_value build_expression(builder b, astn n) {
   }
   case ast_expr_typecast: {
     return build_expr_typecast(b, n);
+  }
+  case ast_block: {
+    return build_statement_block(b, n);
   }
   default:
   }

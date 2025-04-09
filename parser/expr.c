@@ -59,7 +59,12 @@ astn parse_expr_primary(parser parser) {
   }
   case '(':
     parser_consume(parser);
-    node = parse_expression(parser);
+    if (parser->current_token == '{') {
+      // impl GNU statement in expression feature
+      node = parse_statement_compound(parser);
+    } else {
+      node = parse_expression(parser);
+    }
     parser_consume_with(parser, ')');
     break;
   default:

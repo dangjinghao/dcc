@@ -203,6 +203,8 @@ void tbc_ptr_unary_right() {
             "++p;char*p5 = --p;void*pp = &p;int c =*p; c = !p;}");
 }
 
+void tbc_unary_promote() { tbc_entry("void F(){char v = 1;+v;- v;~v;!v;}"); }
+
 void tbc_ptr_self_inc() {
   tbc_entry("void F(){int* p = 0; char*x = p++;char c =  *--p;}");
 }
@@ -289,8 +291,8 @@ void tbc_while_done_now() {
 }
 
 void tbc_for_done_now() {
-  tbc_entry(
-      "int F(){int sum = 0;for(int i = 0;i <= -1;i++){sum += i;}return sum;}");
+  tbc_entry("int F(){int sum = 0;for(int i = 0;i <= -1;i++){sum += i;}return "
+            "sum;}");
 }
 
 void tbc_always() {
@@ -311,8 +313,8 @@ void tbc_if_else() {
 }
 
 void tbc_if_else_chain() {
-  tbc_entry(
-      "int fib(int n){if(n <= 1){return n;}else{return fib(n-1) + fib(n-2);}}");
+  tbc_entry("int fib(int n){if(n <= 1){return n;}else{return fib(n-1) + "
+            "fib(n-2);}}");
 }
 
 void tbc_enum() {
@@ -850,7 +852,15 @@ void tbc_int_const_global_variable() {
 void tbc_sizeof() {
   tbc_entry("int F(){\
     int a = 1;\
-    int b = sizeof(void*);\
+    char b = sizeof(void*);\
+    int c = sizeof(b);\
   }\
   ");
+}
+
+void tbc_statement_in_expr() {
+  tbc_entry("\
+    int F(){\
+      int a = ({int c = 2; c++; c;});\
+    }");
 }

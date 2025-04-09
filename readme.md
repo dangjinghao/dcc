@@ -8,6 +8,7 @@ a simple C89 compiler, emits to llvm ir.
 - declaration at anywhere is allowed. (C99)
 - declaration at `for` statement `init` scope. (C99)
 - In fact we doesn't support `long long int` type, it is same as `long int` same as `long`, so we set a static_assert to make sure that the sizeof long long equals to sizeof long.
+- statement in expresssion (GNU C)
 
 ### Unsupport Features
 
@@ -108,7 +109,7 @@ struct s{int a;char b;};
 - [x] 72 long long int support
 - [ ] ~~remove uid, I don't think it is necessary.(we have to use it to distinguish the static variable)~~
 - [x] sizeof constant expression
-- [ ] 89 gnu `({})` ext
+- [x] 89 gnu `({})` ext
 - [ ] type unfold redefine bug
 - [ ] QA scaffold
 - [ ] refactor

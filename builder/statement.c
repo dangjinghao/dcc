@@ -124,16 +124,25 @@ void build_statement_jump(builder b, astn n) {
             convert_repr_token(n->jump_statement.type));
 }
 
-void build_statement_block(builder b, astn blk) {
+typed_value build_statement_block(builder b, astn blk) {
   assert(blk->type == ast_block);
   astn item;
+  typed_value tv = NULL;
   slist_foreach(&blk->block.list, item) {
     if (item->type == ast_declaration) {
       build_declaration(b, item);
     } else {
-      build_statement(b, item);
+      tv = build_statement(b, item);
     }
   }
+  if (!tv) {
+    // create int 0
+    slist int_type_chain = build_type_chain_by_lit(TOK_LIT_INT);
+    LLVMValueRef i32_v0 =
+        LLVMConstInt(LLVMInt32TypeInContext(b->context), 0, 0);
+    tv = typed_value_new(i32_v0, int_type_chain);
+  }
+  return tv;
 }
 
 void build_statement_labeled_goto(builder b, astn n) {
@@ -462,34 +471,33 @@ void build_statement_switch(builder b, astn n) {
 #endif
   LLVMPositionBuilderAtEnd(b->builder, switch_after);
 }
-void build_statement(builder b, astn n) {
+typed_value build_statement(builder b, astn n) {
   assert(n);
   if (g_is_empty_statement(n)) {
     // do nothing
     log_trace("got an empty statement, do nothing");
-    return;
+    return NULL;
   }
   switch (n->type) {
   case ast_statement_jump:
     build_statement_jump(b, n);
-    return;
+    return NULL;
   case ast_block:
     build_statement_block(b, n);
-    return;
+    return NULL;
   case ast_statement_labeled:
     build_statement_labeled(b, n);
-    return;
+    return NULL;
   case ast_statement_iteration:
     build_statement_iteration(b, n);
-    return;
+    return NULL;
   case ast_statement_if:
     build_statement_if(b, n);
-    return;
+    return NULL;
   case ast_statement_switch:
     build_statement_switch(b, n);
-    return;
+    return NULL;
   default:
-    build_expression(b, n);
-    break;
+    return build_expression(b, n);
   }
 }
