@@ -1,6 +1,6 @@
 #ifndef __STRING_H
 #define __STRING_H
-typedef unsigned long size_t;
+#include <stddef.h>
 
 void *memcpy(void *dest, const void *src, size_t n);
 void *memmove(void *dest, const void *src, size_t n);

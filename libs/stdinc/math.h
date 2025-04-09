@@ -1,5 +1,6 @@
 #ifndef __MATH_H
 #define __MATH_H
+#include <stddef.h>
 
 double sin(double x);
 double cos(double x);

@@ -7,7 +7,7 @@ a simple C89 compiler, emits to llvm ir.
 - Almost C89 features
 - declaration at anywhere is allowed. (C99)
 - declaration at `for` statement `init` scope. (C99)
-- In fact we doesn't support `long long int` type, it is same as `long int` same as `long`.
+- In fact we doesn't support `long long int` type, it is same as `long int` same as `long`, so we set a static_assert to make sure that the sizeof long long equals to sizeof long.
 
 ### Unsupport Features
 
@@ -15,10 +15,8 @@ a simple C89 compiler, emits to llvm ir.
   - I'm not good at align or something, so looks like I cannot solve this right now.
 - struct/union pass to or return from function by value
   - same as before.
-- global variable initialization with value
-  - planned
-- sizeof operator
-  - planned
+- static variable initialization with complex value
+  - same as before, but I implement a simple static expression initialization.
 - incomplete type
   - planned
 
@@ -107,10 +105,10 @@ struct s{int a;char b;};
 - [x] ptr to struct/union(any complex type) - ptr
 - [x] {} initializer
   - [x] struct/array init
-- [ ] 72 long long int support
-- [ ] remove uid, I don't think it is necessary.
+- [x] 72 long long int support
+- [ ] ~~remove uid, I don't think it is necessary.(we have to use it to distinguish the static variable)~~
+- [x] sizeof constant expression
 - [ ] 89 gnu `({})` ext
-- [ ] sizeof constant expression
 - [ ] type unfold redefine bug
 - [ ] QA scaffold
 - [ ] refactor

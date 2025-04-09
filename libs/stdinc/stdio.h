@@ -1,11 +1,10 @@
 #ifndef __STDIO_H
 #define __STDIO_H
-#define NULL ((void *)0)
-#define EOF (-1)
+#include <stddef.h>
 
-typedef unsigned long size_t;
-typedef long ssize_t;
+#define EOF (-1)
 typedef void FILE;
+
 int printf(const char *fmt, ...);
 int sprintf(char *, const char *, ...);
 FILE *fopen(const char *filename, const char *mode);
