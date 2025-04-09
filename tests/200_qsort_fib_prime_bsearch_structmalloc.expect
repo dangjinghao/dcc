@@ -1,0 +1,7 @@
+Is 7919 prime? Yes
+Fibonacci(15) = 610, it should be 610
+Before sort: [0] = 7 [1] = 2 [2] = 5 [3] = 3 [4] = 11 [5] = 1 [6] = 8 [7] = 9 
+Sorted array: [0] = 1 [1] = 2 [2] = 3 [3] = 5 [4] = 7 [5] = 8 [6] = 9 [7] = 11 
+Found 5 at index: 3
+Found 9 at index: 6
+Linked list contents: 40 30 20 10 0

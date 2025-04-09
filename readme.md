@@ -1,6 +1,34 @@
 # DCC
 
-a simple C89 compiler, emits to llvm ir.
+a simple C89 compiler.
+
+## summary
+
+- Compiler only, without preprocessor and assembler.
+- Emits to llvm ir.
+- LL(1) type parser with **recovery lexer** feature to support those syntax that LL(1) supports poorly.
+  - the recovery lexer support lexer snapshot, we can resume the lexer snapshot when parsing failed, then select the other way to parse.
+  - e.g. parse `LABEL: result = 1+1;` and `result = 1+1;` they have the same firstset, so we try to parse as `labeled-statement`, for `result = 1+1;` the next token is `=`, not `:` as labeled-statement described. So we can snapshot the lexer(wrapped in parser snapshot function) before process this situation, if parse failed, just resume snapshot and select the `expression-statement` parsing way.
+- 2 pass compiler(AST generation + llvm ir generation)
+  - to solve the multiple same name declaration problem.
+- Achieved `96.7%` test pass rate on `60` critical syntax cases (adapted from TCC),
+- Engineered trade-offs:
+  - Simplified static initialization
+  - Unified `long`/`long long` types with static assertions for cross-platform compatibility.
+  - Omitted bitfields and struct/union value passing to function after evaluating alignment complexity.
+- Tools
+  - AST visiualization web at `analysis/AST.html`
+  - a simple CLI tool `dcc.sh` for compile source file.
+    - e.g. `dcc.sh src.c -o a.out`
+
+*In fact, lots of caused problems derived from my poor architecture, LOL.*
+
+## Test Coverage
+
+I picked up `60` core syntax test cases derived from `TinyCC` project, and move some static initialization code into function body because of dcc's poor ability of static initialization.
+
+- 58/60 tests passed (`96.7%` success rate)
+- 2 edge cases about `sizeof static inferation(55)` and `nameless function parameter(81)`
 
 ## Features
 
@@ -19,7 +47,7 @@ a simple C89 compiler, emits to llvm ir.
 - static variable initialization with complex value
   - same as before, but I implement a simple static expression initialization.
 - incomplete type
-  - planned
+  - I just implement the incomplete enum type feature.
 
 ## Hint
 
