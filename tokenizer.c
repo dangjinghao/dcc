@@ -55,7 +55,7 @@ static void error_at(char *loc, char *fmt, ...) {
   exit(1);
 }
 
-static void error_tok(Token *tok, char *fmt, ...) {
+void error_tok(Token *tok, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt,
@@ -482,7 +482,7 @@ Token *tokenize(DFile *file) {
       continue;
     }
 
-    else if (str_startswith(p, "/*")) {
+    if (str_startswith(p, "/*")) {
       char *q = strstr(p + 2, "*/");
       if (!q) {
         error_at(p, "unclosed block comment");
@@ -491,12 +491,12 @@ Token *tokenize(DFile *file) {
       continue;
     }
 
-    else if (isspace(*p)) {
+    if (isspace(*p)) {
       p++;
       continue;
     }
 
-    else if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
+    if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
       char *start = p++;
 
       while (true) {
@@ -508,10 +508,11 @@ Token *tokenize(DFile *file) {
           break;
       }
       cur = cur->next = new_token(TK_NUM, start, p);
+      convert_number(cur);
       continue;
     }
 
-    else if (*p == '"') {
+    if (*p == '"') {
       cur = cur->next = read_string_literal(p, p);
       p += cur->len;
       continue;
@@ -519,7 +520,7 @@ Token *tokenize(DFile *file) {
 
     // TODO: u8, u, L, U
 
-    else if (*p == '\'') {
+    if (*p == '\'') {
       cur = cur->next = read_char_literal(p, p, ty_int);
       cur->val = (char)cur->val;
       p += cur->len;
