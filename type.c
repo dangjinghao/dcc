@@ -1,4 +1,5 @@
 #include "dcc.h"
+#include <assert.h>
 #include <stdalign.h>
 #include <stdlib.h>
 
@@ -158,19 +159,12 @@ Type *enum_type(void) {
 
 Type *struct_type(void) {
   // struct type is a dynamic type so I can't determine the size and align
-  return new_type(TY_STRUCT, 0, 1);
+  return new_type(TY_STRUCT, 0, alignof(struct {}));
 }
 
 // used to infering the common (largest) type in expression
 static Type *get_common_type(Type *ty1, Type *ty2) {
-  // cast array or pointer to pointer
-  if (ty1->base)
-    return pointer_to(ty1->base);
-
-  // implict cast function to function pointer
-  if (ty1->kind == TY_FUNC)
-    return pointer_to(ty1);
-
+  assert(!ty1->base && ty1->kind != TY_FUNC);
   // upper cast
   if (ty1->kind == TY_LDOUBLE || ty2->kind == TY_LDOUBLE)
     return ty_ldouble;
@@ -204,6 +198,14 @@ static void usual_arith_conv(Node **lhs, Node **rhs) {
   Type *ty = get_common_type((*lhs)->ty, (*rhs)->ty);
   *lhs = new_cast(*lhs, ty);
   *rhs = new_cast(*rhs, ty);
+}
+
+// For unary operand type promotion
+static Node *integer_promotion(Node *n) {
+  if (n->ty->size < sizeof(int)) {
+    return new_cast(n, ty_int);
+  }
+  return n;
 }
 
 void add_type(Node *node) {
@@ -240,10 +242,12 @@ void add_type(Node *node) {
     usual_arith_conv(&node->lhs, &node->rhs);
     node->ty = node->lhs->ty;
     return;
+  case ND_BITNOT:
+  case ND_SHL:
+  case ND_SHR:
   case ND_NEG: {
-    Type *ty = get_common_type(ty_int, node->lhs->ty);
-    node->lhs = new_cast(node->lhs, ty);
-    node->ty = ty;
+    node->lhs = integer_promotion(node->lhs);
+    node->ty = node->lhs->ty;
     return;
   }
   case ND_ASSIGN:
@@ -268,11 +272,6 @@ void add_type(Node *node) {
   case ND_LOGAND:
     node->ty = ty_int;
     return;
-  case ND_BITNOT: // WARN: typeof(~(char)1) : int
-  case ND_SHL:
-  case ND_SHR:
-    node->ty = node->lhs->ty;
-    return;
   case ND_VAR:
   case ND_VLA_PTR:
     node->ty = node->var->ty;
@@ -294,6 +293,7 @@ void add_type(Node *node) {
   case ND_ADDR: {
     Type *ty = node->lhs->ty;
     if (ty->kind == TY_ARRAY)
+      // WARN: it is not std
       node->ty = pointer_to(ty->base);
     else
       node->ty = pointer_to(ty);
