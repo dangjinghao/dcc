@@ -48,6 +48,9 @@ struct Token {
 
 noreturn void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+#ifndef unreachable
+#define unreachable() error("internal error at %s:%d", __FILE__, __LINE__)
+#endif
 
 //
 /// type.c

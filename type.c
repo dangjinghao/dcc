@@ -65,6 +65,7 @@ bool is_flonum(Type *ty) {
 
 bool is_numeric(Type *ty) { return is_integer(ty) || is_flonum(ty); }
 
+// used in generic_selection and __builtin_types_compatible_p
 bool is_compatible(Type *t1, Type *t2) {
   if (t1 == t2)
     return true;
@@ -98,15 +99,18 @@ bool is_compatible(Type *t1, Type *t2) {
 
     Type *p1 = t1->params;
     Type *p2 = t2->params;
-    for (; p1 && p2; p1 = p1->next, p2 = p2->next)
+    while (p1 && p2) {
       if (!is_compatible(p1, p2))
         return false;
+      p1 = p1->next;
+      p2 = p2->next;
+    }
     return p1 == NULL && p2 == NULL;
   }
   case TY_ARRAY: {
     if (!is_compatible(t1->base, t2->base))
       return false;
-    return t1->array_len < 0 && t2->array_len < 0 &&
+    return t1->array_len < 0 || t2->array_len < 0 ||
            t1->array_len == t2->array_len;
   }
   default:
@@ -130,8 +134,7 @@ Type *pointer_to(Type *base) {
 }
 
 Type *func_type(Type *ret_ty) {
-  // WARN: the function align in chibicc is 1, not 4
-  Type *ty = new_type(TY_FUNC, sizeof(func_type), alignof(func_type));
+  Type *ty = new_type(TY_FUNC, 1, 1);
   ty->return_ty = ret_ty;
   return ty;
 }
@@ -144,7 +147,9 @@ Type *array_of(Type *base, int len) {
 }
 
 Type *vla_of(Type *base, Node *len) {
-  // WARN: why VLA's size and align is 8?
+  // VLA size and alignment cannot be determined at compile time.
+  // Storing 8 as a placeholder is harmless; the actual size comes from
+  // the expression tree.
   Type *ty = new_type(TY_VLA, 8, 8);
   ty->base = base;
   ty->vla_len = len;
@@ -152,60 +157,113 @@ Type *vla_of(Type *base, Node *len) {
 }
 
 Type *enum_type(void) {
-  // if enum value is large enough, the size of enum may be bigger than int
-  // but now we just ignore this feature and treat it as int
+  // Treat enum as int (simplified; standard allows larger underlying types)
   return new_type(TY_ENUM, sizeof(int), sizeof(int));
 }
 
-Type *struct_type(void) {
-  // struct type is a dynamic type so I can't determine the size and align
-  return new_type(TY_STRUCT, 0, alignof(struct {}));
+Type *struct_type(void) { return new_type(TY_STRUCT, 0, alignof(struct {})); }
+
+/* --------------------------------------------------------------------------
+   Integer promotions and usual arithmetic conversions (C11 6.3.1.8)
+   -------------------------------------------------------------------------- */
+
+/* Return the integer rank of a type. Higher rank means larger.
+   Only call this for integer types (including enum). */
+static int type_rank(Type *ty) {
+  switch (ty->kind) {
+  case TY_BOOL:
+    return 1;
+  case TY_CHAR:
+    return 2;
+  case TY_SHORT:
+    return 3;
+  case TY_INT:
+  case TY_ENUM:
+    return 4;
+  case TY_LONG:
+    return 5;
+  default:
+    unreachable();
+    return 0;
+  }
 }
 
-// used to infering the common (largest) type in expression
-static Type *get_common_type(Type *ty1, Type *ty2) {
-  assert(!ty1->base && ty1->kind != TY_FUNC);
-  // upper cast
-  if (ty1->kind == TY_LDOUBLE || ty2->kind == TY_LDOUBLE)
-    return ty_ldouble;
-  if (ty1->kind == TY_DOUBLE || ty2->kind == TY_DOUBLE)
-    return ty_double;
-  if (ty1->kind == TY_FLOAT || ty2->kind == TY_FLOAT)
+static Type *type_integer_promotion(Type *ty) {
+  if (ty->kind == TY_ENUM)
+    return ty_int;
+  if (is_integer(ty) && ty->size < sizeof(int)) {
+    return ty_int;
+  }
+  return ty;
+}
+
+static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
+  assert(!t1->base && t1->kind != TY_FUNC);
+  assert(!t2->base && t2->kind != TY_FUNC);
+
+  t1 = type_integer_promotion(t1);
+  t2 = type_integer_promotion(t2);
+
+  if (t1 == t2)
+    return t1;
+
+  //  If either operand is floating-point
+  if (is_flonum(t1) || is_flonum(t2)) {
+    if (t1->kind == TY_LDOUBLE || t2->kind == TY_LDOUBLE)
+      return ty_ldouble;
+    if (t1->kind == TY_DOUBLE || t2->kind == TY_DOUBLE)
+      return ty_double;
     return ty_float;
-  // any type small than int will be promoted to int
-  if (ty1->size < sizeof(int))
-    ty1 = ty_int;
-  if (ty2->size < sizeof(int))
-    ty2 = ty_int;
+  }
 
-  if (ty1->size != ty2->size)
-    return (ty1->size < ty2->size) ? ty2 : ty1;
+  // Both operands are now integers
+  int r1 = type_rank(t1), r2 = type_rank(t2);
+  bool u1 = t1->is_unsigned, u2 = t2->is_unsigned;
 
-  if (ty2->is_unsigned)
-    return ty2;
-  return ty1;
+  if (r1 > r2) {
+    /* t1 has higher rank */
+    if (u1)
+      return t1; /* if t1 is unsigned, use it */
+    /* t1 is signed. If t2 is unsigned and t1 can represent all values
+       of t2, pick t1; otherwise pick the unsigned version of t1. */
+    if (u2 && t1->size > t2->size)
+      return t1; /* signed large enough */
+    else if (u2)
+      return (t1->kind == TY_LONG) ? ty_ulong : ty_uint;
+    else
+      return t1;
+  } else if (r2 > r1) {
+    /* symmetric case */
+    if (u2)
+      return t2;
+    if (u1 && t2->size > t1->size)
+      return t2;
+    else if (u1)
+      return (t2->kind == TY_LONG) ? ty_ulong : ty_uint;
+    else
+      return t2;
+  } else {
+    /* Same rank – if signedness differs, pick unsigned */
+    if (u1 == u2)
+      return t1;
+    if (u2)
+      return t2;
+    return t1;
+  }
 }
 
-// chibicc:
-// For many binary operators, we implicitly promote operands so that
-// both operands have the same type. Any integral type smaller than
-// int is always promoted to int. If the type of one operand is larger
-// than the other's (e.g. "long" vs. "int"), the smaller operand will
-// be promoted to match with the other.
-//
-// This operation is called the "usual arithmetic conversion".
+static Node *integer_promotion(Node *n) {
+  Type *promoted = type_integer_promotion(n->ty);
+  if (promoted != n->ty)
+    return new_cast(n, promoted);
+  return n;
+}
+
 static void usual_arith_conv(Node **lhs, Node **rhs) {
-  Type *ty = get_common_type((*lhs)->ty, (*rhs)->ty);
+
+  Type *ty = type_usual_arithmetic_conversion((*lhs)->ty, (*rhs)->ty);
   *lhs = new_cast(*lhs, ty);
   *rhs = new_cast(*rhs, ty);
-}
-
-// For unary operand type promotion
-static Node *integer_promotion(Node *n) {
-  if (n->ty->size < sizeof(int)) {
-    return new_cast(n, ty_int);
-  }
-  return n;
 }
 
 void add_type(Node *node) {
@@ -229,7 +287,9 @@ void add_type(Node *node) {
 
   switch (node->kind) {
   case ND_NUM:
-    node->ty = ty_int;
+    // I think num node should has the type when created.
+    // node->ty = node->tok->ty;
+    unreachable();
     return;
   case ND_ADD:
   case ND_SUB:
@@ -253,6 +313,9 @@ void add_type(Node *node) {
   case ND_ASSIGN:
     if (node->lhs->ty->kind == TY_ARRAY)
       error_tok(node->lhs->tok, "not an lvalue");
+    /* For struct assignment, we should eventually check type compatibility
+       and insert memcpy. For now we leave the cast insertion only for
+       non-struct types. */
     if (node->lhs->ty->kind != TY_STRUCT)
       node->rhs = new_cast(node->rhs, node->lhs->ty);
     node->ty = node->lhs->ty;
@@ -291,6 +354,7 @@ void add_type(Node *node) {
     node->ty = node->member->ty;
     return;
   case ND_ADDR: {
+    // correct: node->ty = pointer_to(node->lhs->ty);
     Type *ty = node->lhs->ty;
     if (ty->kind == TY_ARRAY)
       // WARN: it is not std
