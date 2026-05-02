@@ -154,10 +154,10 @@ Type *copy_type(Type *ty);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_ty);
 Type *array_of(Type *base, int size);
-// Type *vla_of(Type *base, Node *expr);
+Type *vla_of(Type *base, Node *expr);
 Type *enum_type(void);
 Type *struct_type(void);
-// void add_type(Node *node);
+void add_type(Node *node);
 
 //
 /// parser.c
@@ -319,7 +319,5 @@ struct Obj {
 };
 
 Node *new_cast(Node *expr, Type *ty);
-uint64_t const_expr(Token **rest, Token *tok);
-Obj *parse(Token *tok);
 
 #endif
