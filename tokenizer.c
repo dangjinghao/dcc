@@ -1,13 +1,21 @@
 #include "dcc.h"
+#include <assert.h>
+#include <ctype.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
-DFile *current_file;
+static DFile *current_file;
 
 static bool str_startswith(char *str, char *substr) {
   return strncmp(str, substr, strlen(substr)) == 0;
+}
+
+static bool str_startswithcase(char *str, char *substr) {
+  return strncasecmp(str, substr, strlen(substr)) == 0;
 }
 
 // Throw an error message with this format:
@@ -47,6 +55,92 @@ static void error_at(char *loc, char *fmt, ...) {
   exit(1);
 }
 
+static void error_tok(Token *tok, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt,
+            ap);
+  exit(1);
+}
+
+static void warn_tok(Token *tok, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt,
+            ap);
+  va_end(ap);
+}
+
+static bool tok_equal_str(Token *tok, char *op) {
+  return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
+}
+
+// Create a new token.
+static Token *new_token(TokenKind kind, char *start, char *end) {
+  Token *tok = calloc(1, sizeof(Token));
+  tok->kind = kind;
+  tok->loc = start;
+  tok->len = end - start;
+  tok->file = current_file;
+
+  return tok;
+}
+
+static bool is_ident1(char c) { return isalpha(c) || c == '_' || c == '$'; }
+
+static bool is_ident2(char c) { return isalnum(c) || c == '_' || c == '$'; }
+
+static int read_ident(char *start) {
+  if (!is_ident1(*start)) {
+    return 0;
+  }
+  char *p = start;
+  while (is_ident2(*p)) {
+    p += 1;
+  }
+  return p - start;
+}
+
+static int read_punct(char *p) {
+  // TODO: use hashmap
+  static char *kw[] = {
+      "<<=", ">>=", "...", "==", "!=", "<=", ">=", "->", "+=", "-=", "*=", "/=",
+      "++",  "--",  "%=",  "&=", "|=", "^=", "&&", "||", "<<", ">>", "##",
+  };
+  for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
+    if (str_startswith(p, kw[i])) {
+      return strlen(kw[i]);
+    }
+  }
+  return ispunct(*p) ? 1 : 0;
+}
+
+static bool is_keyword(Token *tok) {
+  static char *kw[] = {
+      "return",    "if",         "else",
+      "for",       "while",      "int",
+      "sizeof",    "char",       "struct",
+      "union",     "short",      "long",
+      "void",      "typedef",    "_Bool",
+      "enum",      "static",     "goto",
+      "break",     "continue",   "switch",
+      "case",      "default",    "extern",
+      "_Alignof",  "_Alignas",   "do",
+      "signed",    "unsigned",   "const",
+      "volatile",  "auto",       "register",
+      "restrict",  "__restrict", "__restrict__",
+      "_Noreturn", "float",      "double",
+      "typeof",    "asm",        "_Thread_local",
+      "__thread",  "_Atomic",    "__attribute__",
+  };
+  for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
+    if (strncmp(tok->loc, kw[i], tok->len) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 #define isodigit(c) ('0' <= (c) && (c) <= '7')
 
 // Read the escaped char after `\`
@@ -57,17 +151,13 @@ static void error_at(char *loc, char *fmt, ...) {
 static int read_escaped_char(char *p, char **new_pos) {
 
   if (isodigit(*p)) {
-    char *endpos = NULL;
-    long v = strtol(p, &endpos, 8);
-    *new_pos = endpos;
+    long v = strtol(p, new_pos, 8);
     return (int)v;
   }
 
   if (*p == 'x') {
     p += 1;
-    char *endptr = NULL;
-    long v = strtol(p, &endptr, 16);
-    *new_pos = endptr;
+    long v = strtol(p, new_pos, 16);
     return (int)v;
   }
 
@@ -95,6 +185,263 @@ static int read_escaped_char(char *p, char **new_pos) {
   }
 }
 
+// Find a closing double-quote.
+static char *string_literal_end(char *p) {
+  char *start = p;
+  for (; *p != '"'; p++) {
+    if (*p == '\n' || *p == '\0')
+      error_at(start, "unclosed string literal");
+    if (*p == '\\') {
+      p++; // skip '\\'
+      // avoid stop at '\"'
+    }
+  }
+  return p;
+}
+
+// We need to support u8"", u"" and L"" in the future.
+// So we need split out 'start' and 'quote' arguments
+static Token *read_string_literal(char *start, char *quote) {
+  char *end = string_literal_end(quote + 1);
+  char *buf = calloc(1, end - quote);
+  int len = 0;
+
+  for (char *p = quote + 1; p < end;) {
+    if (*p == '\\') {
+      buf[len++] = read_escaped_char(p + 1, &p);
+    } else
+      buf[len++] = *p++;
+  }
+
+  Token *tok = new_token(TK_STR, start, end + 1);
+  tok->ty = array_of(ty_char, len + 1);
+  tok->str = buf;
+  return tok;
+}
+
+static Token *read_char_literal(char *start, char *quote, Type *ty) {
+  char *p = quote + 1;
+  if (*p == '\0')
+    error_at(start, "unclosed char literal");
+
+  int c;
+  if (*p == '\\')
+    c = read_escaped_char(p + 1, &p);
+  else
+    c = *p;
+
+  char *end = strchr(p, '\'');
+  if (!end)
+    error_at(p, "unclosed char literal");
+
+  Token *tok = new_token(TK_NUM, start, end + 1);
+  tok->val = c;
+  tok->ty = ty;
+  return tok;
+}
+
+static bool convert_number_integer_type(Token *tok) {
+  char *p = tok->loc;
+  // Read a binary, octal, decimal or hexadecimal number.
+  int base = 10;
+  if (!strncasecmp(p, "0x", 2) && isxdigit(p[2])) {
+    p += 2;
+    base = 16;
+  } else if (!strncasecmp(p, "0b", 2) && (p[2] == '0' || p[2] == '1')) {
+    p += 2;
+    base = 2;
+  } else if (*p == '0') {
+    base = 8;
+  }
+
+  uint64_t val = strtoul(p, &p, base);
+
+  // Read U, L or LL suffixes.
+  bool l = false;
+  bool u = false;
+  if (str_startswith(p, "LLU") || str_startswith(p, "LLu") ||
+      str_startswith(p, "llU") || str_startswith(p, "llu") ||
+      str_startswith(p, "ULL") || str_startswith(p, "Ull") ||
+      str_startswith(p, "uLL") || str_startswith(p, "ull")) {
+    p += 3;
+    l = u = true;
+  } else if (str_startswithcase(p, "lu") || str_startswithcase(p, "ul")) {
+    p += 2;
+    l = u = true;
+  } else if (str_startswith(p, "LL") || str_startswith(p, "ll")) {
+    p += 2;
+    l = true;
+  } else if (str_startswithcase(p, "l")) {
+    p++;
+    l = true;
+  } else if (str_startswithcase(p, "u")) {
+    p++;
+    u = true;
+  }
+
+  if (p != tok->loc + tok->len) {
+    return false;
+  }
+
+  // in fact we will reuse the basic type which declared in type.c
+  // so we don't worry about this stack pointer.
+  Type *ty;
+  if (base == 10) {
+    if (l && u)
+      ty = ty_ulong;
+    else if (l)
+      ty = ty_long;
+    else if (u)
+      ty = (val >> 32) ? ty_ulong : ty_uint;
+    else
+      ty = (val >> 31) ? ty_long : ty_int;
+  } else {
+    if (l && u)
+      ty = ty_ulong;
+    else if (l)
+      ty = (val >> 63) ? ty_ulong : ty_long;
+    else if (u)
+      ty = (val >> 32) ? ty_ulong : ty_uint;
+    else if (val >> 63)
+      ty = ty_ulong;
+    else if (val >> 32)
+      ty = ty_long;
+    else if (val >> 31)
+      ty = ty_uint;
+    else
+      ty = ty_int;
+  }
+  tok->val = val;
+  tok->ty = ty;
+  return tok;
+}
+
+// convert a number token to integer number token or fp number token
+static void convert_number(Token *tok) {
+  assert(tok->kind == TK_NUM);
+  if (convert_number_integer_type(tok)) {
+    return;
+  }
+
+  // not an integer, should be fp.
+  char *end;
+  long double val = strtold(tok->loc, &end);
+  Type *ty;
+  if (*end == 'f' || *end == 'F') {
+    ty = ty_float;
+    end++;
+  } else if (*end == 'l' || *end == 'L') {
+    ty = ty_ldouble;
+    end++;
+  } else {
+    ty = ty_double;
+  }
+  if (tok->loc + tok->len != end) {
+    error_tok(tok, "invalid numeric constant");
+  }
+  tok->fval = val;
+  tok->ty = ty;
+}
+
+// Initialize line info for all tokens.
+static void add_line_numbers(Token *tok) {
+  char *p = current_file->contents;
+  int n = 1;
+
+  do {
+    if (p == tok->loc) {
+      tok->line_no = n;
+      tok = tok->next;
+    }
+    if (*p == '\n')
+      n++;
+  } while (*p++);
+}
+
+// Returns the contents of a given file.
+static char *read_file(char *path) {
+  FILE *fp;
+
+  if (strcmp(path, "-") == 0) {
+    // By convention, read from stdin if a given filename is "-".
+    fp = stdin;
+  } else {
+    fp = fopen(path, "r");
+    if (!fp)
+      return NULL;
+  }
+
+  char *buf;
+  size_t buflen;
+  FILE *out = open_memstream(&buf, &buflen);
+
+  // Read the entire file.
+  for (;;) {
+    char buf2[4096];
+    int n = fread(buf2, 1, sizeof(buf2), fp);
+    if (n == 0)
+      break;
+    fwrite(buf2, 1, n, out);
+  }
+
+  if (fp != stdin)
+    fclose(fp);
+
+  // Make sure that the last line is properly terminated with '\n'.
+  fflush(out);
+  if (buflen == 0 || buf[buflen - 1] != '\n')
+    fputc('\n', out);
+  fputc('\0', out);
+  fclose(out);
+  return buf;
+}
+
+// Replaces \r or \r\n with \n.
+static void canonicalize_newline(char *p) {
+  int i = 0, j = 0;
+
+  while (p[i]) {
+    if (p[i] == '\r' && p[i + 1] == '\n') {
+      i += 2;
+      p[j++] = '\n';
+    } else if (p[i] == '\r') {
+      i++;
+      p[j++] = '\n';
+    } else {
+      p[j++] = p[i++];
+    }
+  }
+
+  p[j] = '\0';
+}
+
+// Removes backslashes followed by a newline.
+static void remove_backslash_newline(char *p) {
+  int i = 0, j = 0;
+
+  // We want to keep the number of newline characters so that
+  // the logical line number matches the physical one.
+  // This counter maintain the number of newlines we have removed.
+  int n = 0;
+
+  while (p[i]) {
+    if (p[i] == '\\' && p[i + 1] == '\n') {
+      i += 2;
+      n++;
+    } else if (p[i] == '\n') {
+      p[j++] = p[i++];
+      for (; n > 0; n--)
+        p[j++] = '\n';
+    } else {
+      p[j++] = p[i++];
+    }
+  }
+
+  for (; n > 0; n--)
+    p[j++] = '\n';
+  p[j] = '\0';
+}
+
 void error(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -103,13 +450,139 @@ void error(char *fmt, ...) {
   exit(1);
 }
 
-int main() {
-  char *p = "\12345";
-  char *endp = NULL;
-  int c = read_escaped_char(p, &endp);
-  printf("%d %s\n", c, endp);
-  p = "\1Ab";
-  c = read_escaped_char(p, &endp);
-  printf("%d %s\n", c, endp);
+// Ensure that the current token is `op`
+Token *skip(Token *tok, char *op) {
+  if (!tok_equal_str(tok, op))
+    error_tok(tok, "expected '%s'", op);
+  return tok->next;
+}
+
+bool consume(Token **rest, Token *tok, char *str) {
+  if (tok_equal_str(tok, str)) {
+    *rest = tok->next;
+    return true;
+  }
+  *rest = tok;
+  return false;
+}
+
+Token *tokenize(DFile *file) {
+  current_file = file;
+
+  char *p = file->contents;
+
+  Token head = {};
+  Token *cur = &head;
+
+  while (*p) {
+    if (str_startswith(p, "//")) {
+      p += 2;
+      while (*p != '\n')
+        p++;
+      continue;
+    }
+
+    else if (str_startswith(p, "/*")) {
+      char *q = strstr(p + 2, "*/");
+      if (!q) {
+        error_at(p, "unclosed block comment");
+      }
+      p = q + 2;
+      continue;
+    }
+
+    else if (isspace(*p)) {
+      p++;
+      continue;
+    }
+
+    else if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
+      char *start = p++;
+
+      while (true) {
+        if (p[0] && p[1] && strchr("eEpP", p[0]) && strchr("+-", p[1]))
+          p += 2;
+        else if (isalnum(*p) || *p == '.')
+          p++;
+        else
+          break;
+      }
+      cur = cur->next = new_token(TK_NUM, start, p);
+      continue;
+    }
+
+    else if (*p == '"') {
+      cur = cur->next = read_string_literal(p, p);
+      p += cur->len;
+      continue;
+    }
+
+    // TODO: u8, u, L, U
+
+    else if (*p == '\'') {
+      cur = cur->next = read_char_literal(p, p, ty_int);
+      cur->val = (char)cur->val;
+      p += cur->len;
+      continue;
+    }
+
+    int ident_len = read_ident(p);
+    if (ident_len) {
+      cur = cur->next = new_token(TK_IDENT, p, p + ident_len);
+      p += cur->len;
+      continue;
+    }
+
+    int punct_len = read_punct(p);
+    if (punct_len) {
+      cur = cur->next = new_token(TK_PUNCT, p, p + punct_len);
+      p += cur->len;
+      continue;
+    }
+
+    error_at(p, "invalid token");
+  }
+  cur = cur->next = new_token(TK_EOF, p, p);
+  add_line_numbers(head.next);
+  return head.next;
+}
+
+DFile *new_file(char *name, char *contents) {
+  DFile *file = calloc(1, sizeof(DFile));
+  file->name = name;
+  file->contents = contents;
+  return file;
+}
+
+Token *tokenize_file(char *path) {
+  char *p = read_file(path);
+  if (!p)
+    return NULL;
+
+  // UTF-8 texts may start with a 3-byte "BOM" marker sequence.
+  // If exists, just skip them because they are useless bytes.
+  // (It is actually not recommended to add BOM markers to UTF-8
+  // texts, but it's not uncommon particularly on Windows.)
+  if (!memcmp(p, "\xef\xbb\xbf", 3))
+    p += 3;
+
+  canonicalize_newline(p);
+  remove_backslash_newline(p);
+  // convert_universal_chars(p);
+
+  DFile *file = new_file(path, p);
+
+  return tokenize(file);
+}
+
+int main(int argc, char *argv[]) {
+  if (argc < 2) {
+    exit(1);
+  }
+  Token *t = tokenize_file(argv[1]);
+  while (t) {
+    printf("%d: %.*s\n", t->line_no, t->len, t->loc);
+    t = t->next;
+  }
   return 0;
 }
