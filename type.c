@@ -5,44 +5,67 @@
 
 // basic type
 
-Type *ty_void =
-    &(Type){.kind = TY_VOID, .size = sizeof(void), .align = alignof(void)};
-Type *ty_bool =
-    &(Type){.kind = TY_BOOL, .size = sizeof(bool), .align = alignof(bool)};
+// debug infomation
+static Type _ty_void = {
+    .kind = TY_VOID, .size = sizeof(void), .align = alignof(void)};
+Type *ty_void = &_ty_void;
 
-Type *ty_char =
-    &(Type){.kind = TY_CHAR, .size = sizeof(char), .align = alignof(char)};
-Type *ty_short =
-    &(Type){.kind = TY_SHORT, .size = sizeof(short), .align = alignof(short)};
-Type *ty_int =
-    &(Type){.kind = TY_INT, .size = sizeof(int), .align = alignof(int)};
-Type *ty_long =
-    &(Type){.kind = TY_LONG, .size = sizeof(long), .align = alignof(long)};
+static Type _ty_bool = {
+    .kind = TY_BOOL, .size = sizeof(bool), .align = alignof(bool)};
+Type *ty_bool = &_ty_bool;
 
-Type *ty_uchar = &(Type){.kind = TY_CHAR,
+static Type _ty_char = {
+    .kind = TY_CHAR, .size = sizeof(char), .align = alignof(char)};
+Type *ty_char = &_ty_char;
+
+static Type _ty_short = {
+    .kind = TY_SHORT, .size = sizeof(short), .align = alignof(short)};
+Type *ty_short = &_ty_short;
+
+static Type _ty_int = {
+    .kind = TY_INT, .size = sizeof(int), .align = alignof(int)};
+Type *ty_int = &_ty_int;
+
+static Type _ty_long = {
+    .kind = TY_LONG, .size = sizeof(long), .align = alignof(long)};
+Type *ty_long = &_ty_long;
+
+static Type _ty_uchar = {.kind = TY_CHAR,
                          .size = sizeof(unsigned char),
                          .align = alignof(unsigned char),
                          .is_unsigned = true};
-Type *ty_ushort = &(Type){.kind = TY_SHORT,
+Type *ty_uchar = &_ty_uchar;
+
+static Type _ty_ushort = {.kind = TY_SHORT,
                           .size = sizeof(unsigned short),
                           .align = alignof(unsigned short),
                           .is_unsigned = true};
-Type *ty_uint = &(Type){.kind = TY_INT,
+Type *ty_ushort = &_ty_ushort;
+
+static Type _ty_uint = {.kind = TY_INT,
                         .size = sizeof(unsigned int),
                         .align = alignof(unsigned int),
                         .is_unsigned = true};
-Type *ty_ulong = &(Type){.kind = TY_LONG,
+Type *ty_uint = &_ty_uint;
+
+static Type _ty_ulong = {.kind = TY_LONG,
                          .size = sizeof(unsigned long),
                          .align = alignof(unsigned long),
                          .is_unsigned = true};
+Type *ty_ulong = &_ty_ulong;
 
-Type *ty_float =
-    &(Type){.kind = TY_FLOAT, .size = sizeof(float), .align = alignof(float)};
-Type *ty_double = &(Type){
+static Type _ty_float = {
+    .kind = TY_FLOAT, .size = sizeof(float), .align = alignof(float)};
+Type *ty_float = &_ty_float;
+
+static Type _ty_double = {
     .kind = TY_DOUBLE, .size = sizeof(double), .align = alignof(double)};
-Type *ty_ldouble = &(Type){.kind = TY_LDOUBLE,
+Type *ty_double = &_ty_double;
+
+static Type _ty_ldouble = {.kind = TY_LDOUBLE,
                            .size = sizeof(long double),
                            .align = alignof(long double)};
+Type *ty_ldouble = &_ty_ldouble;
 
 static Type *new_type(TypeKind kind, int size, int align) {
   Type *ty = calloc(1, sizeof(Type));

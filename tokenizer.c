@@ -575,15 +575,3 @@ Token *tokenize_file(char *path) {
 
   return tokenize(file);
 }
-
-int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    exit(1);
-  }
-  Token *t = tokenize_file(argv[1]);
-  while (t) {
-    printf("%d: %.*s\n", t->line_no, t->len, t->loc);
-    t = t->next;
-  }
-  return 0;
-}

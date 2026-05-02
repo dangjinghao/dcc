@@ -47,7 +47,9 @@ struct Token {
 };
 
 noreturn void error(char *fmt, ...);
-void error_tok(Token *tok, char *fmt, ...);
+noreturn void error_tok(Token *tok, char *fmt, ...);
+Token *tokenize_file(char *path);
+
 #ifndef unreachable
 #define unreachable() error("internal error at %s:%d", __FILE__, __LINE__)
 #endif
@@ -280,6 +282,7 @@ struct Node {
 
   // Numeric literal
   uint64_t val;
+  bool is_unsigned;
   long double fval;
 };
 
@@ -322,5 +325,7 @@ struct Obj {
 };
 
 Node *new_cast(Node *expr, Type *ty);
+
+void parse(Token *tok);
 
 #endif
