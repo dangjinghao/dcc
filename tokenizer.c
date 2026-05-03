@@ -102,7 +102,6 @@ static int read_ident(char *start) {
 }
 
 static int read_punct(char *p) {
-  // TODO: use hashmap
   static char *kw[] = {
       "<<=", ">>=", "...", "==", "!=", "<=", ">=", "->", "+=", "-=", "*=", "/=",
       "++",  "--",  "%=",  "&=", "|=", "^=", "&&", "||", "<<", ">>", "##",

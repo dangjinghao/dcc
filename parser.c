@@ -3050,7 +3050,7 @@ static Node *primary(Token **rest, Token *tok) {
   }
   // "_Generic" generic-selection
   if (equal(tok, "_Generic")) {
-    // TODO:
+    // TODO:understand
     return generic_selection(rest, tok->next);
   }
 
@@ -3064,7 +3064,7 @@ static Node *primary(Token **rest, Token *tok) {
   }
 
   if (equal(tok, "__builtin_reg_class")) {
-    // TODO:
+    // TODO:understand
     tok = skip(tok->next, "(");
     Type *ty = typename(&tok, tok);
     *rest = skip(tok, ")");
@@ -3219,17 +3219,22 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   Type *ty = declarator(&tok, tok, basety);
   if (!ty->name)
     error_tok(ty->name_pos, "function name omitted");
-  char *name_str = get_ident(ty->name);
 
-  Obj *fn = find_func(name_str);
-  if (fn) {
+  Obj *fn = NULL;
+  char *name_str = get_ident(ty->name);
+  VarScope *sym = find_var(ty->name);
+  if (sym) {
     // Redeclaration
-    if (!fn->is_function)
-      error_tok(tok, "redeclared as a different kind of symbol");
+    fn = sym->var;
+    if (!fn || !fn->is_function) {
+      error_tok(tok, "redeclared %s as a different kind of symbol", name_str);
+    }
     if (fn->is_definition && equal(tok, "{"))
       error_tok(tok, "redefinition of %s", name_str);
-    if (!fn->is_static && attr->is_static)
-      error_tok(tok, "static declaration follows a non-static declaration");
+    if (fn->is_static != attr->is_static)
+      error_tok(tok, "static declaration conflicts with a same name non-static "
+                     "declaration");
+    //  reuse previous function
     fn->is_definition = fn->is_definition || equal(tok, "{");
   } else {
     fn = new_gvar(name_str, ty);
@@ -3281,6 +3286,10 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
 }
 
 static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
+  if (attr->is_inline) {
+    error_tok(tok, "'inline' can only appear on functions");
+  }
+
   bool first = true;
 
   while (!consume(&tok, tok, ";")) {
@@ -3292,16 +3301,51 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
     if (!ty->name)
       error_tok(ty->name_pos, "variable name omitted");
 
-    Obj *var = new_gvar(get_ident(ty->name), ty);
-    var->is_definition = !attr->is_extern;
-    var->is_static = attr->is_static;
-    var->is_tls = attr->is_tls;
-    if (attr->align)
-      var->align = attr->align;
+    Obj *var = NULL;
+    VarScope *sc = find_var(ty->name);
+    if (sc) {
+      var = sc->var;
+      if (!var || var->is_function) {
+        error_tok(tok, "redeclared as a different kind of symbol");
+      }
+      if (var->is_static != attr->is_static) {
+        error_tok(tok,
+                  "static declaration conflicts with a same name non-static "
+                  "declaration");
+      }
+      if (var->is_tls != attr->is_tls) {
+        error_tok(tok, "thread-local declaration conflicts with a same name "
+                       "non-thread-local "
+                       "declaration");
+      }
+      if (var->init_data && equal(tok, "=")) {
+        error_tok(tok, "redefinition of %s", var->name);
+      }
+      // else if (!var->init_data && !equal(tok, "=")) {
+      //   // reuse existing var, both of them are tentative or extern
+      // } else if (var->init_data /* && !equal(tok, "=") */) {
+      //   // reuse existing var, prev var is better
+      // } else /*if (!var->init_data && equal(tok, "=")) */ {
+      //   // reuse existing var, but assign init data to prev var
+      // }
+      var->is_definition = var->is_definition || !attr->is_extern;
+    } else {
+      var = new_gvar(get_ident(ty->name), ty);
 
-    if (equal(tok, "="))
+      var->is_definition = !attr->is_extern;
+      var->is_static = attr->is_static;
+      var->is_tls = attr->is_tls;
+      if (attr->align)
+        var->align = attr->align;
+    }
+
+    if (equal(tok, "=")) {
+      if (attr->is_extern) {
+        error_tok(tok, "%s initialized and declared 'extern'",
+                  get_ident(ty->name));
+      }
       gvar_initializer(&tok, tok->next, var);
-    else if (!attr->is_extern && !attr->is_tls)
+    } else if (!attr->is_extern && !attr->is_tls)
       var->is_tentative = true;
   }
   return tok;
@@ -3325,6 +3369,7 @@ static void declare_builtin_functions(void) {
   builtin_alloca->is_definition = false;
 }
 
+// program = (typedef | function-definition | global-variable)*
 Obj *parse(Token *tok) {
   declare_builtin_functions();
   globals = NULL;
@@ -3333,16 +3378,19 @@ Obj *parse(Token *tok) {
     VarAttr attr = {};
     Type *basety = declspec(&tok, tok, &attr);
 
+    // Typedef
     if (attr.is_typedef) {
       tok = parse_typedef(tok, basety);
       continue;
     }
 
+    // Function
     if (is_function(tok)) {
       tok = function(tok, basety, &attr);
       continue;
     }
 
+    // Global variable
     tok = global_variable(tok, basety, &attr);
   }
   // TODO: static inline related
@@ -3350,6 +3398,5 @@ Obj *parse(Token *tok) {
   //   if (var->is_root)
   //     mark_live(var);
 
-  // scan_globals();
   return globals;
 }
