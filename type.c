@@ -311,7 +311,7 @@ void add_type(Node *node) {
   switch (node->kind) {
   case ND_NUM:
     // I think num node should has the type when created.
-    // node->ty = node->tok->ty;
+    // node->ty = ty_int;
     unreachable();
     return;
   case ND_ADD:

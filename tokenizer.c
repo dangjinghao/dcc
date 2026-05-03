@@ -71,7 +71,7 @@ static void warn_tok(Token *tok, char *fmt, ...) {
   va_end(ap);
 }
 
-static bool tok_equal_str(Token *tok, char *op) {
+bool equal(Token *tok, char *op) {
   return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
 }
 
@@ -452,13 +452,13 @@ void error(char *fmt, ...) {
 
 // Ensure that the current token is `op`
 Token *skip(Token *tok, char *op) {
-  if (!tok_equal_str(tok, op))
+  if (!equal(tok, op))
     error_tok(tok, "expected '%s'", op);
   return tok->next;
 }
 
 bool consume(Token **rest, Token *tok, char *str) {
-  if (tok_equal_str(tok, str)) {
+  if (equal(tok, str)) {
     *rest = tok->next;
     return true;
   }

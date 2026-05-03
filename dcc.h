@@ -14,6 +14,12 @@ typedef struct Node Node;
 typedef struct Obj Obj;
 typedef struct Member Member;
 
+// Round up `n` to the nearest multiple of `align`. For instance,
+// align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
+static inline int align_to(int n, int align) {
+  return (n + align - 1) / align * align;
+}
+
 //
 /// tokenizer.c
 //
@@ -46,13 +52,18 @@ struct Token {
   Token *next;
 };
 
+bool equal(Token *tok, char *op);
+bool consume(Token **rest, Token *tok, char *str);
+Token *skip(Token *tok, char *op);
+
 noreturn void error(char *fmt, ...);
 noreturn void error_tok(Token *tok, char *fmt, ...);
 Token *tokenize_file(char *path);
 
-#ifndef unreachable
-#define unreachable() error("internal error at %s:%d", __FILE__, __LINE__)
+#ifdef unreachable
+#undef unreachable
 #endif
+#define unreachable() error("internal error at %s:%d", __FILE__, __LINE__)
 
 //
 /// type.c
@@ -282,7 +293,6 @@ struct Node {
 
   // Numeric literal
   uint64_t val;
-  bool is_unsigned;
   long double fval;
 };
 
@@ -303,8 +313,12 @@ struct Obj {
   bool is_static;
 
   // Global variable
+
+  // used to distinguish same name global variable
+  // e.g. in global scope,
+  // extern int a;int a; int a = 1;
   bool is_tentative;
-  bool is_tls;
+  bool is_tls; // thread local
   char *init_data;
 
   // TODO: Relocation *rel;
@@ -325,7 +339,35 @@ struct Obj {
 };
 
 Node *new_cast(Node *expr, Type *ty);
+Obj *parse(Token *tok);
 
-void parse(Token *tok);
+//
+/// strings.c
+//
+
+char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
+//
+// hashmap.c
+//
+
+typedef struct {
+  char *key;
+  int keylen;
+  void *val;
+} HashEntry;
+
+typedef struct {
+  HashEntry *buckets;
+  int capacity;
+  int used;
+} HashMap;
+
+void *hashmap_get(HashMap *map, char *key);
+void *hashmap_get2(HashMap *map, char *key, int keylen);
+void hashmap_put(HashMap *map, char *key, void *val);
+void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
+void hashmap_delete(HashMap *map, char *key);
+void hashmap_delete2(HashMap *map, char *key, int keylen);
 
 #endif
