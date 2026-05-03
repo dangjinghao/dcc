@@ -13,12 +13,16 @@ typedef struct Token Token;
 typedef struct Node Node;
 typedef struct Obj Obj;
 typedef struct Member Member;
+typedef struct Relocation Relocation;
 
 // Round up `n` to the nearest multiple of `align`. For instance,
 // align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
 static inline int align_to(int n, int align) {
   return (n + align - 1) / align * align;
 }
+
+#define MAX(x, y) ((x) < (y) ? (y) : (x))
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 //
 /// tokenizer.c
@@ -321,7 +325,7 @@ struct Obj {
   bool is_tls; // thread local
   char *init_data;
 
-  // TODO: Relocation *rel;
+  Relocation *rel;
 
   // Function
   bool is_inline;
@@ -338,7 +342,19 @@ struct Obj {
   // StringArray refs;
 };
 
+// Global variable can be initialized either by a constant expression
+// or a pointer to another global variable. This struct represents the
+// latter.
+typedef struct Relocation Relocation;
+struct Relocation {
+  Relocation *next;
+  int offset;
+  char **label;
+  long addend;
+};
+
 Node *new_cast(Node *expr, Type *ty);
+int64_t const_expr(Token **rest, Token *tok);
 Obj *parse(Token *tok);
 
 //
