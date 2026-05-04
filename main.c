@@ -8,6 +8,8 @@ int main(int argc, char *argv[]) {
   }
   Token *ts = tokenize_file(argv[1]);
 
-  parse(ts);
+  Obj *o = parse(ts);
+  char *s = objrepr(o);
+  puts(s);
   return 0;
 }

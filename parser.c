@@ -307,6 +307,7 @@ static Obj *new_lvar(char *name, Type *ty) {
   return var;
 }
 
+// create a static gloabl definition variable
 static Obj *new_gvar(char *name, Type *ty) {
   Obj *var = new_var(name, ty);
   var->next = globals;
@@ -866,6 +867,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety,
     // Generate code for computing a VLA size. We need to do this
     // even if ty is not VLA because ty may be a pointer to VLA
     // (e.g. int (*foo)[n][m] where n and m are variables.)
+    // TODO:understand
     cur = cur->next = new_unary(ND_EXPR_STMT, compute_vla_size(ty, tok), tok);
 
     if (ty->kind == TY_VLA) {
@@ -2366,6 +2368,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   if (is_numeric(lhs->ty) && is_numeric(rhs->ty))
     return new_binary(ND_ADD, lhs, rhs, tok);
 
+  // ptr + ptr
   if (lhs->ty->base && rhs->ty->base)
     error_tok(tok, "invalid operands");
 
@@ -3103,15 +3106,13 @@ static Node *primary(Token **rest, Token *tok) {
     VarScope *sc = find_var(tok);
     *rest = tok->next;
 
-    // For "static inline" function
-    if (sc && sc->var && sc->var->is_function) {
-      // TODO:
-      unreachable();
-      // if (current_fn)
-      //   strarray_push(&current_fn->refs, sc->var->name);
-      // else
-      //   sc->var->is_root = true;
-    }
+    // TODO:For "static inline" function
+    // if (sc && sc->var && sc->var->is_function) {
+    // if (current_fn)
+    //   strarray_push(&current_fn->refs, sc->var->name);
+    // else
+    //   sc->var->is_root = true;
+    // }
 
     if (sc) {
       if (sc->var)
@@ -3271,13 +3272,12 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   // [https://www.sigbus.info/n1570#6.4.2.2p1] "__func__" is
   // automatically defined as a local variable containing the
   // current function name.
-  push_scope("__func__")->var =
+  Obj *func_name_str =
       new_string_literal(fn->name, array_of(ty_char, strlen(fn->name) + 1));
+  push_scope("__func__")->var = func_name_str;
 
   // [GNU] __FUNCTION__ is yet another name of __func__.
-  push_scope("__FUNCTION__")->var =
-      new_string_literal(fn->name, array_of(ty_char, strlen(fn->name) + 1));
-
+  push_scope("__FUNCTION__")->var = func_name_str;
   fn->body = compound_stmt(&tok, tok);
   fn->locals = locals;
   leave_scope();
@@ -3365,7 +3365,7 @@ static bool is_function(Token *tok) {
 static void declare_builtin_functions(void) {
   Type *ty = func_type(pointer_to(ty_void));
   ty->params = copy_type(ty_int);
-  builtin_alloca = new_gvar("alloca", ty);
+  builtin_alloca = new_gvar("__builtin_alloca", ty);
   builtin_alloca->is_definition = false;
 }
 

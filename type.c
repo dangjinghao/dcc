@@ -232,7 +232,7 @@ static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
   // It just like that: oh, we've expand any operation which including pointer
   // so now we can just type cast those expanded value to pointer.
   if (t1->base) {
-    return pointer_to(t1);
+    return pointer_to(t1->base);
   }
 
   if (t1->kind == TY_FUNC)

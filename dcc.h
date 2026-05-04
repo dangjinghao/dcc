@@ -238,8 +238,8 @@ typedef enum {
 struct Node {
   NodeKind kind; // Node kind
   Node *next;    // Next node
-  Type *ty;      // Type, e.g. int or pointer to int
-  Token *tok;    // Representative token
+  Type *ty; // Type, e.g. int or pointer to int or function calling return type
+  Token *tok; // Representative token
 
   Node *lhs; // Left-hand side
   Node *rhs; // Right-hand side
@@ -364,7 +364,7 @@ Obj *parse(Token *tok);
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 //
-// hashmap.c
+/// hashmap.c
 //
 
 typedef struct {
@@ -385,5 +385,13 @@ void hashmap_put(HashMap *map, char *key, void *val);
 void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
 void hashmap_delete(HashMap *map, char *key);
 void hashmap_delete2(HashMap *map, char *key, int keylen);
+
+//
+/// astrepr.c
+//
+
+char *objrepr(Obj *o);
+char *typerepr(Type *ty);
+char *noderepr(Node *n);
 
 #endif
