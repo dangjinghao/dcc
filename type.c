@@ -221,9 +221,24 @@ static Type *type_integer_promotion(Type *ty) {
 }
 
 static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
-  assert(!t1->base && t1->kind != TY_FUNC);
-  assert(!t2->base && t2->kind != TY_FUNC);
 
+  // If there is a pointer in binary operation, we can return t1 type with
+  // pointer. That's because in the new_add/new_dec function the pointer-related
+  // operation has been expanded. E.g. (int*)ptr - 4 --> (int*)ptr - 4 *
+  // (long)sizeof(int) then we can leave the t2 type - we don't need this type
+  // infomation to defer value so we can return t1 type with pointer if pointer
+  // exists in this binary operation.
+  // also, it could be used in compare operation.
+  // It just like that: oh, we've expand any operation which including pointer
+  // so now we can just type cast those expanded value to pointer.
+  if (t1->base) {
+    return pointer_to(t1);
+  }
+
+  if (t1->kind == TY_FUNC)
+    return pointer_to(t1);
+  if (t2->kind == TY_FUNC)
+    return pointer_to(t2);
   t1 = type_integer_promotion(t1);
   t2 = type_integer_promotion(t2);
 
@@ -282,11 +297,19 @@ static Node *integer_promotion(Node *n) {
   return n;
 }
 
-static void usual_arith_conv(Node **lhs, Node **rhs) {
-
+static Type *usual_arith_conv(Node **lhs, Node **rhs) {
   Type *ty = type_usual_arithmetic_conversion((*lhs)->ty, (*rhs)->ty);
   *lhs = new_cast(*lhs, ty);
   *rhs = new_cast(*rhs, ty);
+  return ty;
+}
+
+static void integer_binary_operator_type_check(Node *lhs, Node *rhs) {
+  if (!is_integer(rhs->ty) || !is_integer(lhs->ty)) {
+    // is it possible to use their parent node to locate?
+    error_tok((!is_integer(rhs->ty)) ? rhs->tok : lhs->tok,
+              "invalid operands to this operand");
+  }
 }
 
 void add_type(Node *node) {
@@ -310,24 +333,49 @@ void add_type(Node *node) {
 
   switch (node->kind) {
   case ND_NUM:
-    // I think num node should has the type when created.
+    // I think num node should has the int type when created.
     // node->ty = ty_int;
     unreachable();
     return;
+  // arithmetic binary operation
+  // add operation has been canonicalized and pointer will always in the lhs
   case ND_ADD:
+  // it's not allowed to set pointer in rhs in sub operation
   case ND_SUB:
   case ND_MUL:
-  case ND_DIV:
+  case ND_DIV: {
+    node->ty = usual_arith_conv(&node->lhs, &node->rhs);
+    return;
+  }
+  // integer-only binary operation
   case ND_MOD:
   case ND_BITAND:
   case ND_BITOR:
-  case ND_BITXOR:
-    usual_arith_conv(&node->lhs, &node->rhs);
+  case ND_BITXOR: {
+    integer_binary_operator_type_check(node->lhs, node->rhs);
+    node->ty = usual_arith_conv(&node->lhs, &node->rhs);
+    return;
+  }
+  // integer-only unary operation
+  case ND_BITNOT: {
+    if (!is_integer(node->lhs->ty)) {
+      error_tok(node->lhs->tok,
+                "Invalid argument type (non-interger) for ~ operation");
+    }
+    node->lhs = integer_promotion(node->lhs);
     node->ty = node->lhs->ty;
     return;
-  case ND_BITNOT:
+  }
+  // based on lhs type
   case ND_SHL:
-  case ND_SHR:
+  case ND_SHR: {
+    integer_binary_operator_type_check(node->lhs, node->rhs);
+    node->lhs = integer_promotion(node->lhs);
+    node->rhs = integer_promotion(node->rhs);
+    node->ty = node->lhs->ty;
+    return;
+  }
+  // arithmetic unary operation
   case ND_NEG: {
     node->lhs = integer_promotion(node->lhs);
     node->ty = node->lhs->ty;
@@ -343,16 +391,19 @@ void add_type(Node *node) {
       node->rhs = new_cast(node->rhs, node->lhs->ty);
     node->ty = node->lhs->ty;
     return;
+  // compare binary operation (always return int)
   case ND_EQ:
   case ND_NE:
   case ND_LT:
-  case ND_LE:
+  case ND_LE: {
     usual_arith_conv(&node->lhs, &node->rhs);
     node->ty = ty_int;
     return;
+  }
   case ND_FUNCALL:
     node->ty = node->func_ty->return_ty;
     return;
+  // logic operation (always return int)
   case ND_NOT:
   case ND_LOGOR:
   case ND_LOGAND:
@@ -366,8 +417,7 @@ void add_type(Node *node) {
     if (node->then->ty->kind == TY_VOID || node->_else->ty->kind == TY_VOID) {
       node->ty = ty_void;
     } else {
-      usual_arith_conv(&node->then, &node->_else);
-      node->ty = node->then->ty;
+      node->ty = usual_arith_conv(&node->then, &node->_else);
     }
     return;
   case ND_COMMA:
@@ -377,13 +427,14 @@ void add_type(Node *node) {
     node->ty = node->member->ty;
     return;
   case ND_ADDR: {
-    // correct: node->ty = pointer_to(node->lhs->ty);
     Type *ty = node->lhs->ty;
-    if (ty->kind == TY_ARRAY)
+    if (ty->kind == TY_ARRAY) {
+      // correct: node->ty = pointer_to(node->lhs->ty);
       // WARN: it is not std
       node->ty = pointer_to(ty->base);
-    else
+    } else {
       node->ty = pointer_to(ty);
+    }
     return;
   }
   case ND_DEREF:
