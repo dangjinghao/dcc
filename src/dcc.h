@@ -1,6 +1,7 @@
 #ifndef DCC_H
 #define DCC_H
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdnoreturn.h>
 
@@ -62,6 +63,8 @@ Token *skip(Token *tok, char *op);
 
 noreturn void error(char *fmt, ...);
 noreturn void error_tok(Token *tok, char *fmt, ...);
+void warn_tok(Token *tok, char *fmt, ...);
+
 Token *tokenize_file(char *path);
 
 #ifdef unreachable
@@ -362,6 +365,7 @@ Obj *parse(Token *tok);
 //
 
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
+char *visual_data(char *s, size_t len);
 
 //
 /// hashmap.c

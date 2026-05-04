@@ -171,8 +171,7 @@ static void write_obj(ReprCtx *ctx, Obj *o) {
   if (seen_put(&ctx->seen_obj, o)) {
     char *summary =
         format("Obj(ref) %s%s%s", o->name ? o->name : "(anon)",
-               o->is_function ? " (func)" : "",
-               o->is_local ? " (local)" : "");
+               o->is_function ? " (func)" : "", o->is_local ? " (local)" : "");
     write_ref(ctx->out, summary);
     return;
   }
@@ -225,8 +224,8 @@ static void write_obj(ReprCtx *ctx, Obj *o) {
 
   if (o->init_data) {
     childlist_add_start(&cl);
-    char *idata =
-        format("init_data(%d): '%s'", o->ty ? o->ty->size : 0, o->init_data);
+    char *idata = format("init_data(%d):  '%s'", o->ty ? o->ty->size : 0,
+                         visual_data(o->init_data, o->ty ? o->ty->size : 0));
     fprintf(ctx->out, "{\"name\":");
     json_write_string(ctx->out, idata);
     fprintf(ctx->out, "}");
@@ -407,8 +406,8 @@ static void write_type(ReprCtx *ctx, Type *ty) {
   }
   if (seen_put(&ctx->seen_type, ty)) {
     const char *k = TypeKind_string[ty->kind];
-    char *summary = format("Type(ref) %s size=%d align=%d", k, ty->size,
-                           ty->align);
+    char *summary =
+        format("Type(ref) %s size=%d align=%d", k, ty->size, ty->align);
     write_ref(ctx->out, summary);
     return;
   }

@@ -2387,6 +2387,8 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   }
 
   // ptr + num
+  // We expand this calculate process, so if we meet a ptr + num operation, we
+  // don't need to do it again. Just cast the num to pointer type and
   rhs = new_binary(ND_MUL, rhs, new_long(lhs->ty->base->size, tok), tok);
   return new_binary(ND_ADD, lhs, rhs, tok);
 }
