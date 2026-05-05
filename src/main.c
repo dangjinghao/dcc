@@ -8,8 +8,14 @@ int main(int argc, char *argv[]) {
   }
   Token *ts = tokenize_file(argv[1]);
 
-  Obj *o = parse(ts);
-  char *s = objrepr(o);
-  puts(s);
+  Obj *ast = parse(ts);
+  // Open a temporary output buffer.
+  char *buf;
+  size_t buflen;
+  FILE *output_buf = open_memstream(&buf, &buflen);
+
+  codegen(ast, output_buf);
+  fclose(output_buf);
+  puts(buf);
   return 0;
 }

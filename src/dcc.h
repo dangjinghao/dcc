@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdnoreturn.h>
 
 //
@@ -359,6 +360,12 @@ struct Relocation {
 Node *new_cast(Node *expr, Type *ty);
 int64_t const_expr(Token **rest, Token *tok);
 Obj *parse(Token *tok);
+
+//
+// codegen
+//
+
+void codegen(Obj *prog, FILE *out);
 
 //
 /// strings.c
