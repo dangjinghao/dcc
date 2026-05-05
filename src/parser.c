@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1396,25 +1395,25 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
 }
 
 static uint64_t read_buf(char *buf, int sz) {
-  if (sz == 1)
-    return *buf;
-  if (sz == 2)
+  if (sz == sizeof(uint8_t))
+    return *(uint8_t *)buf;
+  if (sz == sizeof(uint16_t))
     return *(uint16_t *)buf;
-  if (sz == 4)
+  if (sz == sizeof(uint32_t))
     return *(uint32_t *)buf;
-  if (sz == 8)
+  if (sz == sizeof(uint64_t))
     return *(uint64_t *)buf;
   unreachable();
 }
 
 static void write_buf(char *buf, uint64_t val, int sz) {
-  if (sz == 1)
-    *buf = val;
-  else if (sz == 2)
+  if (sz == sizeof(uint8_t))
+    *(uint8_t *)buf = (uint8_t)val;
+  else if (sz == sizeof(uint16_t))
     *(uint16_t *)buf = val;
-  else if (sz == 4)
+  else if (sz == sizeof(uint32_t))
     *(uint32_t *)buf = val;
-  else if (sz == 8)
+  else if (sz == sizeof(uint64_t))
     *(uint64_t *)buf = val;
   else
     unreachable();
@@ -3129,20 +3128,8 @@ static Node *primary(Token **rest, Token *tok) {
   }
 
   if (tok->kind == TK_STR) {
-    // str concat
-    char *str_buf = NULL;
-    size_t str_buf_size = 0;
-    FILE *str_buf_fp = open_memstream(&str_buf, &str_buf_size);
-    Type *str_ty = tok->ty;
-    while (tok->kind == TK_STR) {
-      fwrite(tok->str, 1, strlen(tok->str), str_buf_fp);
-      tok = tok->next;
-    }
-    Obj *var = new_string_literal(str_buf, str_ty);
+    Obj *var = new_string_literal(tok->str, tok->ty);
     *rest = tok->next;
-    fputc('\0', str_buf_fp);
-    fflush(str_buf_fp);
-    fclose(str_buf_fp);
     return new_var_node(var, tok);
   }
 

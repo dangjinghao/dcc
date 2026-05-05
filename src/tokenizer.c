@@ -10,6 +10,13 @@
 
 static DFile *current_file;
 
+static Token *copy_token(Token *tok) {
+  Token *t = calloc(1, sizeof(Token));
+  *t = *tok;
+  t->next = NULL;
+  return t;
+}
+
 static bool str_startswith(char *str, char *substr) {
   return strncmp(str, substr, strlen(substr)) == 0;
 }
@@ -439,7 +446,7 @@ bool consume(Token **rest, Token *tok, char *str) {
   return false;
 }
 
-Token *tokenize(DFile *file) {
+static Token *tokenize(DFile *file) {
   current_file = file;
 
   char *p = file->contents;
@@ -528,6 +535,45 @@ DFile *new_file(char *name, char *contents) {
   return file;
 }
 
+// Concatenate adjacent string literals into a single string literal
+// as per the C spec.
+static void join_adjacent_string_literals(Token *tok) {
+  // First pass: If regular string literals are adjacent to wide
+  // string literals, regular string literals are converted to a wide
+  // type before concatenation. In this pass, we do the conversion.
+  // TODO:
+
+  // Second pass: concatenate adjacent string literals.
+  for (Token *tok1 = tok; tok1->kind != TK_EOF;) {
+    if (tok1->kind != TK_STR || tok1->next->kind != TK_STR) {
+      tok1 = tok1->next;
+      continue;
+    }
+
+    Token *tok2 = tok1->next;
+    while (tok2->kind == TK_STR)
+      tok2 = tok2->next;
+
+    int len = tok1->ty->array_len;
+    for (Token *t = tok1->next; t != tok2; t = t->next)
+      len = len + t->ty->array_len - 1;
+
+    char *buf = calloc(tok1->ty->base->size, len);
+
+    int i = 0;
+    for (Token *t = tok1; t != tok2; t = t->next) {
+      memcpy(buf + i, t->str, t->ty->size);
+      i = i + t->ty->size - t->ty->base->size;
+    }
+
+    *tok1 = *copy_token(tok1);
+    tok1->ty = array_of(tok1->ty->base, len);
+    tok1->str = buf;
+    tok1->next = tok2;
+    tok1 = tok2;
+  }
+}
+
 Token *tokenize_file(char *path) {
   char *p = read_file(path);
   if (!p)
@@ -546,5 +592,7 @@ Token *tokenize_file(char *path) {
 
   DFile *file = new_file(path, p);
 
-  return tokenize(file);
+  Token *tok = tokenize(file);
+  join_adjacent_string_literals(tok);
+  return tok;
 }
