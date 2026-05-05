@@ -52,6 +52,7 @@ typedef struct {
   HashMap seen_node;
   HashMap seen_type;
   HashMap seen_member;
+  HashMap seen_reloc;
 } ReprCtx;
 
 typedef struct {
@@ -128,6 +129,7 @@ static void write_obj(ReprCtx *ctx, Obj *o);
 static void write_node(ReprCtx *ctx, Node *n);
 static void write_type(ReprCtx *ctx, Type *ty);
 static void write_member(ReprCtx *ctx, Member *mem);
+static void write_reloc(ReprCtx *ctx, Relocation *rel);
 
 static void write_node_list(ReprCtx *ctx, ChildList *cl, Node *n) {
   for (Node *cur = n; cur; cur = cur->next) {
@@ -154,6 +156,13 @@ static void write_member_list(ReprCtx *ctx, ChildList *cl, Member *mem) {
   for (Member *cur = mem; cur; cur = cur->next) {
     childlist_add_start(cl);
     write_member(ctx, cur);
+  }
+}
+
+static void write_reloc_list(ReprCtx *ctx, ChildList *cl, Relocation *rel) {
+  for (Relocation *cur = rel; cur; cur = cur->next) {
+    childlist_add_start(cl);
+    write_reloc(ctx, cur);
   }
 }
 
@@ -224,7 +233,7 @@ static void write_obj(ReprCtx *ctx, Obj *o) {
 
   if (o->init_data) {
     childlist_add_start(&cl);
-    char *idata = format("init_data(%d):  '%s'", o->ty ? o->ty->size : 0,
+    char *idata = format("init_data(%d B):  '%s'", o->ty ? o->ty->size : 0,
                          visual_data(o->init_data, o->ty ? o->ty->size : 0));
     fprintf(ctx->out, "{\"name\":");
     json_write_string(ctx->out, idata);
@@ -245,6 +254,16 @@ static void write_obj(ReprCtx *ctx, Obj *o) {
       write_obj(ctx, o->alloca_bottom);
     }
     childlist_close(&al);
+    fprintf(ctx->out, "}");
+  }
+
+  if (o->rel) {
+    childlist_add_start(&cl);
+    fprintf(ctx->out, "{\"name\":\"relocations\"");
+    ChildList rl;
+    childlist_init(&rl, ctx->out);
+    write_reloc_list(ctx, &rl, o->rel);
+    childlist_close(&rl);
     fprintf(ctx->out, "}");
   }
 
@@ -369,6 +388,34 @@ static void write_node(ReprCtx *ctx, Node *n) {
   fprintf(ctx->out, "}");
 }
 
+static void write_reloc(ReprCtx *ctx, Relocation *rel) {
+  if (!rel) {
+    fprintf(ctx->out, "{\"name\":\"Relocation(null)\"}");
+    return;
+  }
+  if (seen_put(&ctx->seen_reloc, rel)) {
+    char *summary =
+        format("Reloc(ref) off=%d addend=%ld", rel->offset, rel->addend);
+    write_ref(ctx->out, summary);
+    return;
+  }
+
+  char *name = format("Reloc off=%d addend=%ld", rel->offset, rel->addend);
+  fprintf(ctx->out, "{\"name\":");
+  json_write_string(ctx->out, name);
+
+  ChildList cl;
+  childlist_init(&cl, ctx->out);
+  if (rel->label && *rel->label) {
+    childlist_add_start(&cl);
+    char *lbl = format("label %s", *rel->label);
+    fprintf(ctx->out, "{\"name\":");
+    json_write_string(ctx->out, lbl);
+    fprintf(ctx->out, "}");
+  }
+  childlist_close(&cl);
+  fprintf(ctx->out, "}");
+}
 static void write_member(ReprCtx *ctx, Member *mem) {
   if (!mem) {
     fprintf(ctx->out, "{\"name\":\"Member(null)\"}");
