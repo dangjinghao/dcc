@@ -12,25 +12,26 @@ add_compile_options(
     -fno-common
     -Wall
     -Wno-switch
-)
+    )
 
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CORE_SRCS src/tokenizer.c
-        src/parser.c
-        src/strings.c
-        src/type.c
-        src/hashmap.c
-        src/astrepr.c
-        )
+add_library(dcc_core STATIC src/tokenizer.c
+                        src/parser.c
+                        src/strings.c
+                        src/type.c
+                        src/hashmap.c
+                        )
 
 add_executable(dcc)
-
-target_sources(dcc PRIVATE src/main.c ${CORE_SRCS})
+target_link_libraries(dcc PRIVATE dcc_core)
+target_sources(dcc PRIVATE src/main.c)
 
 # tools
 add_executable(astrepr)
-target_sources(astrepr PRIVATE src/tools/astrepr.c ${CORE_SRCS})
+target_link_libraries(astrepr PRIVATE dcc_core)
+target_sources(astrepr PRIVATE src/tools/astrepr.c)
+
 
 include_directories(src/)
 

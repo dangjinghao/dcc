@@ -396,12 +396,4 @@ void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
 void hashmap_delete(HashMap *map, char *key);
 void hashmap_delete2(HashMap *map, char *key, int keylen);
 
-//
-/// astrepr.c
-//
-
-char *objrepr(Obj *o);
-char *typerepr(Type *ty);
-char *noderepr(Node *n);
-
 #endif
