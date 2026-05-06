@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(dcc C CXX)
+project(dcc C CXX) # CXX for llvm
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -22,11 +22,15 @@ set(CORE_SRCS src/tokenizer.c
         src/type.c
         src/hashmap.c
         src/astrepr.c
-        src/main.c)
+        )
 
 add_executable(dcc)
 
-target_sources(dcc PRIVATE ${CORE_SRCS})
+target_sources(dcc PRIVATE src/main.c ${CORE_SRCS})
+
+# tools
+add_executable(astrepr)
+target_sources(astrepr PRIVATE src/tools/astrepr.c ${CORE_SRCS})
 
 include_directories(src/)
 
