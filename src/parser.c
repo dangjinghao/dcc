@@ -3334,8 +3334,12 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
                   get_ident(ty->name));
       }
       gvar_initializer(&tok, tok->next, var);
-    } else if (!attr->is_extern && !attr->is_tls)
+    }
+
+    if (var->is_definition && !var->is_tls && !var->init_data)
       var->is_tentative = true;
+    else
+      var->is_tentative = false;
   }
   return tok;
 }

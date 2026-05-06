@@ -322,9 +322,7 @@ struct Obj {
 
   // Global variable
 
-  // used to distinguish same name global variable
-  // e.g. in global scope,
-  // extern int a;int a; int a = 1;
+  // common linkage
   bool is_tentative;
   bool is_tls; // thread local
   char *init_data;
