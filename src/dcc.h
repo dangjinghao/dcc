@@ -67,6 +67,7 @@ noreturn void error_tok(Token *tok, char *fmt, ...);
 void warn_tok(Token *tok, char *fmt, ...);
 
 Token *tokenize_file(char *path);
+DFile *get_current_file();
 
 #ifdef unreachable
 #undef unreachable

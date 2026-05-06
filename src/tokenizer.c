@@ -596,3 +596,5 @@ Token *tokenize_file(char *path) {
   join_adjacent_string_literals(tok);
   return tok;
 }
+
+DFile *get_current_file() { return current_file; }

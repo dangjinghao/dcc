@@ -224,8 +224,8 @@ static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
 
   // If there is a pointer in binary operation, we can return t1 type with
   // pointer. That's because in the new_add/new_dec function the pointer-related
-  // operation has been expanded. E.g. (int*)ptr - 4 --> (int*)ptr - 4 *
-  // (long)sizeof(int) then we can leave the t2 type - we don't need this type
+  // operation has been expanded. E.g. (int*)ptr + 4 --> (int*)ptr + 4 *
+  // (long)sizeof(int) then we can ignore the t2 type - we don't need this type
   // infomation to defer value so we can return t1 type with pointer if pointer
   // exists in this binary operation.
   // also, it could be used in compare operation.
