@@ -35,29 +35,6 @@ typedef struct {
   int align;
 } VarAttr;
 
-// This struct represents a variable initializer. Since initializers
-// can be nested (e.g. `int x[2][2] = {{1, 2}, {3, 4}}`), this struct
-// is a tree data structure.
-typedef struct Initializer Initializer;
-struct Initializer {
-  Initializer *next;
-  Type *ty;
-  Token *tok;
-  bool is_flexible;
-
-  // If it's not an aggregate type and has an initializer,
-  // `expr` has an initialization expression.
-  Node *expr;
-
-  // If it's an initializer for an aggregate type (e.g. array or struct),
-  // `children` has initializers for its children.
-  Initializer **children;
-
-  // Only one member can be initialized for a union.
-  // `mem` is used to clarify which member is initialized.
-  Member *mem;
-};
-
 // For local variable initializer.
 typedef struct InitDesg InitDesg;
 struct InitDesg {
@@ -114,13 +91,10 @@ static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
 static Node *expr(Token **rest, Token *tok);
-static int64_t eval(Node *node);
-static int64_t eval2(Node *node, char ***label);
 static int64_t eval_rval(Node *node, char ***label);
 static bool is_const_expr(Node *node);
 static Node *assign(Token **rest, Token *tok);
 static Node *logor(Token **rest, Token *tok);
-static double eval_double(Node *node);
 static Node *conditional(Token **rest, Token *tok);
 static Node *logand(Token **rest, Token *tok);
 static Node *bitor(Token **rest, Token *tok);
@@ -289,6 +263,36 @@ static Initializer *new_initializer(Type *ty, bool is_flexible) {
   return init;
 }
 
+static Initializer *new_string_literal_initializer(Type *ty, char *lit,
+                                                   Token *tok) {
+  Initializer *init = new_initializer(ty, false);
+  size_t len = strlen(lit) + 1;
+  switch (init->ty->base->size) {
+  case 1: {
+    char *str = lit;
+    for (size_t i = 0; i < len; i++)
+      init->children[i]->expr = new_num(str[i], tok);
+    break;
+  }
+  case 2: {
+    uint16_t *str = (uint16_t *)lit;
+    for (size_t i = 0; i < len; i++)
+      init->children[i]->expr = new_num(str[i], tok);
+    break;
+  }
+  case 4: {
+    uint32_t *str = (uint32_t *)lit;
+    for (size_t i = 0; i < len; i++)
+      init->children[i]->expr = new_num(str[i], tok);
+    break;
+  }
+  default:
+    unreachable();
+  }
+
+  return init;
+}
+
 static Obj *new_var(char *name, Type *ty) {
   Obj *var = calloc(1, sizeof(Obj));
   var->name = name;
@@ -325,7 +329,8 @@ static Obj *new_anon_gvar(Type *ty) { return new_gvar(new_unique_name(), ty); }
 
 static Obj *new_string_literal(char *p, Type *ty) {
   Obj *var = new_anon_gvar(ty);
-  var->init_data = p;
+  Token *fake_tok = calloc(1, sizeof(Token));
+  var->init = new_string_literal_initializer(ty, p, fake_tok);
   return var;
 }
 
@@ -1393,111 +1398,13 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
   return new_binary(ND_COMMA, lhs, rhs, tok);
 }
-
-static uint64_t read_buf(char *buf, int sz) {
-  if (sz == sizeof(uint8_t))
-    return *(uint8_t *)buf;
-  if (sz == sizeof(uint16_t))
-    return *(uint16_t *)buf;
-  if (sz == sizeof(uint32_t))
-    return *(uint32_t *)buf;
-  if (sz == sizeof(uint64_t))
-    return *(uint64_t *)buf;
-  unreachable();
-}
-
-static void write_buf(char *buf, uint64_t val, int sz) {
-  if (sz == sizeof(uint8_t))
-    *(uint8_t *)buf = (uint8_t)val;
-  else if (sz == sizeof(uint16_t))
-    *(uint16_t *)buf = val;
-  else if (sz == sizeof(uint32_t))
-    *(uint32_t *)buf = val;
-  else if (sz == sizeof(uint64_t))
-    *(uint64_t *)buf = val;
-  else
-    unreachable();
-}
-
-static Relocation *write_gvar_data(Relocation *cur, Initializer *init, Type *ty,
-                                   char *buf, int offset) {
-  if (ty->kind == TY_ARRAY) {
-    int sz = ty->base->size;
-    for (int i = 0; i < ty->array_len; i++)
-      cur = write_gvar_data(cur, init->children[i], ty->base, buf,
-                            offset + sz * i);
-    return cur;
-  }
-
-  if (ty->kind == TY_STRUCT) {
-    for (Member *mem = ty->members; mem; mem = mem->next) {
-      if (mem->is_bitfield) {
-        Node *expr = init->children[mem->idx]->expr;
-        if (!expr)
-          break;
-
-        char *loc = buf + offset + mem->offset;
-        uint64_t oldval = read_buf(loc, mem->ty->size);
-        uint64_t newval = eval(expr);
-        uint64_t mask = (1L << mem->bit_width) - 1;
-        uint64_t combined = oldval | ((newval & mask) << mem->bit_offset);
-        write_buf(loc, combined, mem->ty->size);
-      } else {
-        cur = write_gvar_data(cur, init->children[mem->idx], mem->ty, buf,
-                              offset + mem->offset);
-      }
-    }
-    return cur;
-  }
-
-  if (ty->kind == TY_UNION) {
-    if (!init->mem)
-      return cur;
-    return write_gvar_data(cur, init->children[init->mem->idx], init->mem->ty,
-                           buf, offset);
-  }
-
-  if (!init->expr)
-    return cur;
-
-  if (ty->kind == TY_FLOAT) {
-    *(float *)(buf + offset) = eval_double(init->expr);
-    return cur;
-  }
-
-  if (ty->kind == TY_DOUBLE) {
-    *(double *)(buf + offset) = eval_double(init->expr);
-    return cur;
-  }
-
-  char **label = NULL;
-  uint64_t val = eval2(init->expr, &label);
-
-  if (!label) {
-    write_buf(buf + offset, val, ty->size);
-    return cur;
-  }
-
-  Relocation *rel = calloc(1, sizeof(Relocation));
-  rel->offset = offset;
-  rel->label = label;
-  rel->addend = val;
-  cur->next = rel;
-  return cur->next;
-}
-
 // Initializers for global variables are evaluated at compile-time and
 // embedded to .data section. This function serializes Initializer
 // objects to a flat byte array. It is a compile error if an
 // initializer list contains a non-constant expression.
 static void gvar_initializer(Token **rest, Token *tok, Obj *var) {
   Initializer *init = initializer(rest, tok, var->ty, &var->ty);
-
-  Relocation head = {};
-  char *buf = calloc(1, var->ty->size);
-  write_gvar_data(&head, init, var->ty, buf, 0);
-  var->init_data = buf;
-  var->rel = head.next;
+  var->init = init;
 }
 
 // Returns true if a given token represents a type.
@@ -1833,7 +1740,7 @@ static Node *expr(Token **rest, Token *tok) {
   return node;
 }
 
-static int64_t eval(Node *node) { return eval2(node, NULL); }
+int64_t eval(Node *node) { return eval2(node, NULL); }
 
 // Evaluate a given node as a constant expression.
 //
@@ -1841,7 +1748,7 @@ static int64_t eval(Node *node) { return eval2(node, NULL); }
 // is a pointer to a global variable and n is a postiive/negative
 // number. The latter form is accepted only as an initialization
 // expression for a global variable.
-static int64_t eval2(Node *node, char ***label) {
+int64_t eval2(Node *node, char ***label) {
   add_type(node);
 
   if (is_flonum(node->ty))
@@ -2005,7 +1912,7 @@ int64_t const_expr(Token **rest, Token *tok) {
   return eval(node);
 }
 
-static double eval_double(Node *node) {
+double eval_double(Node *node) {
   add_type(node);
 
   if (is_integer(node->ty)) {
@@ -3307,14 +3214,14 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
                        "non-thread-local "
                        "declaration");
       }
-      if (var->init_data && equal(tok, "=")) {
+      if (var->init && equal(tok, "=")) {
         error_tok(tok, "redefinition of %s", var->name);
       }
-      // else if (!var->init_data && !equal(tok, "=")) {
+      // else if (!var->init && !equal(tok, "=")) {
       //   // reuse existing var, both of them are tentative or extern
-      // } else if (var->init_data /* && !equal(tok, "=") */) {
+      // } else if (var->init /* && !equal(tok, "=") */) {
       //   // reuse existing var, prev var is better
-      // } else /*if (!var->init_data && equal(tok, "=")) */ {
+      // } else /*if (!var->init && equal(tok, "=")) */ {
       //   // reuse existing var, but assign init data to prev var
       // }
       var->is_definition = var->is_definition || !attr->is_extern;
@@ -3336,7 +3243,7 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
       gvar_initializer(&tok, tok->next, var);
     }
 
-    if (var->is_definition && !var->is_tls && !var->init_data)
+    if (var->is_definition && !var->is_tls && !var->init)
       var->is_tentative = true;
     else
       var->is_tentative = false;

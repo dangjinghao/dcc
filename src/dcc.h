@@ -15,7 +15,7 @@ typedef struct Token Token;
 typedef struct Node Node;
 typedef struct Obj Obj;
 typedef struct Member Member;
-typedef struct Relocation Relocation;
+typedef struct Initializer Initializer;
 
 // Round up `n` to the nearest multiple of `align`. For instance,
 // align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
@@ -326,9 +326,7 @@ struct Obj {
   // common linkage
   bool is_tentative;
   bool is_tls; // thread local
-  char *init_data;
-
-  Relocation *rel;
+  Initializer *init;
 
   // Function
   bool is_inline;
@@ -345,20 +343,34 @@ struct Obj {
   // StringArray refs;
 };
 
-// Global variable can be initialized either by a constant expression
-// or a pointer to another global variable. This struct represents the
-// latter.
-typedef struct Relocation Relocation;
-struct Relocation {
-  Relocation *next;
-  int offset;
-  char **label;
-  long addend;
+// This struct represents a variable initializer. Since initializers
+// can be nested (e.g. `int x[2][2] = {{1, 2}, {3, 4}}`), this struct
+// is a tree data structure.
+struct Initializer {
+  Initializer *next;
+  Type *ty;
+  Token *tok;
+  bool is_flexible;
+
+  // If it's not an aggregate type and has an initializer,
+  // `expr` has an initialization expression.
+  Node *expr;
+
+  // If it's an initializer for an aggregate type (e.g. array or struct),
+  // `children` has initializers for its children.
+  Initializer **children;
+
+  // Only one member can be initialized for a union.
+  // `mem` is used to clarify which member is initialized.
+  Member *mem;
 };
 
 Node *new_cast(Node *expr, Type *ty);
 int64_t const_expr(Token **rest, Token *tok);
 Obj *parse(Token *tok);
+int64_t eval(Node *node);
+int64_t eval2(Node *node, char ***label);
+double eval_double(Node *node);
 
 //
 // codegen
