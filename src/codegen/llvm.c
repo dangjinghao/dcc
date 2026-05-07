@@ -75,14 +75,14 @@ static LLVMValueRef init_data(Type *ty, Initializer *init) {
     char **label = NULL;
     int64_t eval_val = eval2(init->expr, &label);
     if (label) {
-      // Relocation, real data = label + eval_val
+      // Relocation, real data: label + eval_val
       LLVMValueRef target_val = LLVMGetNamedGlobal(M, *label);
       assert(target_val);
-      LLVMValueRef indices[2];
-      indices[0] = LLVMConstInt(LLVMInt64TypeInContext(C), 0, false);
-      indices[1] =
+      assert(ty->base);
+      LLVMTypeRef pointee_ty = type_convert(ty->base);
+      LLVMValueRef indices =
           LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, false);
-      init_val = LLVMConstInBoundsGEP2(llvm_ty, target_val, indices, 2);
+      init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
     } else {
       init_val = LLVMConstInt(llvm_ty, eval_val, ty->is_unsigned);
     }
@@ -90,14 +90,20 @@ static LLVMValueRef init_data(Type *ty, Initializer *init) {
   return init_val;
 }
 
-static void global_variable(Obj *prog) {
+// The first stage. Only declare global variable to avoid dependency order
+// problem
+static void codegen_declare_only(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function || !var->is_definition)
+    if (var->is_function)
       continue;
     LLVMTypeRef ty = type_convert(var->ty);
     LLVMValueRef v = LLVMAddGlobal(M, ty, var->name);
     if (var->is_static) {
       LLVMSetLinkage(v, LLVMInternalLinkage);
+    }
+
+    if (!var->is_definition) {
+      LLVMSetLinkage(v, LLVMExternalLinkage);
     }
 
     if (var->is_tentative) {
@@ -109,8 +115,17 @@ static void global_variable(Obj *prog) {
     }
 
     LLVMSetAlignment(v, var->ty->align);
+  }
+}
 
+// stage 2. initialize variable
+static void codegen_init(Obj *prog) {
+  for (Obj *var = prog; var; var = var->next) {
+    if (var->is_function)
+      continue;
     if (var->init) {
+      LLVMValueRef v = LLVMGetNamedGlobal(M, var->name);
+      assert(v);
       LLVMSetInitializer(v, init_data(var->ty, var->init));
     }
   }
@@ -121,8 +136,9 @@ void codegen(Obj *prog, FILE *out) {
   M = LLVMModuleCreateWithNameInContext(get_current_file()->name, C);
   B = LLVMCreateBuilderInContext(C);
 
-  global_variable(prog);
+  codegen_declare_only(prog);
 
+  codegen_init(prog);
   // print to out
   char *ir = LLVMPrintModuleToString(M);
   fputs(ir, out);
