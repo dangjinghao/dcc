@@ -1,6 +1,6 @@
 enum { X = 10 };
 int a = 1 + X;
-int b = -1;
+int b = -1 + 10 * 54 / 3;
 
 double c = .2;
 float d = .3 + 1.f;
@@ -9,3 +9,5 @@ int e[] = {1, 2, 3};
 float f[] = {1., .52, 3.1f};
 
 long g[10][3] = {{1, 2, 3}};
+char i[] = "123";
+char *h = "456";

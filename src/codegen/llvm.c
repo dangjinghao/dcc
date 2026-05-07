@@ -72,7 +72,20 @@ static LLVMValueRef init_data(Type *ty, Initializer *init) {
   } else if (!init->expr) {
     init_val = LLVMConstNull(llvm_ty);
   } else {
-    init_val = LLVMConstInt(llvm_ty, eval(init->expr), ty->is_unsigned);
+    char **label = NULL;
+    int64_t eval_val = eval2(init->expr, &label);
+    if (label) {
+      // Relocation, real data = label + eval_val
+      LLVMValueRef target_val = LLVMGetNamedGlobal(M, *label);
+      assert(target_val);
+      LLVMValueRef indices[2];
+      indices[0] = LLVMConstInt(LLVMInt64TypeInContext(C), 0, false);
+      indices[1] =
+          LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, false);
+      init_val = LLVMConstInBoundsGEP2(llvm_ty, target_val, indices, 2);
+    } else {
+      init_val = LLVMConstInt(llvm_ty, eval_val, ty->is_unsigned);
+    }
   }
   return init_val;
 }
