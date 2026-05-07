@@ -20,7 +20,7 @@ static LLVMTypeRef type_convert(Type *ty) {
   case TY_BOOL:
     return LLVMInt1TypeInContext(C);
   case TY_CHAR:
-    assert(ty->base->size == sizeof(char));
+    assert(ty->size == sizeof(char));
     return LLVMInt8TypeInContext(C);
   case TY_SHORT:
     return LLVMInt16TypeInContext(C);
