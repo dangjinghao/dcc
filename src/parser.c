@@ -3101,17 +3101,6 @@ static void resolve_goto_labels(void) {
   gotos = labels = NULL;
 }
 
-static Obj *find_func(char *name) {
-  Scope *sc = scope;
-  while (sc->next)
-    sc = sc->next;
-
-  VarScope *sc2 = hashmap_get(&sc->vars, name);
-  if (sc2 && sc2->var && sc2->var->is_function)
-    return sc2->var;
-  return NULL;
-}
-
 static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   Type *ty = declarator(&tok, tok, basety);
   if (!ty->name)

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdnoreturn.h>
-
 //
 /// MISC
 //
@@ -25,7 +24,13 @@ static inline int align_to(int n, int align) {
 
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
-
+#define next_iter_count(p)                                                     \
+  ({                                                                           \
+    size_t number = 0;                                                         \
+    for (typeof(p) n = p; n; n = n->next)                                        \
+      number++;                                                                \
+    number;                                                                    \
+  })
 //
 /// tokenizer.c
 //
@@ -183,7 +188,6 @@ Type *vla_of(Type *base, Node *expr);
 Type *enum_type(void);
 Type *struct_type(void);
 void add_type(Node *node);
-size_t members_number(Member *members);
 //
 /// parser.c
 //

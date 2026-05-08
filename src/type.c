@@ -1,5 +1,4 @@
 #include "dcc.h"
-#include <assert.h>
 #include <stdalign.h>
 #include <stdlib.h>
 
@@ -480,11 +479,4 @@ void add_type(Node *node) {
   default:
     break;
   }
-}
-
-size_t members_number(Member *members) {
-  size_t member_len = 0;
-  for (Member *m = members; m; m = m->next)
-    member_len++;
-  return member_len;
 }

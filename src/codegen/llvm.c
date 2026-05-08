@@ -40,17 +40,17 @@ static LLVMTypeRef type_convert(Type *ty) {
     assert(ty->array_len > 0);
     return LLVMArrayType2(type_convert(ty->base), ty->array_len);
   case TY_STRUCT: {
-    size_t member_num = members_number(ty->members);
-    LLVMTypeRef *members_type = calloc(member_num, sizeof(LLVMTypeRef));
+    size_t member_count = next_iter_count(ty->members);
+    LLVMTypeRef *members_type = calloc(member_count, sizeof(LLVMTypeRef));
     {
       size_t members_type_idx = 0;
       for (Member *m = ty->members; m; m = m->next) {
         members_type[members_type_idx++] = type_convert(m->ty);
       }
-      assert(member_num == members_type_idx);
+      assert(member_count == members_type_idx);
     }
     LLVMTypeRef r =
-        LLVMStructTypeInContext(C, members_type, member_num, ty->is_packed);
+        LLVMStructTypeInContext(C, members_type, member_count, ty->is_packed);
     free(members_type);
     return r;
   }
@@ -78,28 +78,30 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     // TODO:
     unreachable();
   } else if (ty->kind == TY_STRUCT) {
-    size_t member_num = members_number(ty->members);
+    size_t member_count = next_iter_count(ty->members);
     LLVMValueRef *cv_array = calloc(ty->array_len, sizeof(LLVMValueRef));
     {
       size_t cv_array_idx = 0;
       for (Member *m = ty->members; m; m = m->next) {
+        // TODO: bitfield
         assert(!m->is_bitfield);
         cv_array[cv_array_idx++] =
             init_global_data(m->ty, init->children[m->idx]);
       }
-      assert(cv_array_idx == member_num);
+      assert(cv_array_idx == member_count);
     }
-    init_val = LLVMConstNamedStruct(type_convert(ty), cv_array, member_num);
+    init_val = LLVMConstNamedStruct(type_convert(ty), cv_array, member_count);
     free(cv_array);
   } else if (ty->kind == TY_DOUBLE || ty->kind == TY_FLOAT) {
     init_val = LLVMConstReal(llvm_ty, eval_double(init->expr));
   } else if (!init->expr) {
     init_val = LLVMConstNull(llvm_ty);
   } else {
+    // integer family and ptr
     char **label = NULL;
     int64_t eval_val = eval2(init->expr, &label);
     if (label) {
-      // Relocation, real data: label + eval_val
+      // Relocation pointer, real data: label + eval_val
       LLVMValueRef target_val = LLVMGetNamedGlobal(M, *label);
       assert(target_val);
       assert(ty->base);
@@ -108,6 +110,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
           LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, false);
       init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
     } else {
+      // int family
       init_val = LLVMConstInt(llvm_ty, eval_val, ty->is_unsigned);
     }
   }
@@ -115,8 +118,8 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
 }
 
 // The first stage. Only declare global variable to avoid dependency order
-// problem
-static void codegen_declare_only(Obj *prog) {
+// problem.
+static void codegen_global_declare(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
     if (var->is_function)
       continue;
@@ -160,7 +163,7 @@ void codegen(Obj *prog, FILE *out) {
   M = LLVMModuleCreateWithNameInContext(get_current_file()->name, C);
   B = LLVMCreateBuilderInContext(C);
 
-  codegen_declare_only(prog);
+  codegen_global_declare(prog);
 
   codegen_global_init(prog);
   // print to out
