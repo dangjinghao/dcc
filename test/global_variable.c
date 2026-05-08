@@ -14,3 +14,19 @@ char *h = "hhh";
 char *ip = &i[1];
 
 extern int SUM;
+
+struct SA {
+  int i;
+  char c;
+} SAs;
+
+struct SA SAs2;
+
+struct {
+  int i1;
+  int i2;
+  struct {
+    char c;
+    short s;
+  } s;
+} SB2 = {.i1 = 1, .i2 = 2, .s.s = 1};

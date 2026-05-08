@@ -39,11 +39,24 @@ static LLVMTypeRef type_convert(Type *ty) {
   case TY_ARRAY:
     assert(ty->array_len > 0);
     return LLVMArrayType2(type_convert(ty->base), ty->array_len);
-
+  case TY_STRUCT: {
+    size_t member_num = members_number(ty->members);
+    LLVMTypeRef *members_type = calloc(member_num, sizeof(LLVMTypeRef));
+    {
+      size_t members_type_idx = 0;
+      for (Member *m = ty->members; m; m = m->next) {
+        members_type[members_type_idx++] = type_convert(m->ty);
+      }
+      assert(member_num == members_type_idx);
+    }
+    LLVMTypeRef r =
+        LLVMStructTypeInContext(C, members_type, member_num, ty->is_packed);
+    free(members_type);
+    return r;
+  }
   case TY_ENUM:
   case TY_FUNC:
   case TY_VLA:
-  case TY_STRUCT:
   case TY_UNION:
   default:
     break;
@@ -51,13 +64,13 @@ static LLVMTypeRef type_convert(Type *ty) {
   unreachable();
 }
 
-static LLVMValueRef init_data(Type *ty, Initializer *init) {
+static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
   LLVMTypeRef llvm_ty = type_convert(ty);
   LLVMValueRef init_val;
   if (ty->kind == TY_ARRAY) {
     LLVMValueRef *cv_array = calloc(ty->array_len, sizeof(LLVMValueRef));
     for (int i = 0; i < ty->array_len; i++) {
-      cv_array[i] = init_data(ty->base, init->children[i]);
+      cv_array[i] = init_global_data(ty->base, init->children[i]);
     }
     init_val = LLVMConstArray2(type_convert(ty->base), cv_array, ty->array_len);
     free(cv_array);
@@ -65,8 +78,19 @@ static LLVMValueRef init_data(Type *ty, Initializer *init) {
     // TODO:
     unreachable();
   } else if (ty->kind == TY_STRUCT) {
-    // TODO:
-    unreachable();
+    size_t member_num = members_number(ty->members);
+    LLVMValueRef *cv_array = calloc(ty->array_len, sizeof(LLVMValueRef));
+    {
+      size_t cv_array_idx = 0;
+      for (Member *m = ty->members; m; m = m->next) {
+        assert(!m->is_bitfield);
+        cv_array[cv_array_idx++] =
+            init_global_data(m->ty, init->children[m->idx]);
+      }
+      assert(cv_array_idx == member_num);
+    }
+    init_val = LLVMConstNamedStruct(type_convert(ty), cv_array, member_num);
+    free(cv_array);
   } else if (ty->kind == TY_DOUBLE || ty->kind == TY_FLOAT) {
     init_val = LLVMConstReal(llvm_ty, eval_double(init->expr));
   } else if (!init->expr) {
@@ -118,15 +142,15 @@ static void codegen_declare_only(Obj *prog) {
   }
 }
 
-// stage 2. initialize variable
-static void codegen_init(Obj *prog) {
+// stage 2. initialize global variable
+static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
     if (var->is_function)
       continue;
     if (var->init) {
       LLVMValueRef v = LLVMGetNamedGlobal(M, var->name);
       assert(v);
-      LLVMSetInitializer(v, init_data(var->ty, var->init));
+      LLVMSetInitializer(v, init_global_data(var->ty, var->init));
     }
   }
 }
@@ -138,7 +162,7 @@ void codegen(Obj *prog, FILE *out) {
 
   codegen_declare_only(prog);
 
-  codegen_init(prog);
+  codegen_global_init(prog);
   // print to out
   char *ir = LLVMPrintModuleToString(M);
   fputs(ir, out);

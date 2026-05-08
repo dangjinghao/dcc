@@ -183,7 +183,7 @@ Type *vla_of(Type *base, Node *expr);
 Type *enum_type(void);
 Type *struct_type(void);
 void add_type(Node *node);
-
+size_t members_number(Member *members);
 //
 /// parser.c
 //
