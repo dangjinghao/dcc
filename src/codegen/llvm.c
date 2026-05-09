@@ -23,7 +23,7 @@ static LLVMTypeRef type_convert(Type *ty) {
   case TY_VOID:
     return LLVMVoidTypeInContext(C);
   case TY_BOOL:
-    return LLVMInt1TypeInContext(C);
+    return LLVMInt8TypeInContext(C);
   case TY_CHAR:
     assert(ty->size == sizeof(char));
     return LLVMInt8TypeInContext(C);
@@ -489,14 +489,26 @@ static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
                LLVMConstInt(LLVMInt1TypeInContext(C), is_volatile, false));
 }
 
-static LLVMValueRef cmp_zero(LLVMValueRef v) {
+// Return i1, so do not use it as _Bool(i8) type directly
+static LLVMValueRef cmp_nz(LLVMValueRef v) {
   LLVMTypeRef vty = LLVMTypeOf(v);
   LLVMTypeKind vk = LLVMGetTypeKind(vty);
-  LLVMValueRef zero = LLVMConstNull(LLVMTypeOf(v));
+  LLVMValueRef zero = LLVMConstNull(vty);
   if (vk == LLVMIntegerTypeKind || vk == LLVMPointerTypeKind) {
-    return LLVMBuildICmp(B, LLVMIntNE, v, zero, "cmp_zero_i");
+    return LLVMBuildICmp(B, LLVMIntNE, v, zero, "cmp_nz_i");
   }
-  return LLVMBuildFCmp(B, LLVMRealONE, v, zero, "cmp_zero_f");
+  return LLVMBuildFCmp(B, LLVMRealONE, v, zero, "cmp_nz_f");
+}
+
+// Return i1, so do not use it as _Bool(i8) type directly
+static LLVMValueRef cmp_ez(LLVMValueRef v) {
+  LLVMTypeRef vty = LLVMTypeOf(v);
+  LLVMTypeKind vk = LLVMGetTypeKind(vty);
+  LLVMValueRef zero = LLVMConstNull(vty);
+  if (vk == LLVMIntegerTypeKind || vk == LLVMPointerTypeKind) {
+    return LLVMBuildICmp(B, LLVMIntEQ, v, zero, "cmp_ez_i");
+  }
+  return LLVMBuildFCmp(B, LLVMRealOEQ, v, zero, "cmp_ez_f");
 }
 
 static LLVMValueRef gen_expr(Node *node) {
@@ -564,7 +576,7 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_COND: {
     LLVMValueRef cond = gen_expr(node->cond);
-    cond = cmp_zero(cond);
+    cond = cmp_nz(cond);
     LLVMBasicBlockRef bb_then =
         LLVMAppendBasicBlockInContext(C, F, "cond_then");
     LLVMBasicBlockRef bb_else =
@@ -584,6 +596,16 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMAddIncoming(phi, (LLVMValueRef[]){then_v, else_v},
                     (LLVMBasicBlockRef[]){bb_then, bb_else}, 2);
     return phi;
+  }
+  case ND_BITNOT: {
+    LLVMValueRef v = gen_expr(node->lhs);
+    return LLVMBuildNot(B, v, "bitnot");
+  }
+  case ND_NOT: {
+    LLVMValueRef v = gen_expr(node->lhs);
+    v = cmp_ez(v);
+    // we have to ext i1 to i8
+    return LLVMBuildZExt(B, v, LLVMInt8TypeInContext(C), "not_ext");
   }
   default: {
     unreachable();
