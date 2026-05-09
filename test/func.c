@@ -30,5 +30,12 @@ void *F2() {
   return __FUNCTION__;
 }
 
-int F3() { return 3; }
+static float F3_retf = 0;
+static int F3_reti;
+
+int F3() {
+  F3_retf = 4;
+  ;
+  return F3_reti = F3_retf;
+}
 // int main(int argc, char *argv[]) { return calc(argc); }

@@ -425,6 +425,18 @@ static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
   return LLVMBuildLoad2(B, type_convert(pointee_ty), ptr, "load");
 }
 
+static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
+  switch (ty->kind) {
+  case TY_STRUCT:
+  case TY_UNION:
+    // TODO: struct
+    unreachable();
+  default:
+    break;
+  }
+  LLVMBuildStore(B, v, ptr);
+}
+
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
@@ -473,7 +485,14 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_COMMA:
     gen_expr(node->lhs);
     return gen_expr(node->rhs);
-  case ND_ASSIGN:
+  case ND_ASSIGN: {
+    LLVMValueRef ptr = gen_addr(node->lhs);
+    LLVMValueRef v = gen_expr(node->rhs);
+    // TODO: bitfield
+    store(node->ty, v, ptr);
+    // load again
+    return load(node->lhs->ty, ptr);
+  }
   default: {
     unreachable();
   }
