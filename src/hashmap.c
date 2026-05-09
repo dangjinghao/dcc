@@ -130,3 +130,5 @@ void hashmap_delete2(HashMap *map, char *key, int keylen) {
   if (ent)
     ent->key = TOMBSTONE;
 }
+
+void hashmap_destory(HashMap *map) { free(map); }

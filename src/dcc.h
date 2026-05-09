@@ -27,7 +27,7 @@ static inline int align_to(int n, int align) {
 #define next_iter_count(p)                                                     \
   ({                                                                           \
     size_t number = 0;                                                         \
-    for (typeof(p) n = p; n; n = n->next)                                        \
+    for (typeof(p) n = p; n; n = n->next)                                      \
       number++;                                                                \
     number;                                                                    \
   })
@@ -318,7 +318,11 @@ struct Obj {
   int align;     // alignment
 
   // Local variable
-  int offset;
+
+  // Could be used to store codegen data
+  // e.g. offset for x86 asm backend
+  // or LLVMValueRef(pointer) saved the reference to this obj for llvm backend
+  intptr_t codegen_data;
 
   // Global variable or function
   bool is_function;
@@ -411,5 +415,6 @@ void hashmap_put(HashMap *map, char *key, void *val);
 void hashmap_put2(HashMap *map, char *key, int keylen, void *val);
 void hashmap_delete(HashMap *map, char *key);
 void hashmap_delete2(HashMap *map, char *key, int keylen);
+void hashmap_destory(HashMap *map);
 
 #endif

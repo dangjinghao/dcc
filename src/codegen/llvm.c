@@ -8,10 +8,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static LLVMContextRef C;
 static LLVMModuleRef M;
 static LLVMBuilderRef B;
+static LLVMValueRef F;
 
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
@@ -54,8 +56,23 @@ static LLVMTypeRef type_convert(Type *ty) {
     free(members_type);
     return r;
   }
+  case TY_FUNC: {
+    size_t param_count = next_iter_count(ty->params);
+    LLVMTypeRef *params = calloc(param_count, sizeof(LLVMTypeRef));
+    {
+      size_t params_idx = 0;
+      for (Type *p = ty->params; p; p = p->next) {
+        params[params_idx++] = type_convert(p);
+      }
+      assert(params_idx == param_count);
+    }
+    LLVMTypeRef r = LLVMFunctionType(type_convert(ty->return_ty), params,
+                                     param_count, ty->is_variadic);
+    free(params);
+    return r;
+  }
+
   case TY_ENUM:
-  case TY_FUNC:
   case TY_VLA:
   case TY_UNION:
   default:
@@ -121,10 +138,15 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
 // problem.
 static void codegen_global_declare(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function)
-      continue;
-    LLVMTypeRef ty = type_convert(var->ty);
-    LLVMValueRef v = LLVMAddGlobal(M, ty, var->name);
+    LLVMValueRef v;
+    if (var->is_function) {
+      LLVMTypeRef fn_ty = type_convert(var->ty);
+      v = LLVMAddFunction(M, var->name, fn_ty);
+    } else {
+      LLVMTypeRef ty = type_convert(var->ty);
+      v = LLVMAddGlobal(M, ty, var->name);
+    }
+
     if (var->is_static) {
       LLVMSetLinkage(v, LLVMInternalLinkage);
     }
@@ -141,19 +163,320 @@ static void codegen_global_declare(Obj *prog) {
       LLVMSetThreadLocal(v, true);
     }
 
-    LLVMSetAlignment(v, var->ty->align);
+    if (!var->is_function) {
+      LLVMSetAlignment(v, var->ty->align);
+    }
+    var->codegen_data = (intptr_t)v;
+  }
+}
+
+static void new_block(char *name) {
+  LLVMBasicBlockRef blk_name = LLVMAppendBasicBlockInContext(C, F, name);
+  LLVMBuildBr(B, blk_name);
+  LLVMPositionBuilderAtEnd(B, blk_name);
+}
+
+enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F128 };
+
+static int getTypeId(Type *ty) {
+  switch (ty->kind) {
+  case TY_CHAR:
+    return ty->is_unsigned ? U8 : I8;
+  case TY_SHORT:
+    return ty->is_unsigned ? U16 : I16;
+  case TY_INT:
+    return ty->is_unsigned ? U32 : I32;
+  case TY_LONG:
+    return ty->is_unsigned ? U64 : I64;
+  case TY_FLOAT:
+    return F32;
+  case TY_DOUBLE:
+    return F64;
+  case TY_LDOUBLE:
+    return F128;
+  }
+  return U64;
+}
+enum { CAST_NOP = -1 };
+
+static int cast_table[11][11] = {
+    [I8] =
+        {
+            [I8] = CAST_NOP,
+            [I16] = LLVMSExt,
+            [I32] = LLVMSExt,
+            [I64] = LLVMSExt,
+            [U8] = CAST_NOP,
+            [U16] = LLVMZExt,
+            [U32] = LLVMZExt,
+            [U64] = LLVMZExt,
+            [F32] = LLVMSIToFP,
+            [F64] = LLVMSIToFP,
+            [F128] = LLVMSIToFP,
+        },
+    [I16] =
+        {
+            [I8] = LLVMTrunc,
+            [I16] = CAST_NOP,
+            [I32] = LLVMSExt,
+            [I64] = LLVMSExt,
+            [U8] = LLVMTrunc,
+            [U16] = CAST_NOP,
+            [U32] = LLVMZExt,
+            [U64] = LLVMZExt,
+            [F32] = LLVMSIToFP,
+            [F64] = LLVMSIToFP,
+            [F128] = LLVMSIToFP,
+        },
+    [I32] =
+        {
+            [I8] = LLVMTrunc,
+            [I16] = LLVMTrunc,
+            [I32] = CAST_NOP,
+            [I64] = LLVMSExt,
+            [U8] = LLVMTrunc,
+            [U16] = LLVMTrunc,
+            [U32] = CAST_NOP,
+            [U64] = LLVMZExt,
+            [F32] = LLVMSIToFP,
+            [F64] = LLVMSIToFP,
+            [F128] = LLVMSIToFP,
+        },
+    [I64] =
+        {
+            [I8] = LLVMTrunc,
+            [I16] = LLVMTrunc,
+            [I32] = LLVMTrunc,
+            [I64] = CAST_NOP,
+            [U8] = LLVMTrunc,
+            [U16] = LLVMTrunc,
+            [U32] = LLVMTrunc,
+            [U64] = CAST_NOP,
+            [F32] = LLVMSIToFP,
+            [F64] = LLVMSIToFP,
+            [F128] = LLVMSIToFP,
+        },
+    [U8] =
+        {
+            [I8] = CAST_NOP,
+            [I16] = LLVMZExt,
+            [I32] = LLVMZExt,
+            [I64] = LLVMZExt,
+            [U8] = CAST_NOP,
+            [U16] = LLVMZExt,
+            [U32] = LLVMZExt,
+            [U64] = LLVMZExt,
+            [F32] = LLVMUIToFP,
+            [F64] = LLVMUIToFP,
+            [F128] = LLVMUIToFP,
+        },
+    [U16] =
+        {
+            [I8] = LLVMTrunc,
+            [I16] = CAST_NOP,
+            [I32] = LLVMZExt,
+            [I64] = LLVMZExt,
+            [U8] = LLVMTrunc,
+            [U16] = CAST_NOP,
+            [U32] = LLVMZExt,
+            [U64] = LLVMZExt,
+            [F32] = LLVMUIToFP,
+            [F64] = LLVMUIToFP,
+            [F128] = LLVMUIToFP,
+        },
+    [U32] =
+        {
+            [I8] = LLVMTrunc,
+            [I16] = LLVMTrunc,
+            [I32] = CAST_NOP,
+            [I64] = LLVMZExt,
+            [U8] = LLVMTrunc,
+            [U16] = LLVMTrunc,
+            [U32] = CAST_NOP,
+            [U64] = LLVMZExt,
+            [F32] = LLVMUIToFP,
+            [F64] = LLVMUIToFP,
+            [F128] = LLVMUIToFP,
+        },
+    [U64] =
+        {
+            [I8] = LLVMTrunc,
+            [I16] = LLVMTrunc,
+            [I32] = LLVMTrunc,
+            [I64] = CAST_NOP,
+            [U8] = LLVMTrunc,
+            [U16] = LLVMTrunc,
+            [U32] = LLVMTrunc,
+            [U64] = CAST_NOP,
+            [F32] = LLVMUIToFP,
+            [F64] = LLVMUIToFP,
+            [F128] = LLVMUIToFP,
+        },
+    [F32] =
+        {
+            [I8] = LLVMFPToSI,
+            [I16] = LLVMFPToSI,
+            [I32] = LLVMFPToSI,
+            [I64] = LLVMFPToSI,
+            [U8] = LLVMFPToUI,
+            [U16] = LLVMFPToUI,
+            [U32] = LLVMFPToUI,
+            [U64] = LLVMFPToUI,
+            [F32] = CAST_NOP,
+            [F64] = LLVMFPExt,
+            [F128] = LLVMFPExt,
+        },
+    [F64] =
+        {
+            [I8] = LLVMFPToSI,
+            [I16] = LLVMFPToSI,
+            [I32] = LLVMFPToSI,
+            [I64] = LLVMFPToSI,
+            [U8] = LLVMFPToUI,
+            [U16] = LLVMFPToUI,
+            [U32] = LLVMFPToUI,
+            [U64] = LLVMFPToUI,
+            [F32] = LLVMFPTrunc,
+            [F64] = CAST_NOP,
+            [F128] = LLVMFPExt,
+        },
+    [F128] =
+        {
+            [I8] = LLVMFPToSI,
+            [I16] = LLVMFPToSI,
+            [I32] = LLVMFPToSI,
+            [I64] = LLVMFPToSI,
+            [U8] = LLVMFPToUI,
+            [U16] = LLVMFPToUI,
+            [U32] = LLVMFPToUI,
+            [U64] = LLVMFPToUI,
+            [F32] = LLVMFPTrunc,
+            [F64] = LLVMFPTrunc,
+            [F128] = CAST_NOP,
+        },
+};
+
+static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to) {
+  if (to->kind == TY_VOID) {
+    unreachable();
+  }
+
+  int from_id = getTypeId(from);
+  int to_id = getTypeId(to);
+  int op = cast_table[from_id][to_id];
+  if (op == CAST_NOP) {
+    return v;
+  }
+  return LLVMBuildCast(B, (LLVMOpcode)op, v, type_convert(to), "cast");
+}
+
+static LLVMValueRef gen_addr(Node *n) {
+  Obj *var = n->var;
+  assert(var);
+  assert(var->codegen_data);
+  return (LLVMValueRef)var->codegen_data;
+}
+
+static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
+  switch (pointee_ty->kind) {
+  case TY_ARRAY:
+  case TY_STRUCT:
+  case TY_UNION:
+  case TY_FUNC:
+  case TY_VLA:
+    // we can't load them so we just return the ptr
+    return ptr;
+  default:
+    break;
+  }
+  return LLVMBuildLoad2(B, type_convert(pointee_ty), ptr, "load");
+}
+
+static LLVMValueRef gen_expr(Node *node) {
+  switch (node->kind) {
+  case ND_NULL_EXPR: {
+    // TODO: not good
+    return LLVMConstNull(LLVMInt32TypeInContext(C));
+  }
+  case ND_NUM: {
+    switch (node->ty->kind) {
+    case TY_FLOAT:
+    case TY_DOUBLE:
+    case TY_LDOUBLE:
+      return LLVMConstReal(type_convert(node->ty), node->fval);
+    default:
+      return LLVMConstInt(type_convert(node->ty), node->val,
+                          !node->ty->is_unsigned);
+    }
+  }
+  case ND_NEG: {
+    return LLVMBuildNeg(B, gen_expr(node->lhs), "neg");
+  }
+  case ND_CAST: {
+    return cast(gen_expr(node->lhs), node->lhs->ty, node->ty);
+  }
+  case ND_VAR: {
+    return load(node->ty, gen_addr(node));
+  }
+  case ND_DEREF: {
+    return load(node->ty, gen_addr(node->lhs));
+  }
+  case ND_ADDR: {
+    return gen_addr(node->lhs);
+  }
+  default: {
+    unreachable();
+  }
+  }
+}
+
+static void gen_stmt(Node *node) {
+  switch (node->kind) {
+  case ND_BLOCK: {
+    new_block("block");
+    for (Node *n = node->body; n; n = n->next)
+      gen_stmt(n);
+    return;
+  }
+  case ND_RETURN: {
+    new_block("return");
+    LLVMBuildRet(B, gen_expr(node->lhs));
+    return;
+  }
+  default:
+    unreachable();
   }
 }
 
 // stage 2. initialize global variable
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    if (var->is_function)
-      continue;
     if (var->init) {
       LLVMValueRef v = LLVMGetNamedGlobal(M, var->name);
       assert(v);
       LLVMSetInitializer(v, init_global_data(var->ty, var->init));
+      var->codegen_data = (intptr_t)v;
+      continue;
+    }
+    if (var->is_function && var->body) {
+      F = LLVMGetNamedFunction(M, var->name);
+      assert(F);
+      // prologue
+      LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
+      LLVMPositionBuilderAtEnd(B, entry);
+      size_t args_count = 0;
+      for (Obj *lv = var->params; lv; lv = lv->next) {
+        LLVMValueRef local_arg =
+            LLVMBuildAlloca(B, type_convert(lv->ty), lv->name);
+        LLVMValueRef arg = LLVMGetParam(F, args_count++);
+
+        // store arg to alloca variable
+        LLVMBuildStore(B, arg, local_arg);
+        lv->codegen_data = (intptr_t)local_arg;
+      }
+      gen_stmt(var->body);
+      F = NULL;
+      continue;
     }
   }
 }
