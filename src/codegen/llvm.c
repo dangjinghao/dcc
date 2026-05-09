@@ -179,10 +179,12 @@ static void new_block(char *name) {
   LLVMPositionBuilderAtEnd(B, blk_name);
 }
 
-enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F128 };
+enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F128, PTR };
 
 static int getTypeId(Type *ty) {
   switch (ty->kind) {
+  case TY_BOOL:
+    return I8;
   case TY_CHAR:
     return ty->is_unsigned ? U8 : I8;
   case TY_SHORT:
@@ -197,12 +199,20 @@ static int getTypeId(Type *ty) {
     return F64;
   case TY_LDOUBLE:
     return F128;
+  case TY_FUNC:
+  case TY_ARRAY:
+  case TY_PTR:
+    return PTR;
+  case TY_VLA:
+  case TY_STRUCT:
+  case TY_UNION:
+    break;
   }
-  return U64;
+  unreachable();
 }
-enum { CAST_NOP = -1 };
+enum { CAST_NOP = -1, CAST_INVALID = -2 };
 
-static int cast_table[11][11] = {
+static int cast_table[12][12] = {
     [I8] =
         {
             [I8] = CAST_NOP,
@@ -216,6 +226,7 @@ static int cast_table[11][11] = {
             [F32] = LLVMSIToFP,
             [F64] = LLVMSIToFP,
             [F128] = LLVMSIToFP,
+            [PTR] = LLVMIntToPtr,
         },
     [I16] =
         {
@@ -223,6 +234,7 @@ static int cast_table[11][11] = {
             [I16] = CAST_NOP,
             [I32] = LLVMSExt,
             [I64] = LLVMSExt,
+            [PTR] = LLVMIntToPtr,
             [U8] = LLVMTrunc,
             [U16] = CAST_NOP,
             [U32] = LLVMZExt,
@@ -237,6 +249,7 @@ static int cast_table[11][11] = {
             [I16] = LLVMTrunc,
             [I32] = CAST_NOP,
             [I64] = LLVMSExt,
+            [PTR] = LLVMIntToPtr,
             [U8] = LLVMTrunc,
             [U16] = LLVMTrunc,
             [U32] = CAST_NOP,
@@ -251,6 +264,7 @@ static int cast_table[11][11] = {
             [I16] = LLVMTrunc,
             [I32] = LLVMTrunc,
             [I64] = CAST_NOP,
+            [PTR] = LLVMIntToPtr,
             [U8] = LLVMTrunc,
             [U16] = LLVMTrunc,
             [U32] = LLVMTrunc,
@@ -265,6 +279,7 @@ static int cast_table[11][11] = {
             [I16] = LLVMZExt,
             [I32] = LLVMZExt,
             [I64] = LLVMZExt,
+            [PTR] = LLVMIntToPtr,
             [U8] = CAST_NOP,
             [U16] = LLVMZExt,
             [U32] = LLVMZExt,
@@ -279,6 +294,7 @@ static int cast_table[11][11] = {
             [I16] = CAST_NOP,
             [I32] = LLVMZExt,
             [I64] = LLVMZExt,
+            [PTR] = LLVMIntToPtr,
             [U8] = LLVMTrunc,
             [U16] = CAST_NOP,
             [U32] = LLVMZExt,
@@ -293,6 +309,7 @@ static int cast_table[11][11] = {
             [I16] = LLVMTrunc,
             [I32] = CAST_NOP,
             [I64] = LLVMZExt,
+            [PTR] = LLVMIntToPtr,
             [U8] = LLVMTrunc,
             [U16] = LLVMTrunc,
             [U32] = CAST_NOP,
@@ -307,6 +324,7 @@ static int cast_table[11][11] = {
             [I16] = LLVMTrunc,
             [I32] = LLVMTrunc,
             [I64] = CAST_NOP,
+            [PTR] = LLVMIntToPtr,
             [U8] = LLVMTrunc,
             [U16] = LLVMTrunc,
             [U32] = LLVMTrunc,
@@ -328,6 +346,7 @@ static int cast_table[11][11] = {
             [F32] = CAST_NOP,
             [F64] = LLVMFPExt,
             [F128] = LLVMFPExt,
+            [PTR] = CAST_INVALID,
         },
     [F64] =
         {
@@ -342,6 +361,7 @@ static int cast_table[11][11] = {
             [F32] = LLVMFPTrunc,
             [F64] = CAST_NOP,
             [F128] = LLVMFPExt,
+            [PTR] = CAST_INVALID,
         },
     [F128] =
         {
@@ -356,12 +376,28 @@ static int cast_table[11][11] = {
             [F32] = LLVMFPTrunc,
             [F64] = LLVMFPTrunc,
             [F128] = CAST_NOP,
+            [PTR] = CAST_INVALID,
+        },
+    [PTR] =
+        {
+            [I8] = LLVMPtrToInt,
+            [I16] = LLVMPtrToInt,
+            [I32] = LLVMPtrToInt,
+            [I64] = LLVMPtrToInt,
+            [U8] = LLVMPtrToInt,
+            [U16] = LLVMPtrToInt,
+            [U32] = LLVMPtrToInt,
+            [U64] = LLVMPtrToInt,
+            [PTR] = LLVMBitCast,
+            [F32] = CAST_INVALID,
+            [F64] = CAST_INVALID,
+            [F128] = CAST_INVALID,
         },
 };
 
-static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to) {
+static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
   if (to->kind == TY_VOID) {
-    unreachable();
+    error_tok(tok, "It's not allowed convert type to void");
   }
 
   int from_id = getTypeId(from);
@@ -369,6 +405,8 @@ static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to) {
   int op = cast_table[from_id][to_id];
   if (op == CAST_NOP) {
     return v;
+  } else if (op == CAST_INVALID) {
+    error_tok(tok, "Invalid type cast");
   }
   return LLVMBuildCast(B, (LLVMOpcode)op, v, type_convert(to), "cast");
 }
@@ -481,7 +519,7 @@ static LLVMValueRef gen_expr(Node *node) {
     return LLVMBuildNeg(B, gen_expr(node->lhs), "neg");
   }
   case ND_CAST: {
-    return cast(gen_expr(node->lhs), node->lhs->ty, node->ty);
+    return cast(gen_expr(node->lhs), node->lhs->ty, node->ty, node->tok);
   }
   case ND_VAR: {
     return load(node->ty, gen_addr(node));
