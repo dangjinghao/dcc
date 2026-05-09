@@ -513,7 +513,7 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef v = gen_expr(node->rhs);
     // TODO: bitfield
-    store(node->ty, v, ptr);
+    store(node->ty, ptr, v);
     // load again
     return load(node->lhs->ty, ptr);
   }
