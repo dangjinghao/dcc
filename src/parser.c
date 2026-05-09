@@ -871,7 +871,6 @@ static Node *declaration(Token **rest, Token *tok, Type *basety,
     // Generate code for computing a VLA size. We need to do this
     // even if ty is not VLA because ty may be a pointer to VLA
     // (e.g. int (*foo)[n][m] where n and m are variables.)
-    // TODO:understand
     cur = cur->next = new_unary(ND_EXPR_STMT, compute_vla_size(ty, tok), tok);
 
     if (ty->kind == TY_VLA) {
@@ -2927,7 +2926,6 @@ static Node *primary(Token **rest, Token *tok) {
     *rest = skip(tok, ")");
 
     if (ty->kind == TY_VLA) {
-      // TODO:understand
       if (ty->vla_size)
         return new_var_node(ty->vla_size, tok);
 

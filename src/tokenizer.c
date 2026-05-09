@@ -541,7 +541,6 @@ static void join_adjacent_string_literals(Token *tok) {
   // First pass: If regular string literals are adjacent to wide
   // string literals, regular string literals are converted to a wide
   // type before concatenation. In this pass, we do the conversion.
-  // TODO:
 
   // Second pass: concatenate adjacent string literals.
   for (Token *tok1 = tok; tok1->kind != TK_EOF;) {

@@ -95,7 +95,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     init_val = LLVMConstArray2(type_convert(ty->base), cv_array, ty->array_len);
     free(cv_array);
   } else if (ty->kind == TY_UNION) {
-    // TODO:
+    // TODO:union
     unreachable();
   } else if (ty->kind == TY_STRUCT) {
     size_t member_count = next_iter_count(ty->members);
@@ -403,7 +403,7 @@ static LLVMValueRef gen_addr(Node *node) {
       return gen_expr(node);
     break;
   case ND_VLA_PTR:
-    // TODO:
+    // TODO:vla ptr
     unreachable();
   }
 
