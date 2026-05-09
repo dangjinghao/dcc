@@ -232,7 +232,7 @@ typedef enum {
   ND_LABEL_VAL, // [GNU] Labels-as-values
   ND_FUNCALL,   // Function call
   ND_EXPR_STMT, // Expression statement
-  ND_STMT_EXPR, // Statement expression
+  ND_STMT_EXPR, // [GNU] Statement expression
   ND_VAR,       // Variable
   ND_VLA_PTR,   //  VLA designator
   ND_NUM,       // Integer or fp

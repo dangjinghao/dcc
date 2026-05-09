@@ -15,6 +15,9 @@ static LLVMModuleRef M;
 static LLVMBuilderRef B;
 static LLVMValueRef F;
 
+static LLVMValueRef gen_expr(Node *node);
+static LLVMValueRef gen_stmt(Node *node);
+
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
   case TY_VOID:
@@ -370,11 +373,41 @@ static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to) {
   return LLVMBuildCast(B, (LLVMOpcode)op, v, type_convert(to), "cast");
 }
 
-static LLVMValueRef gen_addr(Node *n) {
-  Obj *var = n->var;
-  assert(var);
-  assert(var->codegen_data);
-  return (LLVMValueRef)var->codegen_data;
+static LLVMValueRef gen_addr(Node *node) {
+  switch (node->kind) {
+  case ND_VAR:
+    // the variable ptr has been stored in codegen_data
+    return (LLVMValueRef)node->var->codegen_data;
+  case ND_DEREF:
+    return gen_expr(node->lhs);
+  case ND_COMMA:
+    gen_expr(node->lhs);
+    return gen_addr(node->rhs);
+  case ND_MEMBER: {
+    LLVMValueRef ptr = gen_addr(node->lhs);
+    return LLVMBuildGEP2(
+        B, type_convert(node->ty), ptr,
+        &(LLVMValueRef){
+            LLVMConstInt(LLVMInt64TypeInContext(C), node->member->idx, false)},
+        1, "mem_GEP");
+  }
+  case ND_FUNCALL:
+    if (node->ret_buffer) {
+      // TODO: understand
+      return gen_expr(node);
+    }
+    break;
+  case ND_ASSIGN:
+  case ND_COND:
+    if (node->ty->kind == TY_STRUCT || node->ty->kind == TY_UNION)
+      return gen_expr(node);
+    break;
+  case ND_VLA_PTR:
+    // TODO:
+    unreachable();
+  }
+
+  error_tok(node->tok, "not an lvalue");
 }
 
 static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
@@ -395,8 +428,7 @@ static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
-    // TODO: not good
-    return LLVMConstNull(LLVMInt32TypeInContext(C));
+    return NULL;
   }
   case ND_NUM: {
     switch (node->ty->kind) {
@@ -424,24 +456,45 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_ADDR: {
     return gen_addr(node->lhs);
   }
+  case ND_MEMBER: {
+    return load(node->ty, gen_addr(node));
+  }
+  case ND_STMT_EXPR: {
+    new_block("stmt_expr");
+    LLVMValueRef r;
+    // statement expression will return the last expression statement
+    for (Node *n = node->body; n; n = n->next)
+      r = gen_stmt(n);
+    if (!r) {
+      error_tok(node->tok, "This statement expression returns the void type");
+    }
+    return r;
+  }
+  case ND_COMMA:
+    gen_expr(node->lhs);
+    return gen_expr(node->rhs);
+  case ND_ASSIGN:
   default: {
     unreachable();
   }
   }
 }
 
-static void gen_stmt(Node *node) {
+static LLVMValueRef gen_stmt(Node *node) {
   switch (node->kind) {
   case ND_BLOCK: {
     new_block("block");
     for (Node *n = node->body; n; n = n->next)
       gen_stmt(n);
-    return;
+    return NULL;
   }
   case ND_RETURN: {
     new_block("return");
     LLVMBuildRet(B, gen_expr(node->lhs));
-    return;
+    return NULL;
+  }
+  case ND_EXPR_STMT: {
+    return gen_expr(node->lhs);
   }
   default:
     unreachable();
