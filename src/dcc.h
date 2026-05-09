@@ -341,8 +341,9 @@ struct Obj {
   Obj *params;
   Node *body;
   Obj *locals;
-  Obj *va_area;
-  Obj *alloca_bottom;
+  // llvm backend doesn't need this.
+  // Obj *va_area;
+  // Obj *alloca_bottom;
   int stack_size;
 
   // TODO: Static inline function

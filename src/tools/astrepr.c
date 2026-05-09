@@ -157,7 +157,6 @@ static void write_member_list(ReprCtx *ctx, ChildList *cl, Member *mem) {
   }
 }
 
-
 static void write_ref(FILE *out, const char *summary) {
   fprintf(out, "{\"name\":");
   json_write_string(out, summary);
@@ -228,23 +227,6 @@ static void write_obj(ReprCtx *ctx, Obj *o) {
     char *idata = format("*initialized*");
     fprintf(ctx->out, "{\"name\":");
     json_write_string(ctx->out, idata);
-    fprintf(ctx->out, "}");
-  }
-
-  if (o->va_area || o->alloca_bottom) {
-    childlist_add_start(&cl);
-    fprintf(ctx->out, "{\"name\":\"va/alloca\"");
-    ChildList al;
-    childlist_init(&al, ctx->out);
-    if (o->va_area) {
-      childlist_add_start(&al);
-      write_obj(ctx, o->va_area);
-    }
-    if (o->alloca_bottom) {
-      childlist_add_start(&al);
-      write_obj(ctx, o->alloca_bottom);
-    }
-    childlist_close(&al);
     fprintf(ctx->out, "}");
   }
 
