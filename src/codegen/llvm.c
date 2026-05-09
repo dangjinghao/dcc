@@ -14,7 +14,7 @@ static LLVMContextRef C;
 static LLVMModuleRef M;
 static LLVMBuilderRef B;
 static LLVMValueRef F;
-
+static LLVMValueRef llvm_memset_declare;
 static LLVMValueRef gen_expr(Node *node);
 static LLVMValueRef gen_stmt(Node *node);
 
@@ -437,6 +437,30 @@ static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
   LLVMBuildStore(B, v, ptr);
 }
 
+static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
+                         LLVMValueRef immarg) {
+  LLVMBuildCall2(B, LLVMTypeOf(llvm_memset_declare), llvm_memset_declare,
+                 (LLVMValueRef[4]){ptr, byte, n, immarg}, 4,
+                 "llvm_memset_call");
+}
+
+static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
+                        bool is_volatile) {
+  llvm_memset2(ptr, LLVMConstInt(LLVMInt8TypeInContext(C), byte, false),
+               LLVMConstInt(LLVMInt64TypeInContext(C), n, false),
+               LLVMConstInt(LLVMInt1TypeInContext(C), is_volatile, false));
+}
+
+static LLVMValueRef cmp_zero(LLVMValueRef v) {
+  LLVMTypeRef vty = LLVMTypeOf(v);
+  LLVMTypeKind vk = LLVMGetTypeKind(vty);
+  LLVMValueRef zero = LLVMConstNull(LLVMTypeOf(v));
+  if (vk == LLVMIntegerTypeKind || vk == LLVMPointerTypeKind) {
+    return LLVMBuildICmp(B, LLVMIntNE, v, zero, "cmp_zero_i");
+  }
+  return LLVMBuildFCmp(B, LLVMRealONE, v, zero, "cmp_zero_f");
+}
+
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
@@ -493,6 +517,36 @@ static LLVMValueRef gen_expr(Node *node) {
     // load again
     return load(node->lhs->ty, ptr);
   }
+  case ND_MEMZERO: {
+    // TODO: test
+    assert(node->var->codegen_data);
+    llvm_memset((LLVMValueRef)node->var->codegen_data, 0, node->var->ty->size,
+                false);
+    return NULL;
+  }
+  case ND_COND: {
+    LLVMValueRef cond = gen_expr(node->cond);
+    cond = cmp_zero(cond);
+    LLVMBasicBlockRef bb_then =
+        LLVMAppendBasicBlockInContext(C, F, "cond_then");
+    LLVMBasicBlockRef bb_else =
+        LLVMAppendBasicBlockInContext(C, F, "cond_else");
+    LLVMBasicBlockRef bb_merge =
+        LLVMAppendBasicBlockInContext(C, F, "cond_merge");
+    LLVMBuildCondBr(B, cond, bb_then, bb_else);
+    LLVMPositionBuilderAtEnd(B, bb_then);
+    LLVMValueRef then_v = gen_expr(node->cond->then);
+    LLVMBuildBr(B, bb_merge);
+    LLVMPositionBuilderAtEnd(B, bb_else);
+    LLVMValueRef else_v = gen_expr(node->cond->_else);
+    LLVMBuildBr(B, bb_merge);
+    LLVMPositionBuilderAtEnd(B, bb_merge);
+    LLVMValueRef phi =
+        LLVMBuildPhi(B, type_convert(node->ty), "cond_merge_phi");
+    LLVMAddIncoming(phi, (LLVMValueRef[]){then_v, else_v},
+                    (LLVMBasicBlockRef[]){bb_then, bb_else}, 2);
+    return phi;
+  }
   default: {
     unreachable();
   }
@@ -523,11 +577,14 @@ static LLVMValueRef gen_stmt(Node *node) {
 // stage 2. initialize global variable
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    if (var->init) {
-      LLVMValueRef v = LLVMGetNamedGlobal(M, var->name);
+    if (!var->is_function) {
+      LLVMValueRef v = (LLVMValueRef)var->codegen_data;
       assert(v);
-      LLVMSetInitializer(v, init_global_data(var->ty, var->init));
-      var->codegen_data = (intptr_t)v;
+      if (var->init) {
+        LLVMSetInitializer(v, init_global_data(var->ty, var->init));
+      } else {
+        LLVMSetInitializer(v, LLVMConstNull(type_convert(var->ty)));
+      }
       continue;
     }
     if (var->is_function && var->body) {
@@ -553,10 +610,23 @@ static void codegen_global_init(Obj *prog) {
   }
 }
 
+void declare_built_function() {
+  unsigned memset_id = LLVMLookupIntrinsicID("llvm.memset.p0.i64", 20);
+  LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0);
+  LLVMTypeRef i8 = LLVMInt8TypeInContext(C);
+  LLVMTypeRef i64 = LLVMInt64TypeInContext(C);
+  LLVMTypeRef immarg = LLVMInt1TypeInContext(C);
+  LLVMTypeRef ParamTys[] = {ptr, i8, i64, immarg};
+  llvm_memset_declare = LLVMGetIntrinsicDeclaration(M, memset_id, ParamTys, 1);
+  assert(llvm_memset_declare);
+}
+
 void codegen(Obj *prog, FILE *out) {
   C = LLVMContextCreate();
   M = LLVMModuleCreateWithNameInContext(get_current_file()->name, C);
   B = LLVMCreateBuilderInContext(C);
+
+  declare_built_function();
 
   codegen_global_declare(prog);
 
