@@ -535,10 +535,10 @@ static LLVMValueRef gen_expr(Node *node) {
         LLVMAppendBasicBlockInContext(C, F, "cond_merge");
     LLVMBuildCondBr(B, cond, bb_then, bb_else);
     LLVMPositionBuilderAtEnd(B, bb_then);
-    LLVMValueRef then_v = gen_expr(node->cond->then);
+    LLVMValueRef then_v = gen_expr(node->then);
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_else);
-    LLVMValueRef else_v = gen_expr(node->cond->_else);
+    LLVMValueRef else_v = gen_expr(node->_else);
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_merge);
     LLVMValueRef phi =
