@@ -14,7 +14,10 @@ static LLVMContextRef C;
 static LLVMModuleRef M;
 static LLVMBuilderRef B;
 static LLVMValueRef F;
+
 static LLVMValueRef llvm_memset_declare;
+static LLVMTypeRef llvm_memset_declare_ty;
+
 static LLVMValueRef gen_expr(Node *node);
 static LLVMValueRef gen_stmt(Node *node);
 
@@ -481,9 +484,8 @@ static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
 
 static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
                          LLVMValueRef immarg) {
-  LLVMBuildCall2(B, LLVMTypeOf(llvm_memset_declare), llvm_memset_declare,
-                 (LLVMValueRef[4]){ptr, byte, n, immarg}, 4,
-                 "llvm_memset_call");
+  LLVMBuildCall2(B, llvm_memset_declare_ty, llvm_memset_declare,
+                 (LLVMValueRef[4]){ptr, byte, n, immarg}, 4, "");
 }
 
 static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
@@ -877,14 +879,16 @@ static void codegen_global_init(Obj *prog) {
 }
 
 void declare_built_function() {
-  unsigned memset_id = LLVMLookupIntrinsicID("llvm.memset.p0.i64", 20);
   LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0);
   LLVMTypeRef i8 = LLVMInt8TypeInContext(C);
   LLVMTypeRef i64 = LLVMInt64TypeInContext(C);
   LLVMTypeRef immarg = LLVMInt1TypeInContext(C);
-  LLVMTypeRef ParamTys[] = {ptr, i8, i64, immarg};
-  llvm_memset_declare = LLVMGetIntrinsicDeclaration(M, memset_id, ParamTys, 1);
-  assert(llvm_memset_declare);
+  LLVMTypeRef param_tys[] = {ptr, i8, i64, immarg};
+  llvm_memset_declare_ty =
+      LLVMFunctionType(LLVMVoidTypeInContext(C), param_tys, 4, false);
+
+  llvm_memset_declare =
+      LLVMAddFunction(M, "llvm.memset.p0.i64", llvm_memset_declare_ty);
 }
 
 void codegen(Obj *prog, FILE *out) {
