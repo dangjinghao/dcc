@@ -562,7 +562,11 @@ static LLVMValueRef gen_expr(Node *node) {
     }
   }
   case ND_NEG: {
-    return LLVMBuildNeg(B, gen_expr(node->lhs), "neg");
+    if (is_flonum(node->lhs->ty)) {
+      return LLVMBuildFNeg(B, gen_expr(node->lhs), "fneg");
+    } else {
+      return LLVMBuildNeg(B, gen_expr(node->lhs), "neg");
+    }
   }
   case ND_CAST: {
     return cast(gen_expr(node->lhs), node->lhs->ty, node->ty, node->tok);
@@ -581,12 +585,12 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_STMT_EXPR: {
     new_block("stmt_expr");
-    LLVMValueRef r;
+    LLVMValueRef r = NULL;
     // statement expression will return the last expression statement
     for (Node *n = node->body; n; n = n->next)
       r = gen_stmt(n);
     if (!r) {
-      error_tok(node->tok, "This statement expression returns the void type");
+      error_tok(node->tok, "This statement expression returns a invalid type");
     }
     return r;
   }
@@ -620,9 +624,15 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMBuildCondBr(B, cond, bb_then, bb_else);
     LLVMPositionBuilderAtEnd(B, bb_then);
     LLVMValueRef then_v = gen_expr(node->then);
+    if (!then_v) {
+      error_tok(node->tok, "there isn't any value returned from true path");
+    }
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_else);
     LLVMValueRef else_v = gen_expr(node->_else);
+    if (!else_v) {
+      error_tok(node->tok, "there isn't any value returned from false path");
+    }
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_merge);
     LLVMValueRef phi =
@@ -690,31 +700,27 @@ static LLVMValueRef gen_expr(Node *node) {
     unreachable();
   }
   case ND_ADD:
-    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
-        node->lhs->ty->kind == TY_LDOUBLE) {
+    if (is_flonum(node->lhs->ty)) {
       return LLVMBuildFAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "fadd");
     } else {
       return LLVMBuildAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "add");
     }
   case ND_SUB: {
-    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
-        node->lhs->ty->kind == TY_LDOUBLE) {
+    if (is_flonum(node->lhs->ty)) {
       return LLVMBuildFSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "fsub");
     } else {
       return LLVMBuildSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "sub");
     }
   }
   case ND_MUL: {
-    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
-        node->lhs->ty->kind == TY_LDOUBLE) {
+    if (is_flonum(node->lhs->ty)) {
       return LLVMBuildFMul(B, gen_expr(node->lhs), gen_expr(node->rhs), "fmul");
     } else {
       return LLVMBuildMul(B, gen_expr(node->lhs), gen_expr(node->rhs), "mul");
     }
   }
   case ND_DIV: {
-    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
-        node->lhs->ty->kind == TY_LDOUBLE) {
+    if (is_flonum(node->lhs->ty)) {
       return LLVMBuildFDiv(B, gen_expr(node->lhs), gen_expr(node->rhs), "fdiv");
     } else {
       if (node->lhs->ty->is_unsigned)
@@ -775,8 +781,7 @@ static LLVMValueRef gen_expr(Node *node) {
       break;
     }
 
-    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
-        node->lhs->ty->kind == TY_LDOUBLE) {
+    if (is_flonum(node->lhs->ty)) {
       return LLVMBuildFCmp(B, fop, gen_expr(node->lhs), gen_expr(node->rhs),
                            "fcmp");
     } else {
