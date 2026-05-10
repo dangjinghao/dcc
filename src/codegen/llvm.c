@@ -123,6 +123,10 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     if (label) {
       // Relocation pointer, real data: label + eval_val
       LLVMValueRef target_val = LLVMGetNamedGlobal(M, *label);
+      if (!target_val) {
+        // maybe it's a function
+        target_val = LLVMGetNamedFunction(M, *label);
+      }
       assert(target_val);
       assert(ty->base);
       LLVMTypeRef pointee_ty = type_convert(ty->base);
@@ -642,6 +646,41 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_LOGOR: {
     return logic_short_circuit(node, false);
+  }
+  case ND_FUNCALL: {
+    // built-in alloca function
+    if (node->lhs->kind == ND_VAR &&
+        !strcmp(node->lhs->var->name, "__builtin_alloca")) {
+      LLVMValueRef sz = gen_expr(node->args);
+      return LLVMBuildArrayAlloca(B, LLVMInt8TypeInContext(C), sz,
+                                  "__builtin_alloca");
+    }
+
+    LLVMValueRef F = gen_expr(node->lhs);
+
+    if (node->ret_buffer) {
+      // TODO: large struct
+      unreachable();
+    }
+
+    size_t arg_count = next_iter_count(node->args);
+    LLVMValueRef *args = calloc(arg_count, sizeof(LLVMValueRef));
+    size_t arg_idx = 0;
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      args[arg_idx++] = gen_expr(arg);
+    }
+    Type *F_ty;
+    if (node->lhs->ty->kind == TY_PTR) {
+      // extract the function type from ponter because LLVM just can recognise
+      // function this in call format
+      F_ty = node->lhs->ty->base;
+    } else {
+      F_ty = node->lhs->ty;
+    }
+    LLVMValueRef r =
+        LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count, "funcall");
+    free(args);
+    return r;
   }
   default: {
     unreachable();
