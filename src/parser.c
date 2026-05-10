@@ -124,6 +124,23 @@ static int align_down(int n, int align) {
   return align_to(n - align + 1, align);
 }
 
+// degrade array type except:
+// - sizeof(arr)
+// - &arr
+// - char arr[] = "hello";
+// - alignof(arr)
+// - typeof(arr)
+// so normally, we should degrade array/ptr(if(ty->base != NULL)) in compute
+// process. And all the pointer operations are located in new_add and new_sub
+static Type *array_degrad(Type *ty) {
+  assert(ty->kind == TY_ARRAY || ty->kind == TY_PTR);
+  if (ty->kind == TY_ARRAY) {
+    Type *nt = pointer_to(ty->base);
+    return nt;
+  }
+  return ty;
+}
+
 static void enter_scope(void) {
   Scope *sc = calloc(1, sizeof(Scope));
   sc->next = scope;
@@ -608,7 +625,7 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
     if (ty2->kind == TY_ARRAY) {
       // "array of T" is converted to "pointer to T" only in the parameter
       // context. For example, *argv[] is converted to **argv by this.
-      ty2 = pointer_to(ty2->base);
+      ty2 = array_degrad(ty);
       ty2->name = name;
     } else if (ty2->kind == TY_FUNC) {
       // Likewise, a function is converted to a pointer to a function
@@ -2294,8 +2311,15 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   // ptr + num
   // We expand this calculate process, so if we meet a ptr + num operation, we
   // don't need to do it again. Just cast the num to pointer type and
-  rhs = new_binary(ND_MUL, rhs, new_long(lhs->ty->base->size, tok), tok);
-  return new_binary(ND_ADD, lhs, rhs, tok);
+  // typeof(ptr)((ulong)ptr + <extracted-num>)
+  Type *ptr_ty = array_degrad(lhs->ty);
+  // cast lhs to ulong to avoid backend meet ptr compute
+  lhs = new_cast(lhs, ty_ulong);
+  rhs = new_binary(ND_MUL, rhs, new_long(ptr_ty->base->size, tok), tok);
+  Node *result = new_binary(ND_ADD, lhs, rhs, tok);
+  add_type(result);
+  // cast result back to previous ptr
+  return new_cast(result, ptr_ty);
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
@@ -2307,7 +2331,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   if (is_numeric(lhs->ty) && is_numeric(rhs->ty))
     return new_binary(ND_SUB, lhs, rhs, tok);
 
-  // VLA + num
+  // VLA - num
   if (lhs->ty->base->kind == TY_VLA) {
     rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
                      tok);
@@ -2319,18 +2343,25 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
 
   // ptr - num
   if (lhs->ty->base && is_integer(rhs->ty)) {
-    rhs = new_binary(ND_MUL, rhs, new_long(lhs->ty->base->size, tok), tok);
-    add_type(rhs);
+    // typeof(ptr)((ulong)ptr - <extracted-num>)
+    Type *ptr_ty = array_degrad(lhs->ty);
+    lhs = new_cast(lhs, ty_ulong);
+    rhs = new_binary(ND_MUL, rhs, new_long(ptr_ty->base->size, tok), tok);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-    node->ty = lhs->ty;
-    return node;
+    add_type(node);
+    return new_cast(node, ptr_ty);
   }
 
   // ptr - ptr, which returns how many elements are between the two.
   if (lhs->ty->base && rhs->ty->base) {
+    // (long)(((ulong)ptr - (ulong)ptr) / <base-size>)
+    Type *ptr_ty = lhs->ty;
+    lhs = new_cast(lhs, ty_ulong);
+    rhs = new_cast(rhs, ty_ulong);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+
     node->ty = ty_long;
-    return new_binary(ND_DIV, node, new_num(lhs->ty->base->size, tok), tok);
+    return new_binary(ND_DIV, node, new_num(ptr_ty->base->size, tok), tok);
   }
 
   error_tok(tok, "invalid operands");

@@ -426,14 +426,7 @@ void add_type(Node *node) {
     node->ty = node->member->ty;
     return;
   case ND_ADDR: {
-    Type *ty = node->lhs->ty;
-    if (ty->kind == TY_ARRAY) {
-      // correct: node->ty = pointer_to(node->lhs->ty);
-      // WARN: it is not std
-      node->ty = pointer_to(ty->base);
-    } else {
-      node->ty = pointer_to(ty);
-    }
+    node->ty = pointer_to(node->lhs->ty);
     return;
   }
   case ND_DEREF:
