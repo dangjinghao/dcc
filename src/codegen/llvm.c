@@ -571,7 +571,7 @@ static LLVMValueRef gen_expr(Node *node) {
     return load(node->ty, gen_addr(node));
   }
   case ND_DEREF: {
-    return load(node->ty, gen_addr(node->lhs));
+    return load(node->ty, gen_expr(node->lhs));
   }
   case ND_ADDR: {
     return gen_addr(node->lhs);
