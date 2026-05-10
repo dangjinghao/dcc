@@ -709,6 +709,39 @@ static LLVMValueRef gen_stmt(Node *node) {
   }
 }
 
+static void codegen_build_function(Obj *var) {
+  F = LLVMGetNamedFunction(M, var->name);
+  assert(F);
+  // prologue
+  LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
+  LLVMPositionBuilderAtEnd(B, entry);
+  size_t args_count = 0;
+  for (Obj *p = var->params; p; p = p->next) {
+    LLVMValueRef local_arg = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
+    LLVMValueRef arg = LLVMGetParam(F, args_count++);
+
+    // store arg to alloca variable
+    LLVMBuildStore(B, arg, local_arg);
+    p->codegen_data = (intptr_t)local_arg;
+  }
+  for (Obj *v = var->locals; v; v = v->next) {
+    if (v->codegen_data)
+      continue;
+    LLVMValueRef lv = LLVMBuildAlloca(B, type_convert(v->ty), v->name);
+    v->codegen_data = (intptr_t)lv;
+  }
+  gen_stmt(var->body);
+  if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(B))) {
+    // If there isn't any terminator(return) in the last BB, create a new one
+    if (var->ty->return_ty->kind == TY_VOID) {
+      LLVMBuildRetVoid(B);
+    } else {
+      LLVMBuildRet(B, LLVMConstNull(type_convert(var->ty->return_ty)));
+    }
+  }
+  F = NULL;
+}
+
 // stage 2. initialize global variable
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
@@ -723,29 +756,7 @@ static void codegen_global_init(Obj *prog) {
       continue;
     }
     if (var->is_function && var->body) {
-      F = LLVMGetNamedFunction(M, var->name);
-      assert(F);
-      // prologue
-      LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
-      LLVMPositionBuilderAtEnd(B, entry);
-      size_t args_count = 0;
-      for (Obj *p = var->params; p; p = p->next) {
-        LLVMValueRef local_arg =
-            LLVMBuildAlloca(B, type_convert(p->ty), p->name);
-        LLVMValueRef arg = LLVMGetParam(F, args_count++);
-
-        // store arg to alloca variable
-        LLVMBuildStore(B, arg, local_arg);
-        p->codegen_data = (intptr_t)local_arg;
-      }
-      for (Obj *v = var->locals; v; v = v->next) {
-        if (v->codegen_data)
-          continue;
-        LLVMValueRef lv = LLVMBuildAlloca(B, type_convert(v->ty), v->name);
-        v->codegen_data = (intptr_t)lv;
-      }
-      gen_stmt(var->body);
-      F = NULL;
+      codegen_build_function(var);
       continue;
     }
   }
