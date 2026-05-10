@@ -682,10 +682,119 @@ static LLVMValueRef gen_expr(Node *node) {
     free(args);
     return r;
   }
-  default: {
+
+  case ND_EXCH:
+  case ND_CAS:
+  case ND_LABEL_VAL: {
+    // TODO: cas, exch, label_val
     unreachable();
   }
+  case ND_ADD:
+    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
+        node->lhs->ty->kind == TY_LDOUBLE) {
+      return LLVMBuildFAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "fadd");
+    } else {
+      return LLVMBuildAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "add");
+    }
+  case ND_SUB: {
+    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
+        node->lhs->ty->kind == TY_LDOUBLE) {
+      return LLVMBuildFSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "fsub");
+    } else {
+      return LLVMBuildSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "sub");
+    }
   }
+  case ND_MUL: {
+    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
+        node->lhs->ty->kind == TY_LDOUBLE) {
+      return LLVMBuildFMul(B, gen_expr(node->lhs), gen_expr(node->rhs), "fmul");
+    } else {
+      return LLVMBuildMul(B, gen_expr(node->lhs), gen_expr(node->rhs), "mul");
+    }
+  }
+  case ND_DIV: {
+    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
+        node->lhs->ty->kind == TY_LDOUBLE) {
+      return LLVMBuildFDiv(B, gen_expr(node->lhs), gen_expr(node->rhs), "fdiv");
+    } else {
+      if (node->lhs->ty->is_unsigned)
+        return LLVMBuildUDiv(B, gen_expr(node->lhs), gen_expr(node->rhs),
+                             "udiv");
+      else
+        return LLVMBuildSDiv(B, gen_expr(node->lhs), gen_expr(node->rhs),
+                             "sdiv");
+    }
+  }
+  case ND_MOD: {
+    assert(is_integer(node->lhs->ty));
+    if (node->lhs->ty->is_unsigned)
+      return LLVMBuildURem(B, gen_expr(node->lhs), gen_expr(node->rhs), "umod");
+    else
+      return LLVMBuildSRem(B, gen_expr(node->lhs), gen_expr(node->rhs), "smod");
+  }
+  case ND_BITAND: {
+    assert(is_integer(node->lhs->ty));
+    return LLVMBuildAnd(B, gen_expr(node->lhs), gen_expr(node->rhs), "bitand");
+  }
+  case ND_BITOR: {
+    assert(is_integer(node->lhs->ty));
+    return LLVMBuildOr(B, gen_expr(node->lhs), gen_expr(node->rhs), "bitor");
+  }
+  case ND_BITXOR: {
+    assert(is_integer(node->lhs->ty));
+    return LLVMBuildXor(B, gen_expr(node->lhs), gen_expr(node->rhs), "bitxor");
+  }
+  case ND_EQ:
+  case ND_NE:
+  case ND_LT:
+  case ND_LE: {
+    int fop = 0;
+    int iop = 0;
+    switch (node->kind) {
+    case ND_EQ:
+      fop = LLVMRealOEQ;
+      iop = LLVMIntEQ;
+      break;
+    case ND_NE:
+      fop = LLVMRealONE;
+      iop = LLVMIntNE;
+      break;
+    case ND_LT:
+      fop = LLVMRealOLT;
+      if (node->lhs->ty->is_unsigned)
+        iop = LLVMIntULT;
+      else
+        iop = LLVMIntSLT;
+      break;
+    case ND_LE:
+      fop = LLVMRealOLE;
+      if (node->lhs->ty->is_unsigned)
+        iop = LLVMIntULE;
+      else
+        iop = LLVMIntSLE;
+      break;
+    }
+
+    if (node->lhs->ty->kind == TY_FLOAT || node->lhs->ty->kind == TY_DOUBLE ||
+        node->lhs->ty->kind == TY_LDOUBLE) {
+      return LLVMBuildFCmp(B, fop, gen_expr(node->lhs), gen_expr(node->rhs),
+                           "fcmp");
+    } else {
+      return LLVMBuildICmp(B, iop, gen_expr(node->lhs), gen_expr(node->rhs),
+                           "cmp");
+    }
+  }
+  case ND_SHL: {
+    return LLVMBuildShl(B, gen_expr(node->lhs), gen_expr(node->rhs), "shl");
+  }
+  case ND_SHR: {
+    if (node->lhs->ty->is_unsigned)
+      return LLVMBuildLShr(B, gen_expr(node->lhs), gen_expr(node->rhs), "lshr");
+    else
+      return LLVMBuildAShr(B, gen_expr(node->lhs), gen_expr(node->rhs), "ashr");
+  }
+  }
+  error_tok(node->tok, "invalid expression");
 }
 
 static LLVMValueRef gen_stmt(Node *node) {
