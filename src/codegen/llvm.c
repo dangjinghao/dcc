@@ -511,6 +511,36 @@ static LLVMValueRef cmp_ez(LLVMValueRef v) {
   return LLVMBuildFCmp(B, LLVMRealOEQ, v, zero, "cmp_ez_f");
 }
 
+static LLVMValueRef logic_short_circuit(Node *node, bool is_and) {
+  LLVMValueRef lhs = gen_expr(node->lhs);
+  LLVMValueRef lhs_check = cmp_nz(lhs);
+  LLVMBasicBlockRef start_block = LLVMGetInsertBlock(B);
+  LLVMBasicBlockRef next_block =
+      LLVMAppendBasicBlockInContext(C, F, is_and ? "and_next" : "or_next");
+  LLVMBasicBlockRef merge_block =
+      LLVMAppendBasicBlockInContext(C, F, is_and ? "and_merge" : "or_merge");
+
+  if (is_and) {
+    LLVMBuildCondBr(B, lhs_check, next_block, merge_block);
+  } else {
+    LLVMBuildCondBr(B, lhs_check, merge_block, next_block);
+  }
+
+  LLVMPositionBuilderAtEnd(B, next_block);
+  LLVMValueRef rhs = gen_expr(node->rhs);
+  LLVMValueRef rhs_check = cmp_nz(rhs);
+  LLVMBuildBr(B, merge_block);
+
+  LLVMPositionBuilderAtEnd(B, merge_block);
+  LLVMValueRef phi =
+      LLVMBuildPhi(B, LLVMInt1TypeInContext(C), is_and ? "and_phi" : "or_phi");
+  LLVMAddIncoming(phi, (LLVMValueRef[]){lhs_check, rhs_check},
+                  (LLVMBasicBlockRef[]){start_block, next_block}, 2);
+  LLVMValueRef ext = LLVMBuildZExt(B, phi, LLVMInt32TypeInContext(C),
+                                   is_and ? "zext_and" : "zext_or");
+  return ext;
+}
+
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
@@ -604,8 +634,14 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_NOT: {
     LLVMValueRef v = gen_expr(node->lhs);
     v = cmp_ez(v);
-    // we have to ext i1 to i8
-    return LLVMBuildZExt(B, v, LLVMInt8TypeInContext(C), "not_ext");
+    // we have to ext i1 to i32
+    return LLVMBuildZExt(B, v, LLVMInt32TypeInContext(C), "not_ext");
+  }
+  case ND_LOGAND: {
+    return logic_short_circuit(node, true);
+  }
+  case ND_LOGOR: {
+    return logic_short_circuit(node, false);
   }
   default: {
     unreachable();
