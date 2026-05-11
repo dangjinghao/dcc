@@ -625,7 +625,7 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
     if (ty2->kind == TY_ARRAY) {
       // "array of T" is converted to "pointer to T" only in the parameter
       // context. For example, *argv[] is converted to **argv by this.
-      ty2 = array_degrad(ty);
+      ty2 = array_degrad(ty2);
       ty2->name = name;
     } else if (ty2->kind == TY_FUNC) {
       // Likewise, a function is converted to a pointer to a function
@@ -3003,7 +3003,7 @@ static Node *primary(Token **rest, Token *tok) {
   }
   // "_Generic" generic-selection
   if (equal(tok, "_Generic")) {
-    // TODO:understand
+    // TODO: understand
     return generic_selection(rest, tok->next);
   }
 
@@ -3055,7 +3055,7 @@ static Node *primary(Token **rest, Token *tok) {
     VarScope *sc = find_var(tok);
     *rest = tok->next;
 
-    // TODO:For "static inline" function
+    // TODO: "static inline" function
     // if (sc && sc->var && sc->var->is_function) {
     // if (current_fn)
     //   strarray_push(&current_fn->refs, sc->var->name);
