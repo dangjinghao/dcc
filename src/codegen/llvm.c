@@ -15,6 +15,8 @@ static LLVMModuleRef M;
 static LLVMBuilderRef B;
 static LLVMValueRef F;
 
+static HashMap func_labels;
+
 static LLVMValueRef llvm_memset_declare;
 static LLVMTypeRef llvm_memset_declare_ty;
 
@@ -121,14 +123,14 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     init_val = LLVMConstNull(llvm_ty);
   } else {
     // integer family and ptr
-    char **label = NULL;
-    int64_t eval_val = eval2(init->expr, &label);
-    if (label) {
+    char **var_ref = NULL;
+    int64_t eval_val = eval2(init->expr, &var_ref);
+    if (var_ref) {
       // Relocation pointer, real data: label + eval_val
-      LLVMValueRef target_val = LLVMGetNamedGlobal(M, *label);
+      LLVMValueRef target_val = LLVMGetNamedGlobal(M, *var_ref);
       if (!target_val) {
         // maybe it's a function
-        target_val = LLVMGetNamedFunction(M, *label);
+        target_val = LLVMGetNamedFunction(M, *var_ref);
       }
       assert(target_val);
       assert(ty->base);
@@ -842,7 +844,33 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMPositionBuilderAtEnd(B, bb_merge);
     return NULL;
   }
+  case ND_LABEL: {
+    new_block("labeled_stmt");
+    LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
+    if (!bb) {
+      // if bb exists, goto statement create this before.
+      // we just reuse this, or we  create a new one
+      bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
+      hashmap_put(&func_labels, node->unique_label, bb);
+    }
+    LLVMBuildBr(B, bb);
+    LLVMPositionBuilderAtEnd(B, bb);
+    return gen_stmt(node->lhs);
+  }
   case ND_GOTO: {
+    new_block("goto");
+
+    LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
+    if (!bb) {
+      // if bb exists, labeled statement create this before.
+      // we just reuse this, or we  create a new one
+      bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
+      hashmap_put(&func_labels, node->unique_label, bb);
+    }
+    LLVMBuildBr(B, bb);
+    // we keep current Builder position because the later code is
+    // not necessary just like those ir after br in same block.
+    return NULL;
   }
   default:
     unreachable();
@@ -880,6 +908,7 @@ static void codegen_build_function(Obj *var) {
     }
   }
   F = NULL;
+  hashmap_clear(&func_labels);
 }
 
 // stage 2. initialize global variable
