@@ -800,13 +800,19 @@ static LLVMValueRef gen_expr(Node *node) {
     }
   }
   case ND_SHL: {
-    return LLVMBuildShl(B, gen_expr(node->lhs), gen_expr(node->rhs), "shl");
+    // LLVM needs both side has same type, so we need cast rhs
+    LLVMValueRef rhs = gen_expr(node->rhs);
+    rhs = cast(rhs, node->rhs->ty, node->lhs->ty, node->tok);
+    return LLVMBuildShl(B, gen_expr(node->lhs), rhs, "shl");
   }
   case ND_SHR: {
+    // LLVM needs both side has same type, so we need cast rhs
+    LLVMValueRef rhs = gen_expr(node->rhs);
+    rhs = cast(rhs, node->rhs->ty, node->lhs->ty, node->tok);
     if (node->lhs->ty->is_unsigned)
-      return LLVMBuildLShr(B, gen_expr(node->lhs), gen_expr(node->rhs), "lshr");
+      return LLVMBuildLShr(B, gen_expr(node->lhs), rhs, "lshr");
     else
-      return LLVMBuildAShr(B, gen_expr(node->lhs), gen_expr(node->rhs), "ashr");
+      return LLVMBuildAShr(B, gen_expr(node->lhs), rhs, "ashr");
   }
   }
   error_tok(node->tok, "invalid expression");
