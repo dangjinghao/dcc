@@ -697,10 +697,18 @@ static LLVMValueRef gen_expr(Node *node) {
     free(args);
     return r;
   }
-
-  case ND_EXCH:
-  case ND_CAS:
   case ND_LABEL_VAL: {
+    LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
+    if (!bb) {
+      // if bb exists, goto statement create this before.
+      // we just reuse this, or we  create a new one
+      bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
+      hashmap_put(&func_labels, node->unique_label, bb);
+    }
+    return LLVMBlockAddress(F, bb);
+  }
+  case ND_EXCH:
+  case ND_CAS: {
     // TODO: cas, exch, label_val
     unreachable();
   }
