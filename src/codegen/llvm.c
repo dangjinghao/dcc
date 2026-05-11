@@ -709,7 +709,7 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_EXCH:
   case ND_CAS: {
-    // TODO: cas, exch, label_val
+    // TODO: cas, exch
     unreachable();
   }
   case ND_ADD:
@@ -849,6 +849,39 @@ static LLVMValueRef gen_stmt(Node *node) {
       gen_stmt(node->_else);
     }
     LLVMBuildBr(B, bb_merge);
+    LLVMPositionBuilderAtEnd(B, bb_merge);
+    return NULL;
+  }
+  case ND_FOR: {
+    new_block("for");
+
+    LLVMBasicBlockRef bb_merge =
+        LLVMAppendBasicBlockInContext(C, F, "for_merge");
+    LLVMBasicBlockRef bb_cond = LLVMAppendBasicBlockInContext(C, F, "for_cond");
+    LLVMBasicBlockRef bb_body = LLVMAppendBasicBlockInContext(C, F, "for_body");
+    LLVMBasicBlockRef bb_inc = LLVMAppendBasicBlockInContext(C, F, "for_inc");
+
+    if (node->init) {
+      gen_stmt(node->init);
+    }
+    LLVMBuildBr(B, bb_cond);
+    LLVMPositionBuilderAtEnd(B, bb_cond);
+    if (node->cond) {
+      LLVMValueRef cond = gen_expr(node->cond);
+      cond = cmp_nz(cond);
+      LLVMBuildCondBr(B, cond, bb_body, bb_merge);
+    } else {
+      LLVMBuildBr(B, bb_body);
+    }
+    LLVMPositionBuilderAtEnd(B, bb_body);
+    gen_stmt(node->then);
+    LLVMBuildBr(B, bb_inc);
+    LLVMPositionBuilderAtEnd(B, bb_inc);
+
+    if (node->inc)
+      gen_expr(node->inc);
+    LLVMBuildBr(B, bb_cond);
+
     LLVMPositionBuilderAtEnd(B, bb_merge);
     return NULL;
   }
