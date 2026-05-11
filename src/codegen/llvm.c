@@ -885,6 +885,23 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMPositionBuilderAtEnd(B, bb_merge);
     return NULL;
   }
+  case ND_DO: {
+    new_block("do");
+    LLVMBasicBlockRef bb_body = LLVMAppendBasicBlockInContext(C, F, "do_body");
+    LLVMBasicBlockRef bb_cond = LLVMAppendBasicBlockInContext(C, F, "do_cond");
+    LLVMBasicBlockRef bb_merge =
+        LLVMAppendBasicBlockInContext(C, F, "do_merge");
+    LLVMBuildBr(B, bb_body);
+    LLVMPositionBuilderAtEnd(B, bb_body);
+    gen_stmt(node->then);
+    LLVMBuildBr(B, bb_cond);
+    LLVMPositionBuilderAtEnd(B, bb_cond);
+    LLVMValueRef cond = gen_expr(node->cond);
+    cond = cmp_nz(cond);
+    LLVMBuildCondBr(B, cond, bb_body, bb_merge);
+    LLVMPositionBuilderAtEnd(B, bb_merge);
+    return NULL;
+  }
   case ND_LABEL: {
     new_block("labeled_stmt");
     LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
