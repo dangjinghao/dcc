@@ -77,28 +77,46 @@ static HashEntry *get_entry(HashMap *map, char *key, int keylen) {
   unreachable();
 }
 
+static void init_map(HashMap *map) {
+  map->buckets = calloc(INIT_SIZE, sizeof(HashEntry));
+  map->capacity = INIT_SIZE;
+  map->used = 0;
+}
+
 static HashEntry *get_or_insert_entry(HashMap *map, char *key, int keylen) {
   if (!map->buckets) {
-    map->buckets = calloc(INIT_SIZE, sizeof(HashEntry));
-    map->capacity = INIT_SIZE;
+    init_map(map);
   } else if ((map->used * 100) / map->capacity >= HIGH_WATERMARK) {
     rehash(map);
   }
-
+  HashEntry *tombstone = NULL;
   uint64_t hash = fnv_hash(key, keylen);
 
   for (int i = 0; i < map->capacity; i++) {
     HashEntry *ent = &map->buckets[(hash + i) % map->capacity];
 
+    if (ent->key == TOMBSTONE && !tombstone) {
+      // find first tombstone
+      tombstone = ent;
+      continue;
+    }
     if (match(ent, key, keylen))
       return ent;
-
     if (ent->key == NULL) {
       ent->key = key;
       ent->keylen = keylen;
       map->used++;
       return ent;
     }
+  }
+  if (tombstone) {
+    // if we don't find a empty slot but we found a tombstone
+    // use this tombstone
+    // See: https://github.com/rui314/chibicc/issues/135
+    tombstone->key = key;
+    tombstone->keylen = keylen;
+    map->used++;
+    return tombstone;
   }
   unreachable();
 }
@@ -129,6 +147,16 @@ void hashmap_delete2(HashMap *map, char *key, int keylen) {
   HashEntry *ent = get_entry(map, key, keylen);
   if (ent)
     ent->key = TOMBSTONE;
+  map->used--;
 }
 
-void hashmap_destory(HashMap *map) { free(map); }
+void hashmap_destroy(HashMap *map) { free(map->buckets); }
+
+void hashmap_clear(HashMap *map) {
+  if (!map->buckets) {
+    init_map(map);
+  } else {
+    map->used = 0;
+    memset(map->buckets, 0, map->capacity * sizeof(HashEntry));
+  }
+}
