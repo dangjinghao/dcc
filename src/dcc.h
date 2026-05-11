@@ -78,7 +78,9 @@ DFile *get_current_file();
 #undef unreachable
 #endif
 #define unreachable() error("internal error at %s:%d", __FILE__, __LINE__)
-
+#define todo_impl(feat)                                                        \
+  error("feature [%s] is waiting for being implemented at %s:%d", feat,        \
+        __FILE__, __LINE__)
 //
 /// type.c
 //
@@ -341,10 +343,11 @@ struct Obj {
   Obj *params;
   Node *body;
   Obj *locals;
+
   // llvm backend doesn't need this.
   // Obj *va_area;
   // Obj *alloca_bottom;
-  int stack_size;
+  // int stack_size;
 
   // TODO: Static inline function
   // bool is_live;

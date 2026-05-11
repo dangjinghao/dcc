@@ -3015,19 +3015,18 @@ static Node *primary(Token **rest, Token *tok) {
     *rest = skip(tok, ")");
     return new_num(is_compatible(t1, t2), start);
   }
+  // TODO: llvm backend doesn't need this.
+  // if (equal(tok, "__builtin_reg_class")) {
+  //   tok = skip(tok->next, "(");
+  //   Type *ty = typename(&tok, tok);
+  //   *rest = skip(tok, ")");
 
-  if (equal(tok, "__builtin_reg_class")) {
-    // TODO:understand
-    tok = skip(tok->next, "(");
-    Type *ty = typename(&tok, tok);
-    *rest = skip(tok, ")");
-
-    if (is_integer(ty) || ty->kind == TY_PTR)
-      return new_num(0, start);
-    if (is_flonum(ty))
-      return new_num(1, start);
-    return new_num(2, start);
-  }
+  //   if (is_integer(ty) || ty->kind == TY_PTR)
+  //     return new_num(0, start);
+  //   if (is_flonum(ty))
+  //     return new_num(1, start);
+  //   return new_num(2, start);
+  // }
 
   if (equal(tok, "__builtin_compare_and_swap")) {
     Node *node = new_node(ND_CAS, tok);
@@ -3172,7 +3171,8 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
     fn->is_inline = attr->is_inline;
   }
 
-  // TODO: fn->is_root = !(fn->is_static && fn->is_inline);
+  // TODO: static inline 
+  //  fn->is_root = !(fn->is_static && fn->is_inline);
 
   if (consume(&tok, tok, ";"))
     return tok;

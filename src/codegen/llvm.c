@@ -100,16 +100,16 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     init_val = LLVMConstArray2(type_convert(ty->base), cv_array, ty->array_len);
     free(cv_array);
   } else if (ty->kind == TY_UNION) {
-    // TODO:union
-    unreachable();
+    todo_impl("union");
   } else if (ty->kind == TY_STRUCT) {
     size_t member_count = next_iter_count(ty->members);
     LLVMValueRef *cv_array = calloc(ty->array_len, sizeof(LLVMValueRef));
     {
       size_t cv_array_idx = 0;
       for (Member *m = ty->members; m; m = m->next) {
-        // TODO: bitfield
-        assert(!m->is_bitfield);
+        if (m->is_bitfield) {
+          todo_impl("bitfield");
+        }
         cv_array[cv_array_idx++] =
             init_global_data(m->ty, init->children[m->idx]);
       }
@@ -440,7 +440,7 @@ static LLVMValueRef gen_addr(Node *node) {
   }
   case ND_FUNCALL:
     if (node->ret_buffer) {
-      // TODO: understand
+      todo_impl("return struct/union");
       return gen_expr(node);
     }
     break;
@@ -450,8 +450,7 @@ static LLVMValueRef gen_addr(Node *node) {
       return gen_expr(node);
     break;
   case ND_VLA_PTR:
-    // TODO:vla ptr
-    unreachable();
+    todo_impl("vla ptr");
   }
 
   error_tok(node->tok, "not an lvalue");
@@ -476,8 +475,7 @@ static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
   switch (ty->kind) {
   case TY_STRUCT:
   case TY_UNION:
-    // TODO: struct
-    unreachable();
+    todo_impl("store struct/union");
   default:
     break;
   }
@@ -604,13 +602,14 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_ASSIGN: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef v = gen_expr(node->rhs);
-    // TODO: bitfield
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      todo_impl("assign bitfield");
+    }
     store(node->ty, ptr, v);
     // load again
     return load(node->lhs->ty, ptr);
   }
   case ND_MEMZERO: {
-    // TODO: test
     assert(node->var->codegen_data);
     llvm_memset((LLVMValueRef)node->var->codegen_data, 0, node->var->ty->size,
                 false);
@@ -673,8 +672,7 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef F = gen_expr(node->lhs);
 
     if (node->ret_buffer) {
-      // TODO: large struct
-      unreachable();
+      todo_impl("return struct from funcall");
     }
 
     size_t arg_count = next_iter_count(node->args);
@@ -709,8 +707,7 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_EXCH:
   case ND_CAS: {
-    // TODO: cas, exch
-    unreachable();
+    todo_impl("cas exch");
   }
   case ND_ADD:
     if (is_flonum(node->lhs->ty)) {
@@ -860,7 +857,8 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMBasicBlockRef bb_cond = LLVMAppendBasicBlockInContext(C, F, "for_cond");
     LLVMBasicBlockRef bb_body = LLVMAppendBasicBlockInContext(C, F, "for_body");
     LLVMBasicBlockRef bb_inc = LLVMAppendBasicBlockInContext(C, F, "for_inc");
-
+    hashmap_put(&func_labels, node->break_label, bb_merge);
+    hashmap_put(&func_labels, node->cont_label, bb_inc);
     if (node->init) {
       gen_stmt(node->init);
     }
@@ -891,6 +889,8 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMBasicBlockRef bb_cond = LLVMAppendBasicBlockInContext(C, F, "do_cond");
     LLVMBasicBlockRef bb_merge =
         LLVMAppendBasicBlockInContext(C, F, "do_merge");
+    hashmap_put(&func_labels, node->break_label, bb_merge);
+    hashmap_put(&func_labels, node->cont_label, bb_cond);
     LLVMBuildBr(B, bb_body);
     LLVMPositionBuilderAtEnd(B, bb_body);
     gen_stmt(node->then);
@@ -930,6 +930,10 @@ static LLVMValueRef gen_stmt(Node *node) {
     // not necessary just like those ir after br in same block.
     return NULL;
   }
+  case ND_SWITCH:
+  case ND_CASE:
+  case ND_GOTO_EXPR:
+  case ND_ASM:
   default:
     unreachable();
   }
