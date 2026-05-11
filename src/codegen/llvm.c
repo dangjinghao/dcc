@@ -690,7 +690,8 @@ static LLVMValueRef gen_expr(Node *node) {
       F_ty = node->lhs->ty;
     }
     LLVMValueRef r =
-        LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count, "funcall");
+        LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count,
+                       F_ty->return_ty->kind == TY_VOID ? "" : "funcall");
     free(args);
     return r;
   }
