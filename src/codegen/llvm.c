@@ -154,6 +154,11 @@ static void codegen_global_declare(Obj *prog) {
     if (var->is_function) {
       LLVMTypeRef fn_ty = type_convert(var->ty);
       v = LLVMAddFunction(M, var->name, fn_ty);
+      if (var->is_inline) {
+        LLVMAttributeRef inline_attr =
+            LLVMCreateStringAttribute(C, "inlinehint", 10, "", 0);
+        LLVMAddAttributeAtIndex(v, LLVMAttributeFunctionIndex, inline_attr);
+      }
     } else {
       LLVMTypeRef ty = type_convert(var->ty);
       v = LLVMAddGlobal(M, ty, var->name);
