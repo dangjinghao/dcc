@@ -818,7 +818,30 @@ static LLVMValueRef gen_stmt(Node *node) {
     return NULL;
   }
   case ND_EXPR_STMT: {
+    new_block("expr_stmt");
     return gen_expr(node->lhs);
+  }
+  case ND_IF: {
+    new_block("if");
+    LLVMValueRef cond = gen_expr(node->cond);
+    cond = cmp_nz(cond);
+    LLVMBasicBlockRef bb_then = LLVMAppendBasicBlockInContext(C, F, "if_then");
+    LLVMBasicBlockRef bb_else = LLVMAppendBasicBlockInContext(C, F, "if_else");
+    LLVMBasicBlockRef bb_merge =
+        LLVMAppendBasicBlockInContext(C, F, "if_merge");
+    LLVMBuildCondBr(B, cond, bb_then, bb_else);
+    LLVMPositionBuilderAtEnd(B, bb_then);
+    gen_stmt(node->then);
+    LLVMBuildBr(B, bb_merge);
+    LLVMPositionBuilderAtEnd(B, bb_else);
+    if (node->_else) {
+      gen_stmt(node->_else);
+    }
+    LLVMBuildBr(B, bb_merge);
+    LLVMPositionBuilderAtEnd(B, bb_merge);
+    return NULL;
+  }
+  case ND_GOTO: {
   }
   default:
     unreachable();
