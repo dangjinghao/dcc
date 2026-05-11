@@ -108,7 +108,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
       size_t cv_array_idx = 0;
       for (Member *m = ty->members; m; m = m->next) {
         if (m->is_bitfield) {
-          todo_impl("bitfield");
+          todo_impl("bitfield global init");
         }
         cv_array[cv_array_idx++] =
             init_global_data(m->ty, init->children[m->idx]);
@@ -800,13 +800,13 @@ static LLVMValueRef gen_expr(Node *node) {
     }
   }
   case ND_SHL: {
-    // LLVM needs both side has same type, so we need cast rhs
+    // LLVM requires both sides to have the same type, so we need cast rhs
     LLVMValueRef rhs = gen_expr(node->rhs);
     rhs = cast(rhs, node->rhs->ty, node->lhs->ty, node->tok);
     return LLVMBuildShl(B, gen_expr(node->lhs), rhs, "shl");
   }
   case ND_SHR: {
-    // LLVM needs both side has same type, so we need cast rhs
+    // LLVM requires both sides to have the same type, so we need cast rhs
     LLVMValueRef rhs = gen_expr(node->rhs);
     rhs = cast(rhs, node->rhs->ty, node->lhs->ty, node->tok);
     if (node->lhs->ty->is_unsigned)

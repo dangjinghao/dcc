@@ -3003,7 +3003,6 @@ static Node *primary(Token **rest, Token *tok) {
   }
   // "_Generic" generic-selection
   if (equal(tok, "_Generic")) {
-    // TODO: understand
     return generic_selection(rest, tok->next);
   }
 
@@ -3015,18 +3014,6 @@ static Node *primary(Token **rest, Token *tok) {
     *rest = skip(tok, ")");
     return new_num(is_compatible(t1, t2), start);
   }
-  // TODO: llvm backend doesn't need this.
-  // if (equal(tok, "__builtin_reg_class")) {
-  //   tok = skip(tok->next, "(");
-  //   Type *ty = typename(&tok, tok);
-  //   *rest = skip(tok, ")");
-
-  //   if (is_integer(ty) || ty->kind == TY_PTR)
-  //     return new_num(0, start);
-  //   if (is_flonum(ty))
-  //     return new_num(1, start);
-  //   return new_num(2, start);
-  // }
 
   if (equal(tok, "__builtin_compare_and_swap")) {
     Node *node = new_node(ND_CAS, tok);
@@ -3054,14 +3041,6 @@ static Node *primary(Token **rest, Token *tok) {
     // Variable or enum constant
     VarScope *sc = find_var(tok);
     *rest = tok->next;
-
-    // TODO: "static inline" function
-    // if (sc && sc->var && sc->var->is_function) {
-    // if (current_fn)
-    //   strarray_push(&current_fn->refs, sc->var->name);
-    // else
-    //   sc->var->is_root = true;
-    // }
 
     if (sc) {
       if (sc->var)
@@ -3171,9 +3150,6 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
     fn->is_inline = attr->is_inline;
   }
 
-  // TODO: static inline 
-  //  fn->is_root = !(fn->is_static && fn->is_inline);
-
   if (consume(&tok, tok, ";"))
     return tok;
 
@@ -3189,11 +3165,6 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
     new_lvar("", pointer_to(rty));
 
   fn->params = locals;
-
-  // TODO: va_area, alloca_bootom
-  // if (ty->is_variadic)
-  //   fn->va_area = new_lvar("__va_area__", array_of(ty_char, 136));
-  // fn->alloca_bottom = new_lvar("__alloca_size__", pointer_to(ty_char));
 
   tok = skip(tok, "{");
 
@@ -3325,10 +3296,6 @@ Obj *parse(Token *tok) {
     // Global variable
     tok = global_variable(tok, basety, &attr);
   }
-  // TODO: static inline related
-  // for (Obj *var = globals; var; var = var->next)
-  //   if (var->is_root)
-  //     mark_live(var);
 
   return globals;
 }
