@@ -180,8 +180,9 @@ static void codegen_global_declare(Obj *prog) {
       LLVMTypeRef fn_ty = type_convert(var->ty);
       v = LLVMAddFunction(M, var->name, fn_ty);
       if (var->is_inline) {
-        LLVMAttributeRef inline_attr =
-            LLVMCreateStringAttribute(C, "inlinehint", 10, "", 0);
+        unsigned int kind_id =
+            LLVMGetEnumAttributeKindForName("inlinehint", 10);
+        LLVMAttributeRef inline_attr = LLVMCreateEnumAttribute(C, kind_id, 0);
         LLVMAddAttributeAtIndex(v, LLVMAttributeFunctionIndex, inline_attr);
       }
     } else {
