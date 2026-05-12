@@ -79,10 +79,18 @@ static LLVMTypeRef type_convert(Type *ty) {
     free(params);
     return r;
   }
-
-  case TY_ENUM:
+  case TY_UNION: {
+    // find max type member and init union as this type
+    Type *max_ty = ty->members->ty;
+    for (Member *mem = ty->members; mem; mem = mem->next) {
+      if (max_ty->size < mem->ty->size)
+        max_ty = mem->ty;
+    }
+    return type_convert(max_ty);
+  }
   case TY_VLA:
-  case TY_UNION:
+    todo_impl("vla");
+  case TY_ENUM:
   default:
     break;
   }
@@ -100,7 +108,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     init_val = LLVMConstArray2(type_convert(ty->base), cv_array, ty->array_len);
     free(cv_array);
   } else if (ty->kind == TY_UNION) {
-    todo_impl("union");
+    todo_impl("union global init");
   } else if (ty->kind == TY_STRUCT) {
     size_t member_count = next_iter_count(ty->members);
     LLVMValueRef *cv_array = calloc(ty->array_len, sizeof(LLVMValueRef));
@@ -437,6 +445,10 @@ static LLVMValueRef gen_addr(Node *node) {
     return gen_addr(node->rhs);
   case ND_MEMBER: {
     LLVMValueRef ptr = gen_addr(node->lhs);
+    if (node->lhs->ty->kind == TY_UNION) {
+      // union type doesn't need gep
+      return ptr;
+    }
     return LLVMBuildGEP2(
         B, type_convert(node->ty), ptr,
         &(LLVMValueRef){
