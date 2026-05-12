@@ -256,7 +256,7 @@ static Initializer *new_initializer(Type *ty, bool is_flexible) {
     return init;
   }
 
-  if (ty->kind == TY_STRUCT || ty->kind == TY_UNION) {
+  if (is_agg_type(ty)) {
     // Count the number of struct members.
     int len = 0;
     for (Member *mem = ty->members; mem; mem = mem->next)
@@ -1321,7 +1321,7 @@ static Initializer *initializer(Token **rest, Token *tok, Type *ty,
   Initializer *init = new_initializer(ty, true);
   initializer2(rest, tok, init);
 
-  if ((ty->kind == TY_STRUCT || ty->kind == TY_UNION) && ty->is_flexible) {
+  if (is_agg_type(ty) && ty->is_flexible) {
     ty = copy_struct_type(ty);
 
     Member *mem = ty->members;
@@ -2519,8 +2519,7 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
     bool first = true;
 
     // Anonymous struct member
-    if ((basety->kind == TY_STRUCT || basety->kind == TY_UNION) &&
-        consume(&tok, tok, ";")) {
+    if (is_agg_type(basety) && consume(&tok, tok, ";")) {
       Member *mem = calloc(1, sizeof(Member));
       mem->ty = basety;
       mem->idx = idx++;
@@ -2705,8 +2704,7 @@ static Type *union_decl(Token **rest, Token *tok) {
 static Member *get_struct_member(Type *ty, Token *tok) {
   for (Member *mem = ty->members; mem; mem = mem->next) {
     // Anonymous struct member
-    if ((mem->ty->kind == TY_STRUCT || mem->ty->kind == TY_UNION) &&
-        !mem->name) {
+    if (is_agg_type(mem->ty) && !mem->name) {
       if (get_struct_member(mem->ty, tok))
         return mem;
       continue;
@@ -2887,7 +2885,7 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
 
   // If a function returns a struct, it is caller's responsibility
   // to allocate a space for the return value.
-  if (node->ty->kind == TY_STRUCT || node->ty->kind == TY_UNION)
+  if (is_agg_type(node->ty))
     node->ret_buffer = new_lvar("", node->ty);
   return node;
 }
@@ -3161,7 +3159,7 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   // A buffer for a struct/union return value is passed
   // as the hidden first parameter.
   Type *rty = ty->return_ty;
-  if ((rty->kind == TY_STRUCT || rty->kind == TY_UNION) && rty->size > 16)
+  if (is_agg_type(rty) && rty->size > 16)
     new_lvar("", pointer_to(rty));
 
   fn->params = locals;

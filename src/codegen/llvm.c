@@ -480,7 +480,7 @@ static LLVMValueRef gen_addr(Node *node) {
     break;
   case ND_ASSIGN:
   case ND_COND:
-    if (node->ty->kind == TY_STRUCT || node->ty->kind == TY_UNION)
+    if (is_agg_type(node->ty))
       return gen_expr(node);
     break;
   case ND_VLA_PTR:

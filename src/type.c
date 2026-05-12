@@ -1,5 +1,6 @@
 #include "dcc.h"
 #include <stdalign.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 // basic type
@@ -86,6 +87,10 @@ bool is_flonum(Type *ty) {
 }
 
 bool is_numeric(Type *ty) { return is_integer(ty) || is_flonum(ty); }
+
+bool is_agg_type(Type *ty) {
+  return ty->kind == TY_STRUCT || ty->kind == TY_UNION;
+};
 
 // used in generic_selection and __builtin_types_compatible_p
 bool is_compatible(Type *t1, Type *t2) {
