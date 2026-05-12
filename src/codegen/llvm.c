@@ -111,7 +111,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     todo_impl("union global init");
   } else if (ty->kind == TY_STRUCT) {
     size_t member_count = next_iter_count(ty->members);
-    LLVMValueRef *cv_array = calloc(ty->array_len, sizeof(LLVMValueRef));
+    LLVMValueRef *cv_array = calloc(member_count, sizeof(LLVMValueRef));
     {
       size_t cv_array_idx = 0;
       for (Member *m = ty->members; m; m = m->next) {
