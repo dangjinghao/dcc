@@ -710,9 +710,29 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     return LLVMBlockAddress(F, bb);
   }
-  case ND_EXCH:
+  case ND_EXCH: {
+    LLVMValueRef ptr = gen_expr(node->lhs);
+    LLVMValueRef new_val = gen_expr(node->rhs);
+    // return old val(pointee type)
+    return LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpXchg, ptr, new_val,
+                              LLVMAtomicOrderingSequentiallyConsistent, false);
+  }
   case ND_CAS: {
-    todo_impl("cas exch");
+    LLVMValueRef ptr = gen_expr(node->cas_addr);
+    LLVMValueRef old_ptr = gen_expr(node->cas_old);
+    LLVMValueRef new_val = gen_expr(node->cas_new);
+    LLVMValueRef old_val = LLVMBuildLoad2(
+        B, type_convert(node->cas_old->ty->base), old_ptr, "cas_load_old_val");
+    LLVMValueRef result = LLVMBuildAtomicCmpXchg(
+        B, ptr, old_val, new_val, LLVMAtomicOrderingSequentiallyConsistent,
+        LLVMAtomicOrderingSequentiallyConsistent, false);
+    LLVMValueRef actual_old_val =
+        LLVMBuildExtractValue(B, result, 0, "cas_actual_old");
+    LLVMBuildStore(B, actual_old_val, old_ptr);
+
+    LLVMValueRef success = LLVMBuildExtractValue(B, result, 1, "cas_success");
+    return LLVMBuildZExt(B, success, LLVMInt8TypeInContext(C),
+                         "cas_success_ext");
   }
   case ND_ADD:
     if (is_flonum(node->lhs->ty)) {
