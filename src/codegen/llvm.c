@@ -108,7 +108,24 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     init_val = LLVMConstArray2(type_convert(ty->base), cv_array, ty->array_len);
     free(cv_array);
   } else if (ty->kind == TY_UNION) {
-    todo_impl("union global init");
+    Member *init_mem = init->mem;
+    if (init_mem) {
+      // create specific union type
+      LLVMValueRef val =
+          init_global_data(init_mem->ty, init->children[init_mem->idx]);
+      int padding = ty->size - init_mem->ty->size;
+      if (padding > 0) {
+        LLVMValueRef pad =
+            LLVMConstNull(LLVMArrayType(LLVMInt8TypeInContext(C), padding));
+        // unnamed struct value { init_val, <pad-array> }
+        init_val =
+            LLVMConstStructInContext(C, (LLVMValueRef[]){val, pad}, 2, false);
+      } else {
+        init_val = val;
+      }
+    } else {
+      init_val = LLVMConstNull(type_convert(ty));
+    }
   } else if (ty->kind == TY_STRUCT) {
     size_t member_count = next_iter_count(ty->members);
     LLVMValueRef *cv_array = calloc(member_count, sizeof(LLVMValueRef));
@@ -1023,7 +1040,31 @@ static void codegen_global_init(Obj *prog) {
       LLVMValueRef v = (LLVMValueRef)var->codegen_data;
       assert(v);
       if (var->init) {
-        LLVMSetInitializer(v, init_global_data(var->ty, var->init));
+        LLVMValueRef init_val = init_global_data(var->ty, var->init);
+        LLVMTypeRef init_ty = LLVMTypeOf(init_val);
+        LLVMTypeRef declared_ty = type_convert(var->ty);
+        // used to resolve fucking union init problem
+        if (init_ty != declared_ty) {
+          // create a new variable with new specific type
+          LLVMValueRef new_v = LLVMAddGlobal(M, init_ty, "");
+          LLVMSetInitializer(new_v, init_val);
+
+          // copy attribute
+          LLVMSetLinkage(new_v, LLVMGetLinkage(v));
+          LLVMSetAlignment(new_v, var->ty->align);
+          LLVMSetThreadLocal(new_v, var->is_tls);
+
+          // update reference in llvm system
+          LLVMReplaceAllUsesWith(v, new_v);
+
+          // set same name and delete old variable
+          LLVMSetValueName2(new_v, var->name, strlen(var->name));
+          LLVMDeleteGlobal(v);
+          // update reference in our system
+          var->codegen_data = (intptr_t)new_v;
+        } else {
+          LLVMSetInitializer(v, init_val);
+        }
       } else {
         LLVMSetInitializer(v, LLVMConstNull(type_convert(var->ty)));
       }
