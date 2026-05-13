@@ -703,7 +703,21 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef *args = calloc(arg_count, sizeof(LLVMValueRef));
     size_t arg_idx = 0;
     for (Node *arg = node->args; arg; arg = arg->next) {
-      args[arg_idx++] = gen_expr(arg);
+      LLVMValueRef arg_vr = gen_expr(arg);
+      if (is_agg_type(arg->ty)) {
+        if (!is_large_agg_type(arg->ty)) {
+          // we can't use load function to load it directly, check below
+          LLVMValueRef arg_addr = gen_addr(arg);
+          arg_vr = LLVMBuildLoad2(B, type_convert(arg->ty), arg_addr,
+                                  "funcall_sstruct_load");
+        }
+        // else: large agg type
+        // because the load function always return ptr for struct/union
+        // and large agg pass-as-value in the callee function will be
+        // reinterpreted to pointer to this type. both of them are same type
+        // (pointer) so we don't need to do anything.
+      }
+      args[arg_idx++] = arg_vr;
     }
     Type *F_ty;
     if (node->lhs->ty->kind == TY_PTR) {
@@ -1023,11 +1037,12 @@ static LLVMValueRef declare_agg_function(Obj *var) {
     size_t params_idx = 0;
     for (Type *p = ty->params; p; p = p->next) {
       if (is_agg_type(p)) {
-        // struct type -> struct pointer type
-        if (!is_large_agg_type(p)) {
-          todo_impl("pass-as-value large struct");
+        // large struct type -> struct pointer type
+        if (is_large_agg_type(p)) {
+          p = pointer_to(p);
         }
-        p = pointer_to(p);
+        // else: for small struct type, treat them as normal type, support
+        // basically support this
       }
       params[params_idx++] = type_convert(p);
     }
@@ -1073,7 +1088,11 @@ static void codegen_alloca_function_local_argument(Obj *var) {
         arg_vr = LLVMBuildInBoundsGEP2(B, type_convert(p->ty), arg, NULL, 0,
                                        "lagg_arg_gep");
       } else {
-        todo_impl(" small agg type argument");
+        // same as normal variable
+        // TODO: correct system v implementation
+        arg_vr = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
+        // store arg to alloca variable
+        LLVMBuildStore(B, arg, arg_vr);
       }
     } else {
       arg_vr = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
