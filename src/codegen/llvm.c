@@ -850,14 +850,18 @@ static LLVMValueRef gen_expr(Node *node) {
         iop = LLVMIntSLE;
       break;
     }
-
+    LLVMValueRef result = NULL;
     if (is_flonum(node->lhs->ty)) {
-      return LLVMBuildFCmp(B, fop, gen_expr(node->lhs), gen_expr(node->rhs),
-                           "fcmp");
+      result = LLVMBuildFCmp(B, fop, gen_expr(node->lhs), gen_expr(node->rhs),
+                             "fcmp");
     } else {
-      return LLVMBuildICmp(B, iop, gen_expr(node->lhs), gen_expr(node->rhs),
-                           "cmp");
+      result = LLVMBuildICmp(B, iop, gen_expr(node->lhs), gen_expr(node->rhs),
+                             "cmp");
     }
+
+    // promote to int
+    return LLVMBuildZExt(B, result, LLVMInt32TypeInContext(C),
+                         "logic_result_zext");
   }
   case ND_SHL: {
     // LLVM requires both sides to have the same type, so we need cast rhs
