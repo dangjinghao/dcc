@@ -23,6 +23,12 @@ static LLVMTypeRef llvm_memset_declare_ty;
 static LLVMValueRef gen_expr(Node *node);
 static LLVMValueRef gen_stmt(Node *node);
 
+static bool is_large_agg_type(Type *ty) {
+  if (!is_agg_type(ty))
+    return false;
+  return ty->size > 16;
+}
+
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
   case TY_VOID:
@@ -171,44 +177,43 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
   return init_val;
 }
 
+static void llvm_set_value_attr(Obj *o, LLVMValueRef v) {
+  if (o->is_function) {
+    if (o->is_inline) {
+      unsigned int kind_id = LLVMGetEnumAttributeKindForName("inlinehint", 10);
+      LLVMAttributeRef inline_attr = LLVMCreateEnumAttribute(C, kind_id, 0);
+      LLVMAddAttributeAtIndex(v, LLVMAttributeFunctionIndex, inline_attr);
+    }
+  } else {
+    LLVMSetAlignment(v, o->ty->align);
+    if (o->is_tentative) {
+      LLVMSetLinkage(v, LLVMCommonLinkage);
+    }
+    if (o->is_tls) {
+      LLVMSetThreadLocal(v, true);
+    }
+  }
+
+  if (o->is_static) {
+    LLVMSetLinkage(v, LLVMInternalLinkage);
+  }
+  if (!o->is_definition) {
+    LLVMSetLinkage(v, LLVMExternalLinkage);
+  }
+}
+
 // The first stage. Only declare global variable to avoid dependency order
 // problem.
 static void codegen_global_declare(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    LLVMValueRef v;
+    LLVMTypeRef ty = type_convert(var->ty);
+    LLVMValueRef v = NULL;
     if (var->is_function) {
-      LLVMTypeRef fn_ty = type_convert(var->ty);
-      v = LLVMAddFunction(M, var->name, fn_ty);
-      if (var->is_inline) {
-        unsigned int kind_id =
-            LLVMGetEnumAttributeKindForName("inlinehint", 10);
-        LLVMAttributeRef inline_attr = LLVMCreateEnumAttribute(C, kind_id, 0);
-        LLVMAddAttributeAtIndex(v, LLVMAttributeFunctionIndex, inline_attr);
-      }
+      v = LLVMAddFunction(M, var->name, ty);
     } else {
-      LLVMTypeRef ty = type_convert(var->ty);
       v = LLVMAddGlobal(M, ty, var->name);
     }
-
-    if (var->is_static) {
-      LLVMSetLinkage(v, LLVMInternalLinkage);
-    }
-
-    if (!var->is_definition) {
-      LLVMSetLinkage(v, LLVMExternalLinkage);
-    }
-
-    if (var->is_tentative) {
-      LLVMSetLinkage(v, LLVMCommonLinkage);
-    }
-
-    if (var->is_tls) {
-      LLVMSetThreadLocal(v, true);
-    }
-
-    if (!var->is_function) {
-      LLVMSetAlignment(v, var->ty->align);
-    }
+    llvm_set_value_attr(var, v);
     var->codegen_data = (intptr_t)v;
   }
 }
@@ -475,7 +480,7 @@ static LLVMValueRef gen_addr(Node *node) {
   }
   case ND_FUNCALL:
     if (node->ret_buffer) {
-      todo_impl("return struct/union");
+      todo_impl("gen_addr funcall return struct/union");
       return gen_expr(node);
     }
     break;
@@ -1001,7 +1006,7 @@ static LLVMValueRef gen_stmt(Node *node) {
 }
 
 static void codegen_build_function(Obj *var) {
-  F = LLVMGetNamedFunction(M, var->name);
+  F = (LLVMValueRef)var->codegen_data;
   assert(F);
   // prologue
   LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
@@ -1038,8 +1043,8 @@ static void codegen_build_function(Obj *var) {
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
     if (!var->is_function) {
-      LLVMValueRef v = (LLVMValueRef)var->codegen_data;
-      assert(v);
+      LLVMValueRef old_v = (LLVMValueRef)var->codegen_data;
+      assert(old_v);
       if (var->init) {
         LLVMValueRef init_val = init_global_data(var->ty, var->init);
         LLVMTypeRef init_ty = LLVMTypeOf(init_val);
@@ -1051,23 +1056,21 @@ static void codegen_global_init(Obj *prog) {
           LLVMSetInitializer(new_v, init_val);
 
           // copy attribute
-          LLVMSetLinkage(new_v, LLVMGetLinkage(v));
-          LLVMSetAlignment(new_v, var->ty->align);
-          LLVMSetThreadLocal(new_v, var->is_tls);
+          llvm_set_value_attr(var, new_v);
 
           // update reference in llvm system
-          LLVMReplaceAllUsesWith(v, new_v);
+          LLVMReplaceAllUsesWith(old_v, new_v);
 
           // set same name and delete old variable
           LLVMSetValueName2(new_v, var->name, strlen(var->name));
-          LLVMDeleteGlobal(v);
+          LLVMDeleteGlobal(old_v);
           // update reference in our system
           var->codegen_data = (intptr_t)new_v;
         } else {
-          LLVMSetInitializer(v, init_val);
+          LLVMSetInitializer(old_v, init_val);
         }
       } else {
-        LLVMSetInitializer(v, LLVMConstNull(type_convert(var->ty)));
+        LLVMSetInitializer(old_v, LLVMConstNull(type_convert(var->ty)));
       }
       continue;
     }
