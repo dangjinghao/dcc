@@ -202,22 +202,6 @@ static void llvm_set_value_attr(Obj *o, LLVMValueRef v) {
   }
 }
 
-// The first stage. Only declare global variable to avoid dependency order
-// problem.
-static void codegen_global_declare(Obj *prog) {
-  for (Obj *var = prog; var; var = var->next) {
-    LLVMTypeRef ty = type_convert(var->ty);
-    LLVMValueRef v = NULL;
-    if (var->is_function) {
-      v = LLVMAddFunction(M, var->name, ty);
-    } else {
-      v = LLVMAddGlobal(M, ty, var->name);
-    }
-    llvm_set_value_attr(var, v);
-    var->codegen_data = (intptr_t)v;
-  }
-}
-
 static void new_block(char *name) {
   LLVMBasicBlockRef blk_name = LLVMAppendBasicBlockInContext(C, F, name);
   LLVMBuildBr(B, blk_name);
@@ -1009,28 +993,108 @@ static LLVMValueRef gen_stmt(Node *node) {
   }
 }
 
-static void codegen_build_function(Obj *var) {
-  F = (LLVMValueRef)var->codegen_data;
-  assert(F);
-  // prologue
-  LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
-  LLVMPositionBuilderAtEnd(B, entry);
+// check whether this function declared agg argument or return agg type
+static bool is_function_agg_declare(Obj *var) {
+  if (!var->is_function) {
+    return false;
+  }
+
+  if (is_agg_type(var->ty->return_ty)) {
+    return true;
+  }
+
+  for (Type *p = var->ty->params; p; p = p->next) {
+    if (is_agg_type(p))
+      return true;
+  }
+  return false;
+}
+
+// this function will not modify var->codegen_data,instead this function just
+// return the LLVMValueRef and codegen_global_declare will do it.
+static LLVMValueRef declare_agg_function(Obj *var) {
+  assert(var->is_function);
+  Type *ty = var->ty;
+  // pass-as-value struct
+
+  size_t param_count = next_iter_count(ty->params);
+  LLVMTypeRef *params = calloc(param_count, sizeof(LLVMTypeRef));
+  {
+    size_t params_idx = 0;
+    for (Type *p = ty->params; p; p = p->next) {
+      if (is_agg_type(p)) {
+        // struct type -> struct pointer type
+        if (!is_large_agg_type(p)) {
+          todo_impl("pass-as-value large struct");
+        }
+        p = pointer_to(p);
+      }
+      params[params_idx++] = type_convert(p);
+    }
+    assert(params_idx == param_count);
+  }
+
+  // return-as-value struct
+  if (is_agg_type(var->ty->return_ty)) {
+    todo_impl("return-as-value struct");
+  }
+
+  // build llvm value
+  LLVMTypeRef ft = LLVMFunctionType(type_convert(ty->return_ty), params,
+                                    param_count, ty->is_variadic);
+  free(params);
+
+  LLVMValueRef func = LLVMAddFunction(M, var->name, ft);
+
+  // attach 'byval' label
+  LLVMAttributeIndex params_idx = 1;
+  for (Type *p = ty->params; p; p = p->next) {
+    if (is_large_agg_type(p)) {
+      unsigned kind_id = LLVMGetEnumAttributeKindForName("byval", 5);
+      LLVMTypeRef actual_struct_type = type_convert(p);
+      LLVMAttributeRef byval_attr =
+          LLVMCreateTypeAttribute(C, kind_id, actual_struct_type);
+
+      LLVMAddAttributeAtIndex(func, params_idx, byval_attr);
+    }
+    params_idx++;
+  }
+  return func;
+}
+
+static void codegen_alloca_function_local_argument(Obj *var) {
   size_t args_count = 0;
   for (Obj *p = var->params; p; p = p->next) {
-    LLVMValueRef local_arg = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
-    LLVMValueRef arg = LLVMGetParam(F, args_count++);
-
-    // store arg to alloca variable
-    LLVMBuildStore(B, arg, local_arg);
-    p->codegen_data = (intptr_t)local_arg;
+    LLVMValueRef arg_vr = NULL;
+    LLVMValueRef arg = LLVMGetParam(F, args_count);
+    if (is_agg_type(p->ty)) {
+      if (is_large_agg_type(p->ty)) {
+        // gep arg only
+        arg_vr = LLVMBuildInBoundsGEP2(B, type_convert(p->ty), arg, NULL, 0,
+                                       "lagg_arg_gep");
+      } else {
+        todo_impl(" small agg type argument");
+      }
+    } else {
+      arg_vr = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
+      // store arg to alloca variable
+      LLVMBuildStore(B, arg, arg_vr);
+    }
+    p->codegen_data = (intptr_t)arg_vr;
+    args_count++;
   }
+}
+
+static void codegen_alloca_function_local_variable(Obj *var) {
   for (Obj *v = var->locals; v; v = v->next) {
     if (v->codegen_data)
       continue;
     LLVMValueRef lv = LLVMBuildAlloca(B, type_convert(v->ty), v->name);
     v->codegen_data = (intptr_t)lv;
   }
-  gen_stmt(var->body);
+}
+
+static void codegen_build_function_default_return(Obj *var) {
   if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(B))) {
     // If there isn't any terminator(return) in the last BB, create a new one
     if (var->ty->return_ty->kind == TY_VOID) {
@@ -1039,8 +1103,43 @@ static void codegen_build_function(Obj *var) {
       LLVMBuildRet(B, LLVMConstNull(type_convert(var->ty->return_ty)));
     }
   }
+}
+
+static void codegen_build_function_body(Obj *var) {
+  F = (LLVMValueRef)var->codegen_data;
+  assert(F);
+  // prologue
+  LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
+  LLVMPositionBuilderAtEnd(B, entry);
+  codegen_alloca_function_local_argument(var);
+  codegen_alloca_function_local_variable(var);
+  gen_stmt(var->body);
+  codegen_build_function_default_return(var);
   F = NULL;
   hashmap_clear(&func_labels);
+}
+
+// stage 1. Only declare global variable to avoid dependency order
+// problem.
+static void codegen_global_declare(Obj *prog) {
+  for (Obj *var = prog; var; var = var->next) {
+    LLVMValueRef vr = NULL;
+    if (var->is_function) {
+      if (is_function_agg_declare(var)) {
+        // So here we should not use the type_convert to build llvm function
+        // declaration because we can't use it to solve agg param/return type
+        vr = declare_agg_function(var);
+      } else {
+        LLVMTypeRef ty = type_convert(var->ty);
+        vr = LLVMAddFunction(M, var->name, ty);
+      }
+    } else {
+      LLVMTypeRef ty = type_convert(var->ty);
+      vr = LLVMAddGlobal(M, ty, var->name);
+    }
+    llvm_set_value_attr(var, vr);
+    var->codegen_data = (intptr_t)vr;
+  }
 }
 
 // stage 2. initialize global variable
@@ -1079,7 +1178,7 @@ static void codegen_global_init(Obj *prog) {
       continue;
     }
     if (var->is_function && var->body) {
-      codegen_build_function(var);
+      codegen_build_function_body(var);
       continue;
     }
   }
