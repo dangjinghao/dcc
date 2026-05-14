@@ -1981,7 +1981,7 @@ double eval_double(Node *node) {
 
 // Convert op= operators to expressions containing an assignment.
 //
-// In general, `A op= C` is converted to ``tmp = &A, *tmp = *tmp op B`.
+// In general, `A op= C` is converted to `tmp = &A, *tmp = *tmp op B`.
 // However, if a given expression is of form `A.x op= C`, the input is
 // converted to `tmp = &A, (*tmp).x = (*tmp).x op C` to handle assignments
 // to bitfields.
@@ -2072,7 +2072,7 @@ static Node *to_assign(Node *binary) {
     return node;
   }
 
-  // Convert `A op= B` to ``tmp = &A, *tmp = *tmp op B`.
+  // Convert `A op= B` to `tmp = &A, *tmp = *tmp op B`.
   Obj *var = new_lvar("", pointer_to(binary->lhs->ty));
 
   Node *expr1 = new_binary(ND_ASSIGN, new_var_node(var, tok),
@@ -2322,17 +2322,11 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   }
 
   // ptr + num
-  // We expand this calculate process, so if we meet a ptr + num operation, we
-  // don't need to do it again. Just cast the num to pointer type and
-  // typeof(ptr)((ulong)ptr + <extracted-num>)
   Type *ptr_ty = array_degrad(lhs->ty);
-  // cast lhs to ulong to avoid backend meet ptr compute
-  lhs = new_cast(lhs, ty_ulong);
-  rhs = new_binary(ND_MUL, rhs, new_long(ptr_ty->base->size, tok), tok);
-  Node *result = new_binary(ND_ADD, lhs, rhs, tok);
-  add_type(result);
-  // cast result back to previous ptr
-  return new_cast(result, ptr_ty);
+  lhs = new_cast(lhs, ptr_ty);
+  // we should not add_type here because the caller maybe to_assign and it needs
+  // the binary style
+  return new_binary(ND_PTR_ADD, lhs, rhs, tok);
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
@@ -2358,11 +2352,10 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   if (lhs->ty->base && is_integer(rhs->ty)) {
     // typeof(ptr)((ulong)ptr - <extracted-num>)
     Type *ptr_ty = array_degrad(lhs->ty);
-    lhs = new_cast(lhs, ty_ulong);
-    rhs = new_binary(ND_MUL, rhs, new_long(ptr_ty->base->size, tok), tok);
-    Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-    add_type(node);
-    return new_cast(node, ptr_ty);
+    lhs = new_cast(lhs, ptr_ty);
+    // we should not add_type here because the caller maybe to_assign and it
+    // needs the binary style
+    return new_binary(ND_PTR_SUB, lhs, rhs, tok);
   }
 
   // ptr - ptr, which returns how many elements are between the two.
@@ -2372,7 +2365,6 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
     lhs = new_cast(lhs, ty_ulong);
     rhs = new_cast(rhs, ty_ulong);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-
     node->ty = ty_long;
     return new_binary(ND_DIV, node, new_num(ptr_ty->base->size, tok), tok);
   }

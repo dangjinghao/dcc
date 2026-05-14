@@ -194,7 +194,8 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
       assert(ty->base);
       LLVMTypeRef pointee_ty = type_convert(ty->base);
       LLVMValueRef indices =
-          LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val / ty->base->size, false);
+          LLVMConstInt(LLVMInt64TypeInContext(C),
+                       (uint64_t)eval_val / ty->base->size, false);
       init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
     } else {
       // int family
@@ -796,6 +797,16 @@ static LLVMValueRef gen_expr(Node *node) {
     } else {
       return LLVMBuildSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "sub");
     }
+  }
+  case ND_PTR_SUB: {
+    LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "ptr_sub_neg");
+    return LLVMBuildGEP2(B, type_convert(node->lhs->ty->base),
+                         gen_expr(node->lhs), &neg, 1, "ptr_sub");
+  }
+  case ND_PTR_ADD: {
+    return LLVMBuildGEP2(B, type_convert(node->lhs->ty->base),
+                         gen_expr(node->lhs),
+                         &(LLVMValueRef){gen_expr(node->rhs)}, 1, "ptr_add");
   }
   case ND_MUL: {
     if (is_flonum(node->lhs->ty)) {

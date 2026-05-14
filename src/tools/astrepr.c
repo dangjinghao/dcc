@@ -30,6 +30,7 @@ static char *NodeKind_string[] = {
     array_string_item(ND_NUM),       array_string_item(ND_CAST),
     array_string_item(ND_MEMZERO),   array_string_item(ND_ASM),
     array_string_item(ND_CAS),       array_string_item(ND_EXCH),
+    array_string_item(ND_PTR_ADD),   array_string_item(ND_PTR_SUB),
 };
 
 static char *TypeKind_string[] = {

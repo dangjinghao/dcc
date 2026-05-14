@@ -245,6 +245,8 @@ typedef enum {
   ND_ASM,       // "asm"
   ND_CAS,       // Atomic compare-and-swap
   ND_EXCH,      // Atomic exchange
+  ND_PTR_ADD,       // pointer operation(+)
+  ND_PTR_SUB,       // pointer operation(-)
 } NodeKind;
 
 // AST node type

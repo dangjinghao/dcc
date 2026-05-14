@@ -1,4 +1,5 @@
 #include "dcc.h"
+#include <assert.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -226,18 +227,7 @@ static Type *type_integer_promotion(Type *ty) {
 
 static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
 
-  // If there is a pointer in binary operation, we can return t1 type with
-  // pointer. That's because in the new_add/new_dec function the pointer-related
-  // operation has been expanded. E.g. (int*)ptr + 4 --> (int*)ptr + 4 *
-  // (long)sizeof(int) then we can ignore the t2 type - we don't need this type
-  // infomation to defer value so we can return t1 type with pointer if pointer
-  // exists in this binary operation.
-  // also, it could be used in compare operation.
-  // It just like that: oh, we've expand any operation which including pointer
-  // so now we can just type cast those expanded value to pointer.
-  if (t1->base) {
-    return pointer_to(t1->base);
-  }
+  assert(t1->kind != TY_PTR);
 
   if (t1->kind == TY_FUNC)
     return pointer_to(t1);
@@ -341,10 +331,14 @@ void add_type(Node *node) {
     // node->ty = ty_int;
     unreachable();
     return;
+  case ND_PTR_ADD:
+  case ND_PTR_SUB:
+    // operation has been canonicalized and pointer will always in the lhs
+    // ptr - ptr has been extracted in frontend
+    node->ty = node->lhs->ty;
+    return;
   // arithmetic binary operation
-  // add operation has been canonicalized and pointer will always in the lhs
   case ND_ADD:
-  // it's not allowed to set pointer in rhs in sub operation
   case ND_SUB:
   case ND_MUL:
   case ND_DIV: {
