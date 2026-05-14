@@ -483,11 +483,8 @@ static LLVMValueRef gen_addr(Node *node) {
       // union type doesn't need gep
       return ptr;
     }
-    return LLVMBuildGEP2(
-        B, type_convert(node->ty), ptr,
-        &(LLVMValueRef){
-            LLVMConstInt(LLVMInt64TypeInContext(C), node->member->idx, false)},
-        1, "mem_GEP");
+    return LLVMBuildStructGEP2(B, type_convert(node->lhs->ty), ptr,
+                               node->member->idx, "mem_GEP");
   }
   case ND_FUNCALL:
     if (node->ret_buffer) {
