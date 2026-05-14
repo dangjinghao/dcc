@@ -19,6 +19,33 @@ static HashMap func_labels;
 
 static LLVMValueRef llvm_memset_declare;
 static LLVMTypeRef llvm_memset_declare_ty;
+static LLVMValueRef llvm_memcpy_declare;
+static LLVMTypeRef llvm_memcpy_declare_ty;
+
+static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
+                         LLVMValueRef is_volatile) {
+  LLVMBuildCall2(B, llvm_memset_declare_ty, llvm_memset_declare,
+                 (LLVMValueRef[4]){ptr, byte, n, is_volatile}, 4, "");
+}
+
+static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
+                        bool is_volatile) {
+  llvm_memset2(ptr, LLVMConstInt(LLVMInt8TypeInContext(C), byte, false),
+               LLVMConstInt(LLVMInt64TypeInContext(C), n, false),
+               LLVMConstInt(LLVMInt1TypeInContext(C), is_volatile, false));
+}
+
+static void llvm_memcpy2(LLVMValueRef dest, LLVMValueRef src, LLVMValueRef n,
+                         LLVMValueRef is_volatile) {
+  LLVMBuildCall2(B, llvm_memcpy_declare_ty, llvm_memcpy_declare,
+                 (LLVMValueRef[4]){dest, src, n, is_volatile}, 4, "");
+}
+
+static void llvm_memcpy(LLVMValueRef dest, LLVMValueRef src, size_t n,
+                        bool is_volatile) {
+  llvm_memcpy2(dest, src, LLVMConstInt(LLVMInt64TypeInContext(C), n, false),
+               LLVMConstInt(LLVMInt1TypeInContext(C), is_volatile, false));
+}
 
 static LLVMValueRef gen_expr(Node *node);
 static LLVMValueRef gen_stmt(Node *node);
@@ -498,25 +525,18 @@ static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
 static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
   switch (ty->kind) {
   case TY_STRUCT:
-  case TY_UNION:
-    todo_impl("store struct/union");
+  case TY_UNION: {
+    if (is_large_agg_type(ty)) {
+      llvm_memcpy(ptr, v, ty->size, false);
+      return;
+    }
+    // small agg type
+    v = LLVMBuildLoad2(B, type_convert(ty), v, "store_agg_load");
+  }
   default:
     break;
   }
   LLVMBuildStore(B, v, ptr);
-}
-
-static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
-                         LLVMValueRef immarg) {
-  LLVMBuildCall2(B, llvm_memset_declare_ty, llvm_memset_declare,
-                 (LLVMValueRef[4]){ptr, byte, n, immarg}, 4, "");
-}
-
-static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
-                        bool is_volatile) {
-  llvm_memset2(ptr, LLVMConstInt(LLVMInt8TypeInContext(C), byte, false),
-               LLVMConstInt(LLVMInt64TypeInContext(C), n, false),
-               LLVMConstInt(LLVMInt1TypeInContext(C), is_volatile, false));
 }
 
 // Return i1, so do not use it as _Bool(i8) type directly
@@ -1204,16 +1224,29 @@ static void codegen_global_init(Obj *prog) {
 }
 
 void declare_built_function() {
+
+  // declare void @llvm.memset.p0.i64(ptr, i8, i64, i1)
   LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0);
   LLVMTypeRef i8 = LLVMInt8TypeInContext(C);
   LLVMTypeRef i64 = LLVMInt64TypeInContext(C);
-  LLVMTypeRef immarg = LLVMInt1TypeInContext(C);
-  LLVMTypeRef param_tys[] = {ptr, i8, i64, immarg};
+  LLVMTypeRef i1 = LLVMInt1TypeInContext(C);
+  LLVMTypeRef void_ty = LLVMVoidTypeInContext(C);
+
+  LLVMTypeRef memset_param_tys[] = {ptr, i8, i64, i1};
+
   llvm_memset_declare_ty =
-      LLVMFunctionType(LLVMVoidTypeInContext(C), param_tys, 4, false);
+      LLVMFunctionType(void_ty, memset_param_tys, 4, false);
 
   llvm_memset_declare =
       LLVMAddFunction(M, "llvm.memset.p0.i64", llvm_memset_declare_ty);
+
+  // declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+  LLVMTypeRef memcpy_param_tys[] = {ptr, ptr, i64, i1};
+
+  llvm_memcpy_declare_ty =
+      LLVMFunctionType(void_ty, memcpy_param_tys, 4, false);
+  llvm_memcpy_declare =
+      LLVMAddFunction(M, "llvm.memcpy.p0.p0.i64", llvm_memcpy_declare_ty);
 }
 
 void codegen(Obj *prog, FILE *out) {
