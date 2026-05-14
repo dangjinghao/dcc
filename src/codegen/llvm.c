@@ -194,7 +194,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
       assert(ty->base);
       LLVMTypeRef pointee_ty = type_convert(ty->base);
       LLVMValueRef indices =
-          LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, false);
+          LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val / ty->base->size, false);
       init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
     } else {
       // int family
