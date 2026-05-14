@@ -69,6 +69,7 @@ Token *skip(Token *tok, char *op);
 
 noreturn void error(char *fmt, ...);
 noreturn void error_tok(Token *tok, char *fmt, ...);
+noreturn void error_at(char *loc, char *fmt, ...);
 void warn_tok(Token *tok, char *fmt, ...);
 
 Token *tokenize_file(char *path);
@@ -413,4 +414,13 @@ void hashmap_delete2(HashMap *map, char *key, int keylen);
 void hashmap_destroy(HashMap *map);
 void hashmap_clear(HashMap *map);
 
+//
+/// unicode.c
+//
+
+bool is_ident2(uint32_t c);
+bool is_ident1(uint32_t c);
+int utf8_encode(char *buf, uint32_t code_point);
+uint32_t utf8_decode(char **new_pos, char *p);
+int display_width(char *p, int len);
 #endif

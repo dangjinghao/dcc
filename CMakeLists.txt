@@ -21,6 +21,7 @@ add_library(dcc_core STATIC src/tokenizer.c
                         src/strings.c
                         src/type.c
                         src/hashmap.c
+                        src/unicode.c
                         )
 
 add_executable(dcc)
