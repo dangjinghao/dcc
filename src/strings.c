@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // Takes a printf-style format string and returns a formatted string.
 char *format(char *fmt, ...) {
@@ -18,7 +19,7 @@ char *format(char *fmt, ...) {
   return buf;
 }
 
-char *visual_data(char *s, size_t len) {
+char *visual_bytes(char *s, size_t len) {
   if (len == 0) {
     return "(null)";
   }
@@ -37,4 +38,20 @@ char *visual_data(char *s, size_t len) {
   fflush(out);
   fclose(out);
   return buf;
+}
+
+void strarray_push(StringArray *arr, char *s) {
+  if (!arr->data) {
+    arr->data = calloc(8, sizeof(char *));
+    arr->capacity = 8;
+  }
+
+  if (arr->capacity == arr->len) {
+    arr->data = realloc(arr->data, sizeof(char *) * arr->capacity * 2);
+    arr->capacity *= 2;
+    for (int i = arr->len; i < arr->capacity; i++)
+      arr->data[i] = NULL;
+  }
+
+  arr->data[arr->len++] = s;
 }

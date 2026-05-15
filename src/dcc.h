@@ -404,9 +404,15 @@ void codegen(Obj *prog, FILE *out);
 /// strings.c
 //
 
-char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
-char *visual_data(char *s, size_t len);
+typedef struct {
+  char **data;
+  int capacity;
+  int len;
+} StringArray;
 
+char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
+char *visual_bytes(char *s, size_t len);
+void strarray_push(StringArray *arr, char *s);
 //
 /// hashmap.c
 //
