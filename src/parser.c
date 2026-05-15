@@ -2396,11 +2396,11 @@ static Node *unary(Token **rest, Token *tok) {
 
   // Read ++i as i+=1
   if (equal(tok, "++"))
-    return new_binary(ND_SA_ADD, unary(rest, tok->next), new_num(1, tok), tok);
+    return new_add(unary(rest, tok->next), new_num(1, tok), tok, true);
 
   // Read --i as i-=1
   if (equal(tok, "--"))
-    return new_binary(ND_SA_SUB, unary(rest, tok->next), new_num(1, tok), tok);
+    return new_sub(unary(rest, tok->next), new_num(1, tok), tok, true);
 
   // [GNU] labels-as-values
   if (equal(tok, "&&")) {
@@ -2662,10 +2662,9 @@ static Node *struct_ref(Node *node, Token *tok) {
 // Convert A++ to `(typeof A)((A += 1) - 1)`
 static Node *new_inc_dec(Node *node, Token *tok, int addend) {
   add_type(node);
-  return new_cast(
-      new_add(new_binary(ND_SA_ADD, node, new_num(addend, tok), tok),
-              new_num(-addend, tok), tok, true),
-      node->ty);
+  return new_cast(new_add(new_add(node, new_num(addend, tok), tok, true),
+                          new_num(-addend, tok), tok, false),
+                  node->ty);
 }
 
 // postfix = "(" type-name ")" "{" initializer-list "}"
