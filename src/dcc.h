@@ -447,4 +447,14 @@ bool is_ident1(uint32_t c);
 int utf8_encode(char *buf, uint32_t code_point);
 uint32_t utf8_decode(char **new_pos, char *p);
 int display_width(char *p, int len);
+
+//
+/// args.c
+//
+
+void parse_args(int argc, char **argv);
+extern bool opt_cc1;
+extern char *opt_cc1_output;
+extern char *opt_cc1_input;
+extern bool opt_ir;
 #endif

@@ -26,7 +26,9 @@ add_library(dcc_core STATIC src/tokenizer.c
 
 add_executable(dcc)
 target_link_libraries(dcc PRIVATE dcc_core)
-target_sources(dcc PRIVATE src/main.c)
+target_sources(dcc PRIVATE src/main.c
+                        src/args.c
+                        )
 
 # tools
 add_executable(astrepr)
