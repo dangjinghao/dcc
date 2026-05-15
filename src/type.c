@@ -397,6 +397,8 @@ void add_type(Node *node) {
   case ND_SA_BITXOR:
   case ND_SA_SHL:
   case ND_SA_SHR:
+    if (node->rhs->ty->kind == TY_VOID)
+      error_tok(node->tok, "assign variable with incomplete type: void");
     if (node->lhs->ty->kind == TY_ARRAY)
       error_tok(node->lhs->tok, "not an lvalue");
     /* For struct assignment, we should eventually check type compatibility

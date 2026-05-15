@@ -454,7 +454,7 @@ static int cast_table[12][12] = {
 
 static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
   if (to->kind == TY_VOID) {
-    error_tok(tok, "It's not allowed convert type to void");
+    return v;
   }
 
   int from_id = getTypeId(from);
@@ -681,6 +681,11 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_merge);
+    // ternary operator returns void, e.g.
+    // 1 ? -2 : (void)-1;
+    if (node->ty->kind == TY_VOID) {
+      return NULL;
+    }
     LLVMValueRef phi =
         LLVMBuildPhi(B, type_convert(node->ty), "cond_merge_phi");
     LLVMAddIncoming(phi, (LLVMValueRef[]){then_v, else_v},
