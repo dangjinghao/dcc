@@ -3203,27 +3203,6 @@ Obj *parse(Token *tok) {
     // Global variable
     tok = global_variable(tok, basety, &attr);
   }
-  Obj *reversed_globals = reverse_objs(globals);
-  // reverse all locals in every function
-  for (Obj *v = reversed_globals; v; v = v->next) {
-    if (v->is_function) {
-      if (v->locals) {
-        v->locals = reverse_objs(v->locals);
-      }
-    }
-  }
-  return reversed_globals;
-}
 
-Obj *reverse_objs(Obj *head) {
-  Obj *prev = NULL;
-  Obj *curr = head;
-  Obj *next = NULL;
-  while (curr != NULL) {
-    next = curr->next;
-    curr->next = prev;
-    prev = curr;
-    curr = next;
-  }
-  return prev;
+  return globals;
 }

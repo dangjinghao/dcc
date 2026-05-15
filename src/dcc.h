@@ -390,7 +390,6 @@ Obj *parse(Token *tok);
 int64_t eval(Node *node);
 int64_t eval2(Node *node, char ***label);
 double eval_double(Node *node);
-Obj *reverse_objs(Obj *head);
 
 //
 // codegen
