@@ -357,8 +357,11 @@ struct Obj {
 
   // Function
   bool is_inline;
-  Obj *params;
+  Obj *params; // positive order
   Node *body;
+  // locals is special. the local variables are reversed order but the param
+  // variables are positive ordered. Both of them are stored in this variable
+  // [local var new] -- [local var old] [param old] -- [param new]
   Obj *locals;
 };
 

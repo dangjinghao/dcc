@@ -1234,9 +1234,9 @@ static LLVMValueRef declare_agg_function(Obj *var) {
   return func;
 }
 
-static void codegen_alloca_function_local_argument(Obj *var) {
+static void codegen_alloca_function_local_argument(Obj *args) {
   size_t args_count = 0;
-  for (Obj *p = var->params; p; p = p->next) {
+  for (Obj *p = args; p; p = p->next) {
     LLVMValueRef arg_vr = NULL;
     LLVMValueRef arg = LLVMGetParam(F, args_count);
     if (is_agg_type(p->ty)) {
@@ -1261,13 +1261,16 @@ static void codegen_alloca_function_local_argument(Obj *var) {
   }
 }
 
-static void codegen_alloca_function_local_variable(Obj *var) {
-  for (Obj *v = var->locals; v; v = v->next) {
-    if (v->codegen_data)
-      continue;
-    LLVMValueRef lv = LLVMBuildAlloca(B, type_convert(v->ty), v->name);
-    v->codegen_data = (intptr_t)lv;
-  }
+// Recurisvely declare them in reversed order, so that the codegen result will
+// keep a same order as source code
+static void codegen_alloca_function_local_variable(Obj *local_vars) {
+
+  if ((!local_vars) || local_vars->codegen_data)
+    return;
+  codegen_alloca_function_local_variable(local_vars->next);
+  LLVMValueRef lv =
+      LLVMBuildAlloca(B, type_convert(local_vars->ty), local_vars->name);
+  local_vars->codegen_data = (intptr_t)lv;
 }
 
 static void codegen_build_function_default_return(Obj *var) {
@@ -1281,41 +1284,45 @@ static void codegen_build_function_default_return(Obj *var) {
   }
 }
 
-static void codegen_build_function_body(Obj *var) {
-  F = (LLVMValueRef)var->codegen_data;
+static void codegen_build_function_body(Obj *fn) {
+  F = (LLVMValueRef)fn->codegen_data;
   assert(F);
   // prologue
   LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
   LLVMPositionBuilderAtEnd(B, entry);
-  codegen_alloca_function_local_argument(var);
-  codegen_alloca_function_local_variable(var);
-  gen_stmt(var->body);
-  codegen_build_function_default_return(var);
+  codegen_alloca_function_local_argument(fn->params);
+  codegen_alloca_function_local_variable(fn->locals);
+  gen_stmt(fn->body);
+  codegen_build_function_default_return(fn);
   F = NULL;
   hashmap_clear(&func_labels);
 }
 
 // stage 1. Only declare global variable to avoid dependency order
 // problem.
-static void codegen_global_declare(Obj *prog) {
-  for (Obj *var = prog; var; var = var->next) {
-    LLVMValueRef vr = NULL;
-    if (var->is_function) {
-      if (is_function_agg_declare(var)) {
-        // So here we should not use the type_convert to build llvm function
-        // declaration because we can't use it to solve agg param/return type
-        vr = declare_agg_function(var);
-      } else {
-        LLVMTypeRef ty = type_convert(var->ty);
-        vr = LLVMAddFunction(M, var->name, ty);
-      }
+// Recurisvely declare them in reversed order, so that the codegen result will
+// keep a same order as source code
+static void codegen_global_declare(Obj *var) {
+  if (!var) {
+    return;
+  }
+  codegen_global_declare(var->next);
+  LLVMValueRef vr = NULL;
+  if (var->is_function) {
+    if (is_function_agg_declare(var)) {
+      // So here we should not use the type_convert to build llvm function
+      // declaration because we can't use it to solve agg param/return type
+      vr = declare_agg_function(var);
     } else {
       LLVMTypeRef ty = type_convert(var->ty);
-      vr = LLVMAddGlobal(M, ty, var->name);
+      vr = LLVMAddFunction(M, var->name, ty);
     }
-    llvm_set_value_attr(var, vr);
-    var->codegen_data = (intptr_t)vr;
+  } else {
+    LLVMTypeRef ty = type_convert(var->ty);
+    vr = LLVMAddGlobal(M, ty, var->name);
   }
+  llvm_set_value_attr(var, vr);
+  var->codegen_data = (intptr_t)vr;
 }
 
 // stage 2. initialize global variable
