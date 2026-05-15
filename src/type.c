@@ -227,8 +227,9 @@ static Type *type_integer_promotion(Type *ty) {
 
 static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
 
-  assert(t1->kind != TY_PTR);
-
+  if (t1->kind == TY_PTR || t2->kind == TY_PTR) {
+    return ty_ulong;
+  }
   if (t1->kind == TY_FUNC)
     return pointer_to(t1);
   if (t2->kind == TY_FUNC)
