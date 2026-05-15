@@ -454,7 +454,9 @@ int display_width(char *p, int len);
 
 void parse_args(int argc, char **argv);
 extern bool opt_cc1;
+extern bool opt_hash_hash_hash;
 extern char *opt_cc1_output;
 extern char *opt_cc1_input;
 extern bool opt_ir;
+extern StringArray opt_input_paths;
 #endif
