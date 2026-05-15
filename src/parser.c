@@ -104,8 +104,8 @@ static Node *equality(Token **rest, Token *tok);
 static Node *relational(Token **rest, Token *tok);
 static Node *shift(Token **rest, Token *tok);
 static Node *add(Token **rest, Token *tok);
-static Node *new_add(Node *lhs, Node *rhs, Token *tok);
-static Node *new_sub(Node *lhs, Node *rhs, Token *tok);
+static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign);
+static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign);
 static Node *mul(Token **rest, Token *tok);
 static Node *cast(Token **rest, Token *tok);
 static Member *get_struct_member(Type *ty, Token *tok);
@@ -1350,7 +1350,7 @@ static Node *init_desg_expr(InitDesg *desg, Token *tok) {
 
   Node *lhs = init_desg_expr(desg->next, tok);
   Node *rhs = new_num(desg->idx, tok);
-  return new_unary(ND_DEREF, new_add(lhs, rhs, tok), tok);
+  return new_unary(ND_DEREF, new_add(lhs, rhs, tok, false), tok);
 }
 
 static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg,
@@ -1979,114 +1979,6 @@ double eval_double(Node *node) {
   error_tok(node->tok, "not a compile-time constant");
 }
 
-// Convert op= operators to expressions containing an assignment.
-//
-// In general, `A op= C` is converted to `tmp = &A, *tmp = *tmp op B`.
-// However, if a given expression is of form `A.x op= C`, the input is
-// converted to `tmp = &A, (*tmp).x = (*tmp).x op C` to handle assignments
-// to bitfields.
-static Node *to_assign(Node *binary) {
-  add_type(binary->lhs);
-  add_type(binary->rhs);
-  Token *tok = binary->tok;
-
-  // Convert `A.x op= C` to `tmp = &A, (*tmp).x = (*tmp).x op C`.
-  if (binary->lhs->kind == ND_MEMBER) {
-    Obj *var = new_lvar("", pointer_to(binary->lhs->lhs->ty));
-
-    Node *expr1 = new_binary(ND_ASSIGN, new_var_node(var, tok),
-                             new_unary(ND_ADDR, binary->lhs->lhs, tok), tok);
-
-    Node *expr2 = new_unary(
-        ND_MEMBER, new_unary(ND_DEREF, new_var_node(var, tok), tok), tok);
-    expr2->member = binary->lhs->member;
-
-    Node *expr3 = new_unary(
-        ND_MEMBER, new_unary(ND_DEREF, new_var_node(var, tok), tok), tok);
-    expr3->member = binary->lhs->member;
-
-    Node *expr4 =
-        new_binary(ND_ASSIGN, expr2,
-                   new_binary(binary->kind, expr3, binary->rhs, tok), tok);
-
-    return new_binary(ND_COMMA, expr1, expr4, tok);
-  }
-
-  // If A is an atomic type, Convert `A op= B` to
-  //
-  // ({
-  //   T1 *addr = &A; T2 val = (B); T1 old = *addr; T1 new;
-  //   do {
-  //    new = old op val;
-  //   } while (!atomic_compare_exchange_strong(addr, &old, new));
-  //   new;
-  // })
-  if (binary->lhs->ty->is_atomic) {
-    Node head = {};
-    Node *cur = &head;
-
-    Obj *addr = new_lvar("", pointer_to(binary->lhs->ty));
-    Obj *val = new_lvar("", binary->rhs->ty);
-    Obj *old = new_lvar("", binary->lhs->ty);
-    Obj *new = new_lvar("", binary->lhs->ty);
-
-    cur = cur->next =
-        new_unary(ND_EXPR_STMT,
-                  new_binary(ND_ASSIGN, new_var_node(addr, tok),
-                             new_unary(ND_ADDR, binary->lhs, tok), tok),
-                  tok);
-
-    cur = cur->next = new_unary(
-        ND_EXPR_STMT,
-        new_binary(ND_ASSIGN, new_var_node(val, tok), binary->rhs, tok), tok);
-
-    cur = cur->next = new_unary(
-        ND_EXPR_STMT,
-        new_binary(ND_ASSIGN, new_var_node(old, tok),
-                   new_unary(ND_DEREF, new_var_node(addr, tok), tok), tok),
-        tok);
-
-    Node *loop = new_node(ND_DO, tok);
-    loop->break_label = new_unique_name();
-    loop->cont_label = new_unique_name();
-
-    Node *body = new_binary(ND_ASSIGN, new_var_node(new, tok),
-                            new_binary(binary->kind, new_var_node(old, tok),
-                                       new_var_node(val, tok), tok),
-                            tok);
-
-    loop->then = new_node(ND_BLOCK, tok);
-    loop->then->body = new_unary(ND_EXPR_STMT, body, tok);
-
-    Node *cas = new_node(ND_CAS, tok);
-    cas->cas_addr = new_var_node(addr, tok);
-    cas->cas_old = new_unary(ND_ADDR, new_var_node(old, tok), tok);
-    cas->cas_new = new_var_node(new, tok);
-    loop->cond = new_unary(ND_NOT, cas, tok);
-
-    cur = cur->next = loop;
-    cur = cur->next = new_unary(ND_EXPR_STMT, new_var_node(new, tok), tok);
-
-    Node *node = new_node(ND_STMT_EXPR, tok);
-    node->body = head.next;
-    return node;
-  }
-
-  // Convert `A op= B` to `tmp = &A, *tmp = *tmp op B`.
-  Obj *var = new_lvar("", pointer_to(binary->lhs->ty));
-
-  Node *expr1 = new_binary(ND_ASSIGN, new_var_node(var, tok),
-                           new_unary(ND_ADDR, binary->lhs, tok), tok);
-
-  Node *expr2 = new_binary(
-      ND_ASSIGN, new_unary(ND_DEREF, new_var_node(var, tok), tok),
-      new_binary(binary->kind, new_unary(ND_DEREF, new_var_node(var, tok), tok),
-                 binary->rhs, tok),
-      tok);
-
-  return new_binary(ND_COMMA, expr1, expr2, tok);
-}
-
 // assign    = conditional (assign-op assign)?
 // assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^="
 //           | "<<=" | ">>="
@@ -2097,34 +1989,34 @@ static Node *assign(Token **rest, Token *tok) {
     return new_binary(ND_ASSIGN, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "+="))
-    return to_assign(new_add(node, assign(rest, tok->next), tok));
+    return new_add(node, assign(rest, tok->next), tok, true);
 
   if (equal(tok, "-="))
-    return to_assign(new_sub(node, assign(rest, tok->next), tok));
+    return new_sub(node, assign(rest, tok->next), tok, true);
 
   if (equal(tok, "*="))
-    return to_assign(new_binary(ND_MUL, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_MUL, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "/="))
-    return to_assign(new_binary(ND_DIV, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_DIV, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "%="))
-    return to_assign(new_binary(ND_MOD, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_MOD, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "&="))
-    return to_assign(new_binary(ND_BITAND, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_BITAND, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "|="))
-    return to_assign(new_binary(ND_BITOR, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_BITOR, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "^="))
-    return to_assign(new_binary(ND_BITXOR, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_BITXOR, node, assign(rest, tok->next), tok);
 
   if (equal(tok, "<<="))
-    return to_assign(new_binary(ND_SHL, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_SHL, node, assign(rest, tok->next), tok);
 
   if (equal(tok, ">>="))
-    return to_assign(new_binary(ND_SHR, node, assign(rest, tok->next), tok));
+    return new_binary(ND_SA_SHR, node, assign(rest, tok->next), tok);
 
   *rest = tok;
   return node;
@@ -2295,13 +2187,17 @@ static Node *shift(Token **rest, Token *tok) {
 // so that p+n points to the location n elements (not bytes) ahead of p.
 // In other words, we need to scale an integer value before adding to a
 // pointer value. This function takes care of the scaling.
-static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
+static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
   add_type(lhs);
   add_type(rhs);
 
   // num + num
-  if (is_numeric(lhs->ty) && is_numeric(rhs->ty))
-    return new_binary(ND_ADD, lhs, rhs, tok);
+  if (is_numeric(lhs->ty) && is_numeric(rhs->ty)) {
+    NodeKind k = ND_ADD;
+    if (self_assign)
+      k = ND_SA_ADD;
+    return new_binary(k, lhs, rhs, tok);
+  }
 
   // ptr + ptr
   if (lhs->ty->base && rhs->ty->base)
@@ -2309,6 +2205,8 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
 
   // Canonicalize `num + ptr` to `ptr + num`.
   if (!lhs->ty->base && rhs->ty->base) {
+    if (self_assign)
+      error_tok(tok, "it's not allowed to use <num> += <ptr>");
     Node *tmp = lhs;
     lhs = rhs;
     rhs = tmp;
@@ -2316,30 +2214,43 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
 
   // VLA + num
   if (lhs->ty->base->kind == TY_VLA) {
+    if (self_assign)
+      error_tok(tok, "it's not allowed to use <VLA> += <num>");
     rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
                      tok);
     return new_binary(ND_ADD, lhs, rhs, tok);
   }
 
-  // ptr + num
-  Type *ptr_ty = array_degrad(lhs->ty);
-  lhs = new_cast(lhs, ptr_ty);
-  // we should not add_type here because the caller maybe to_assign and it needs
-  // the binary style
-  return new_binary(ND_PTR_ADD, lhs, rhs, tok);
+  if (self_assign) {
+    // ptr += num
+    return new_binary(ND_SA_PTR_ADD, lhs, rhs, tok);
+  } else {
+    // ptr + num
+    Type *ptr_ty = array_degrad(lhs->ty);
+    lhs = new_cast(lhs, ptr_ty);
+
+    return new_binary(ND_PTR_ADD, lhs, rhs, tok);
+  }
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
-static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
+static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
   add_type(lhs);
   add_type(rhs);
 
   // num - num
-  if (is_numeric(lhs->ty) && is_numeric(rhs->ty))
-    return new_binary(ND_SUB, lhs, rhs, tok);
+  if (is_numeric(lhs->ty) && is_numeric(rhs->ty)) {
+    NodeKind k = ND_SUB;
+    if (self_assign)
+      k = ND_SA_SUB;
+    return new_binary(k, lhs, rhs, tok);
+  }
 
   // VLA - num
   if (lhs->ty->base->kind == TY_VLA) {
+    if (self_assign)
+      error_tok(tok, "it's not allowed to use <VLA> -= <num>");
+
     rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
                      tok);
     add_type(rhs);
@@ -2350,6 +2261,9 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
 
   // ptr - num
   if (lhs->ty->base && is_integer(rhs->ty)) {
+    if (self_assign) {
+      return new_binary(ND_SA_PTR_SUB, lhs, rhs, tok);
+    }
     // typeof(ptr)((ulong)ptr - <extracted-num>)
     Type *ptr_ty = array_degrad(lhs->ty);
     lhs = new_cast(lhs, ptr_ty);
@@ -2360,6 +2274,8 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
 
   // ptr - ptr, which returns how many elements are between the two.
   if (lhs->ty->base && rhs->ty->base) {
+    if (self_assign)
+      error_tok(tok, "it's not allowed to use <ptr> -= <ptr>");
     // (long)(((ulong)ptr - (ulong)ptr) / <base-size>)
     Type *ptr_ty = lhs->ty;
     lhs = new_cast(lhs, ty_ulong);
@@ -2380,12 +2296,12 @@ static Node *add(Token **rest, Token *tok) {
     Token *start = tok;
 
     if (equal(tok, "+")) {
-      node = new_add(node, mul(&tok, tok->next), start);
+      node = new_add(node, mul(&tok, tok->next), start, false);
       continue;
     }
 
     if (equal(tok, "-")) {
-      node = new_sub(node, mul(&tok, tok->next), start);
+      node = new_sub(node, mul(&tok, tok->next), start, false);
       continue;
     }
 
@@ -2480,11 +2396,11 @@ static Node *unary(Token **rest, Token *tok) {
 
   // Read ++i as i+=1
   if (equal(tok, "++"))
-    return to_assign(new_add(unary(rest, tok->next), new_num(1, tok), tok));
+    return new_binary(ND_SA_ADD, unary(rest, tok->next), new_num(1, tok), tok);
 
   // Read --i as i-=1
   if (equal(tok, "--"))
-    return to_assign(new_sub(unary(rest, tok->next), new_num(1, tok), tok));
+    return new_binary(ND_SA_SUB, unary(rest, tok->next), new_num(1, tok), tok);
 
   // [GNU] labels-as-values
   if (equal(tok, "&&")) {
@@ -2746,9 +2662,10 @@ static Node *struct_ref(Node *node, Token *tok) {
 // Convert A++ to `(typeof A)((A += 1) - 1)`
 static Node *new_inc_dec(Node *node, Token *tok, int addend) {
   add_type(node);
-  return new_cast(new_add(to_assign(new_add(node, new_num(addend, tok), tok)),
-                          new_num(-addend, tok), tok),
-                  node->ty);
+  return new_cast(
+      new_add(new_binary(ND_SA_ADD, node, new_num(addend, tok), tok),
+              new_num(-addend, tok), tok, true),
+      node->ty);
 }
 
 // postfix = "(" type-name ")" "{" initializer-list "}"
@@ -2793,7 +2710,7 @@ static Node *postfix(Token **rest, Token *tok) {
       Token *start = tok;
       Node *idx = expr(&tok, tok->next);
       tok = skip(tok, "]");
-      node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+      node = new_unary(ND_DEREF, new_add(node, idx, start, false), start);
       continue;
     }
 

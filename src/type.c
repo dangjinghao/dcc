@@ -379,7 +379,24 @@ void add_type(Node *node) {
     node->ty = node->lhs->ty;
     return;
   }
+  case ND_SA_PTR_SUB:
+  case ND_SA_PTR_ADD: {
+    if (node->lhs->ty->kind == TY_ARRAY)
+      error_tok(node->lhs->tok, "not an lvalue");
+    node->ty = node->lhs->ty;
+    return;
+  }
   case ND_ASSIGN:
+  case ND_SA_ADD:
+  case ND_SA_SUB:
+  case ND_SA_MUL:
+  case ND_SA_DIV:
+  case ND_SA_MOD:
+  case ND_SA_BITAND:
+  case ND_SA_BITOR:
+  case ND_SA_BITXOR:
+  case ND_SA_SHL:
+  case ND_SA_SHR:
     if (node->lhs->ty->kind == TY_ARRAY)
       error_tok(node->lhs->tok, "not an lvalue");
     /* For struct assignment, we should eventually check type compatibility
