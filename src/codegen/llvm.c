@@ -22,6 +22,9 @@ static LLVMTypeRef llvm_memset_declare_ty;
 static LLVMValueRef llvm_memcpy_declare;
 static LLVMTypeRef llvm_memcpy_declare_ty;
 
+static LLVMValueRef cmp_nz(LLVMValueRef v);
+static LLVMValueRef cmp_ez(LLVMValueRef v);
+
 static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
                          LLVMValueRef is_volatile) {
   LLVMBuildCall2(B, llvm_memset_declare_ty, llvm_memset_declare,
@@ -456,7 +459,11 @@ static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
   if (to->kind == TY_VOID) {
     return v;
   }
-
+  if (to->kind == TY_BOOL) {
+    // special case: (bool)x -> (char)!!x
+    v = cmp_nz(v);
+    return LLVMBuildCast(B, LLVMZExt, v, type_convert(to), "cast_bool");
+  }
   int from_id = getTypeId(from);
   int to_id = getTypeId(to);
   int op = cast_table[from_id][to_id];
