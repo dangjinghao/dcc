@@ -911,8 +911,8 @@ static LLVMValueRef gen_expr(Node *node) {
       tmp_v = LLVMBuildFAdd(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
                             "sa_fadd");
     } else {
-      tmp_v =
-          LLVMBuildAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_add");
+      tmp_v = LLVMBuildAdd(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                           "sa_add");
     }
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
@@ -943,8 +943,8 @@ static LLVMValueRef gen_expr(Node *node) {
       tmp_v = LLVMBuildFSub(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
                             "sa_fsub");
     } else {
-      tmp_v =
-          LLVMBuildSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_sub");
+      tmp_v = LLVMBuildSub(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                           "sa_sub");
     }
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
@@ -956,8 +956,8 @@ static LLVMValueRef gen_expr(Node *node) {
       tmp_v = LLVMBuildFMul(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
                             "sa_fmul");
     } else {
-      tmp_v =
-          LLVMBuildMul(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_mul");
+      tmp_v = LLVMBuildMul(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                           "sa_mul");
     }
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
@@ -969,11 +969,11 @@ static LLVMValueRef gen_expr(Node *node) {
       tmp_v = LLVMBuildFDiv(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
                             "sa_fdiv");
     } else if (node->lhs->ty->is_unsigned) {
-      tmp_v =
-          LLVMBuildUDiv(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_udiv");
+      tmp_v = LLVMBuildUDiv(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                            "sa_udiv");
     } else {
-      tmp_v =
-          LLVMBuildSDiv(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_sdiv");
+      tmp_v = LLVMBuildSDiv(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                            "sa_sdiv");
     }
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
@@ -983,40 +983,40 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef tmp_v = NULL;
 
     if (node->lhs->ty->is_unsigned) {
-      tmp_v =
-          LLVMBuildURem(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_urem");
+      tmp_v = LLVMBuildURem(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                            "sa_urem");
     } else {
-      tmp_v =
-          LLVMBuildSRem(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_srem");
+      tmp_v = LLVMBuildSRem(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                            "sa_srem");
     }
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
   case ND_SA_BITAND: {
     LLVMValueRef ptr = gen_addr(node->lhs);
-    LLVMValueRef tmp_v =
-        LLVMBuildAnd(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_bitand");
+    LLVMValueRef tmp_v = LLVMBuildAnd(B, load(node->lhs->ty, ptr),
+                                      gen_expr(node->rhs), "sa_bitand");
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
   case ND_SA_BITOR: {
     LLVMValueRef ptr = gen_addr(node->lhs);
-    LLVMValueRef tmp_v =
-        LLVMBuildOr(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_bitor");
+    LLVMValueRef tmp_v = LLVMBuildOr(B, load(node->lhs->ty, ptr),
+                                     gen_expr(node->rhs), "sa_bitor");
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
   case ND_SA_BITXOR: {
     LLVMValueRef ptr = gen_addr(node->lhs);
-    LLVMValueRef tmp_v =
-        LLVMBuildXor(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_bitxor");
+    LLVMValueRef tmp_v = LLVMBuildXor(B, load(node->lhs->ty, ptr),
+                                      gen_expr(node->rhs), "sa_bitxor");
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
   case ND_SA_SHL: {
     LLVMValueRef ptr = gen_addr(node->lhs);
-    LLVMValueRef tmp_v =
-        LLVMBuildShl(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_shl");
+    LLVMValueRef tmp_v = LLVMBuildShl(B, load(node->lhs->ty, ptr),
+                                      gen_expr(node->rhs), "sa_shl");
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
@@ -1024,11 +1024,11 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef tmp_v = NULL;
     if (node->lhs->ty->is_unsigned) {
-      tmp_v =
-          LLVMBuildLShr(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_lshr");
+      tmp_v = LLVMBuildLShr(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                            "sa_lshr");
     } else {
-      tmp_v =
-          LLVMBuildAShr(B, gen_expr(node->lhs), gen_expr(node->rhs), "sa_ashr");
+      tmp_v = LLVMBuildAShr(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
+                            "sa_ashr");
     }
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
