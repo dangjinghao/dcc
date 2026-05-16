@@ -124,6 +124,14 @@ static int read_punct(char *p) {
   return ispunct(*p) ? 1 : 0;
 }
 
+static int from_hex(char c) {
+  if ('0' <= c && c <= '9')
+    return c - '0';
+  if ('a' <= c && c <= 'f')
+    return c - 'a' + 10;
+  return c - 'A' + 10;
+}
+
 #define isodigit(c) ('0' <= (c) && (c) <= '7')
 
 // Read the escaped char after `\`
@@ -134,14 +142,28 @@ static int read_punct(char *p) {
 static int read_escaped_char(char *p, char **new_pos) {
 
   if (isodigit(*p)) {
-    long v = strtol(p, new_pos, 8);
-    return (int)v;
+    // Read an octal number.
+    int c = *p++ - '0';
+    if (isodigit(*p)) {
+      c = (c << 3) + (*p++ - '0');
+      if (isodigit(*p))
+        c = (c << 3) + (*p++ - '0');
+    }
+    *new_pos = p;
+    return c;
   }
 
   if (*p == 'x') {
-    p += 1;
-    long v = strtol(p, new_pos, 16);
-    return (int)v;
+    // Read a hexadecimal number.
+    p++;
+    if (!isxdigit(*p))
+      error_at(p, "invalid hex escape sequence");
+
+    int c = 0;
+    for (; isxdigit(*p); p++)
+      c = (c << 4) + from_hex(*p);
+    *new_pos = p;
+    return c;
   }
 
   *new_pos = p + 1;
@@ -279,14 +301,6 @@ static Token *read_char_literal(char *start, char *quote, Type *ty) {
   tok->val = c;
   tok->ty = ty;
   return tok;
-}
-
-static int from_hex(char c) {
-  if ('0' <= c && c <= '9')
-    return c - '0';
-  if ('a' <= c && c <= 'f')
-    return c - 'a' + 10;
-  return c - 'A' + 10;
 }
 
 static uint32_t read_universal_char(char *p, int len) {
