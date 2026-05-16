@@ -1173,6 +1173,7 @@ static LLVMValueRef gen_stmt(Node *node) {
   case ND_CASE:
   case ND_GOTO_EXPR:
   case ND_ASM:
+    todo_impl("switch, case, goto_expr, asm");
   default:
     unreachable();
   }

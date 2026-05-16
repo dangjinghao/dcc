@@ -456,7 +456,7 @@ static char *read_file(char *path) {
     // By convention, read from stdin if a given filename is "-".
     fp = stdin;
   } else {
-    fp = fopen(path, "r");
+    fp = fopen(path, "rb");
     if (!fp)
       return NULL;
   }

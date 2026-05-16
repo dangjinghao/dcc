@@ -16,7 +16,7 @@ void *memset(void *s, int c, long n);
 
 static inline void assert(int expected, int actual, char *code) {
   if (expected != actual) {
-    printf("assert failed: %s\n", code);
+    printf("%s => %d expected but got %d\n", code, expected, actual);
     exit(1);
   }
 }
