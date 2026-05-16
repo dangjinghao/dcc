@@ -62,8 +62,10 @@ void path_cp(char *dst, char *src) {
     error("fopen %s: %s", dst, strerror(errno));
   }
   path_fcp(fdst, fsrc);
-  fclose(fdst);
-  fclose(fsrc);
+  if (fdst != stdout)
+    fclose(fdst);
+  if (fsrc != stdin)
+    fclose(fsrc);
 }
 
 char *path_new_replaced_suffix(char *path, char *suffix) {
