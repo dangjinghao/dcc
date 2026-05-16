@@ -193,14 +193,13 @@ static void run_linker(StringArray *inputs, char *output) {
   }
 
   strarray_push(&arr, format("-L%s", gcc_libpath));
-  strarray_push(&arr, "-L/usr/lib/x86_64-linux-gnu");
   strarray_push(&arr, "-L/usr/lib64");
-  strarray_push(&arr, "-L/lib64");
+  // strarray_push(&arr, "-L/lib64");
   strarray_push(&arr, "-L/usr/lib/x86_64-linux-gnu");
   strarray_push(&arr, "-L/usr/lib/x86_64-pc-linux-gnu");
   strarray_push(&arr, "-L/usr/lib/x86_64-redhat-linux");
   strarray_push(&arr, "-L/usr/lib");
-  strarray_push(&arr, "-L/lib");
+  // strarray_push(&arr, "-L/lib");
 
   if (!opt_static) {
     strarray_push(&arr, "-dynamic-linker");
