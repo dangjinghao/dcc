@@ -413,6 +413,8 @@ typedef struct {
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
 char *visual_bytes(char *s, size_t len);
 void strarray_push(StringArray *arr, char *s);
+void strarray_push_batch(StringArray *arr, char **append_array);
+void strarray_push_batch2(StringArray *arr, StringArray *append_array);
 
 //
 /// hashmap.c
