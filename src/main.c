@@ -53,22 +53,11 @@ static void run_cc1(char *input, char *output, StringArray *args) {
 noreturn void cc1() {
   Token *tokens = tokenize_file(opt_cc1_input);
   Obj *ast = parse(tokens);
-  char *ir_tmp_path = path_new_tmpfile();
-  FILE *ir_file = fopen(ir_tmp_path, "wb");
+  FILE *output_file = fopen(opt_cc1_output, "wb");
 
-  codegen(ast, ir_file);
+  codegen(ast, output_file, !opt_ir);
 
-  fclose(ir_file);
-  ir_file = NULL;
-
-  if (opt_ir) {
-    path_cp(opt_cc1_output, ir_tmp_path);
-    exit(0);
-  }
-
-  char *args[] = {"llc", "-o", opt_cc1_output, ir_tmp_path, NULL};
-  run_subprocess(args);
-
+  fclose(output_file);
   exit(0);
 }
 

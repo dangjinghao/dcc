@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Core.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
 #include <llvm-c/Types.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -1405,7 +1407,7 @@ void declare_built_function() {
       LLVMAddFunction(M, "llvm.memcpy.p0.p0.i64", llvm_memcpy_declare_ty);
 }
 
-void codegen(Obj *prog, FILE *out) {
+void codegen(Obj *prog, FILE *out, bool gen_asm) {
   C = LLVMContextCreate();
   M = LLVMModuleCreateWithNameInContext(get_current_file()->name, C);
   B = LLVMCreateBuilderInContext(C);
@@ -1415,11 +1417,42 @@ void codegen(Obj *prog, FILE *out) {
   codegen_global_declare(prog);
 
   codegen_global_init(prog);
-  // print to out
-  char *ir = LLVMPrintModuleToString(M);
-  fputs(ir, out);
-  fflush(out);
-  LLVMDisposeMessage(ir);
+
+  if (gen_asm) {
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    char *triple = LLVMGetDefaultTargetTriple();
+
+    LLVMTargetRef target = NULL;
+    char *err = NULL;
+    if (LLVMGetTargetFromTriple(triple, &target, &err)) {
+      error("LLVM backend failed to get target machine from triple: %s", err);
+    }
+
+    LLVMTargetMachineRef T = LLVMCreateTargetMachine(
+        target, triple, "generic", "", LLVMCodeGenLevelDefault,
+        opt_fpic ? LLVMRelocPIC : LLVMRelocStatic, LLVMCodeModelSmall);
+    LLVMMemoryBufferRef asm_output_buffer = NULL;
+    if (LLVMTargetMachineEmitToMemoryBuffer(T, M, LLVMAssemblyFile, &err,
+                                            &asm_output_buffer)) {
+
+      error("LLVM backend failed to emit memory buffer: %s", err);
+    }
+    const char *asm_data = LLVMGetBufferStart(asm_output_buffer);
+    size_t asm_size = LLVMGetBufferSize(asm_output_buffer);
+    fwrite(asm_data, sizeof(char), asm_size, out);
+    fflush(out);
+    LLVMDisposeMemoryBuffer(asm_output_buffer);
+    LLVMDisposeTargetMachine(T);
+    LLVMDisposeMessage(triple);
+  } else {
+    // print IR to out
+    char *ir = LLVMPrintModuleToString(M);
+    fputs(ir, out);
+    fflush(out);
+    LLVMDisposeMessage(ir);
+  }
 
   // cleanup
   LLVMDisposeBuilder(B);

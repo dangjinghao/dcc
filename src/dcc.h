@@ -398,7 +398,7 @@ double eval_double(Node *node);
 // codegen
 //
 
-void codegen(Obj *prog, FILE *out);
+void codegen(Obj *prog, FILE *out,bool gen_asm);
 
 //
 /// strings.c
