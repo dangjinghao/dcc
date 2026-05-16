@@ -28,6 +28,7 @@ add_executable(dcc)
 target_link_libraries(dcc PRIVATE dcc_core)
 target_sources(dcc PRIVATE src/main.c
                         src/args.c
+                        src/pathlib.c
                         )
 
 # tools

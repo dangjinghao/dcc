@@ -413,6 +413,7 @@ typedef struct {
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
 char *visual_bytes(char *s, size_t len);
 void strarray_push(StringArray *arr, char *s);
+
 //
 /// hashmap.c
 //
@@ -454,9 +455,29 @@ int display_width(char *p, int len);
 
 void parse_args(int argc, char **argv);
 extern bool opt_cc1;
+extern bool opt_S;
+extern bool opt_c;
+extern bool opt_E;
 extern bool opt_hash_hash_hash;
 extern char *opt_cc1_output;
 extern char *opt_cc1_input;
+extern char *opt_o;
 extern bool opt_ir;
+extern bool opt_static;
+extern bool opt_shared;
+extern bool opt_fcommon;
 extern StringArray opt_input_paths;
+extern StringArray ld_extra_args;
+
+//
+/// pathlib.c
+//
+
+char *path_new_tmpfile(void);
+void path_fcp(FILE *dst, FILE *src);
+void path_cp(char *dst, char *src);
+char *path_new_replaced_suffix(char *path, char *suffix);
+char *path_find_file(char *pattern);
+bool path_exists(char *path);
+
 #endif

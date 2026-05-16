@@ -1,14 +1,19 @@
 #include "dcc.h"
-#include <libgen.h>
 #include <string.h>
 
-// bool opt_E;              // expand macro
-// bool opt_S;              // generate *.s
-// bool opt_c;              // generate *.o
+StringArray include_paths;
+bool opt_E;              // expand macro
+bool opt_S;              // generate *.s
+bool opt_c;              // generate *.o
 bool opt_hash_hash_hash; // dump the subprocess's command line
 bool opt_ir;             // generate llvm ir file *.ll
+bool opt_static;
+bool opt_shared;
+bool opt_fcommon;
 char *opt_o;
 StringArray opt_input_paths;
+
+StringArray ld_extra_args;
 
 bool opt_cc1; // run in cc1 mode
 char *opt_cc1_input;
@@ -44,6 +49,55 @@ void parse_args(int argc, char **argv) {
 
     if (!strcmp(argv[i], "-ir")) {
       opt_ir = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-S")) {
+      opt_S = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-E")) {
+      opt_E = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-c")) {
+      opt_c = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-static")) {
+      opt_static = true;
+      strarray_push(&ld_extra_args, "-static");
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-shared")) {
+      opt_shared = true;
+      strarray_push(&ld_extra_args, "-shared");
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-L")) {
+      strarray_push(&ld_extra_args, "-L");
+      strarray_push(&ld_extra_args, argv[++i]);
+      continue;
+    }
+
+    if (!strncmp(argv[i], "-L", 2)) {
+      strarray_push(&ld_extra_args, "-L");
+      strarray_push(&ld_extra_args, argv[i] + 2);
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-fcommon")) {
+      opt_fcommon = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-fno-common")) {
+      opt_fcommon = false;
       continue;
     }
 

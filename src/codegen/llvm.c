@@ -217,7 +217,7 @@ static void llvm_set_value_attr(Obj *o, LLVMValueRef v) {
     }
   } else {
     LLVMSetAlignment(v, o->ty->align);
-    if (o->is_tentative) {
+    if (opt_fcommon && o->is_tentative) {
       LLVMSetLinkage(v, LLVMCommonLinkage);
     }
     if (o->is_tls) {
