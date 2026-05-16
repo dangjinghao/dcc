@@ -461,15 +461,19 @@ extern bool opt_S;
 extern bool opt_c;
 extern bool opt_E;
 extern bool opt_hash_hash_hash;
-extern char *opt_cc1_output;
-extern char *opt_cc1_input;
-extern char *opt_o;
 extern bool opt_ir;
 extern bool opt_static;
 extern bool opt_shared;
 extern bool opt_fcommon;
+extern bool opt_fpic; // unused
+
+extern char *opt_cc1_output;
+extern char *opt_cc1_input;
+extern char *opt_o;
+
 extern StringArray opt_input_paths;
-extern StringArray ld_extra_args;
+extern StringArray opt_ld_extra_args;
+extern StringArray opt_cpp_extra_args;
 
 //
 /// pathlib.c

@@ -133,7 +133,13 @@ static void expand_macro(char *input, char *output, char *argv0) {
                   output,
                   input,
                   NULL};
-  run_subprocess(argv);
+
+  StringArray args_full = {};
+
+  strarray_push_batch(&args_full, argv);
+  strarray_push_batch2(&args_full, &opt_cpp_extra_args);
+
+  run_subprocess(args_full.data);
 }
 
 static void assemble(char *input, char *output) {
@@ -201,8 +207,8 @@ static void run_linker(StringArray *inputs, char *output) {
     strarray_push(&arr, "/lib64/ld-linux-x86-64.so.2");
   }
 
-  for (int i = 0; i < ld_extra_args.len; i++)
-    strarray_push(&arr, ld_extra_args.data[i]);
+  for (int i = 0; i < opt_ld_extra_args.len; i++)
+    strarray_push(&arr, opt_ld_extra_args.data[i]);
 
   for (int i = 0; i < inputs->len; i++)
     strarray_push(&arr, inputs->data[i]);
@@ -239,6 +245,10 @@ int main(int argc, char *argv[]) {
     cc1();
     unreachable();
   }
+
+  if (opt_input_paths.len > 1 && opt_o && (opt_c || opt_S | opt_E))
+    error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
+
   StringArray ld_objs = {0};
   for (int i = 0; i < opt_input_paths.len; i++) {
     char *input_file = opt_input_paths.data[i];
@@ -249,7 +259,7 @@ int main(int argc, char *argv[]) {
     expand_macro(input_file, expanded_file, argv[0]);
     if (opt_E) {
       path_cp(opt_o ?: "-", expanded_file);
-      exit(0);
+      continue;
     }
     StringArray args = {0};
     pack_args(argc, argv, &args);
@@ -261,17 +271,22 @@ int main(int argc, char *argv[]) {
       opt_S = true;
     if (opt_S) {
       path_cp(opt_o ?: "-", asm_file);
-      exit(0);
+      continue;
     }
     // generate *.o
     assemble(asm_file, obj_file);
 
     if (opt_c) {
-      path_cp(opt_o ?: path_new_replaced_suffix(input_file, ".o"), obj_file);
-      exit(0);
+      path_cp(
+          opt_o ?: path_new_replaced_suffix(basename(strdup(input_file)), ".o"),
+          obj_file);
+      continue;
     }
 
     strarray_push(&ld_objs, obj_file);
+  }
+  if (opt_E || opt_S || opt_c) {
+    return 0;
   }
   run_linker(&ld_objs, opt_o ?: "a.out");
   return 0;
