@@ -458,7 +458,7 @@ static int cast_table[12][12] = {
 };
 
 static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
-  if (to->kind == TY_VOID) {
+  if (to->kind == TY_VOID || is_agg_type(to)) {
     return v;
   }
   if (to->kind == TY_BOOL) {
@@ -695,8 +695,15 @@ static LLVMValueRef gen_expr(Node *node) {
     if (node->ty->kind == TY_VOID) {
       return NULL;
     }
-    LLVMValueRef phi =
-        LLVMBuildPhi(B, type_convert(node->ty), "cond_merge_phi");
+    LLVMTypeRef phi_ty = NULL;
+    if (is_agg_type(node->ty)) {
+      // the struct value in ternary expression should be treated as ptr.
+      // because it's store as ptr type in LLVM
+      phi_ty = type_convert(pointer_to(node->ty));
+    } else {
+      phi_ty = type_convert(node->ty);
+    }
+    LLVMValueRef phi = LLVMBuildPhi(B, phi_ty, "cond_merge_phi");
     LLVMAddIncoming(phi, (LLVMValueRef[]){then_v, else_v},
                     (LLVMBasicBlockRef[]){bb_then, bb_else}, 2);
     return phi;
