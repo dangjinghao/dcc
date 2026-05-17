@@ -1,4 +1,4 @@
-#define ASSERT(x, y) assert(x, y, #y)
+#define ASSERT(x, y) assert(x, y, __FILE_NAME__, __LINE__, #y)
 
 #define alloca(x) __builtin_alloca(x)
 
@@ -14,9 +14,11 @@ long strlen(char *s);
 void *memcpy(void *dest, void *src, long n);
 void *memset(void *s, int c, long n);
 
-static inline void assert(int expected, int actual, char *code) {
+static inline void assert(int expected, int actual, char *filename, int line,
+                          char *code) {
   if (expected != actual) {
-    printf("%s => %d expected but got %d\n", code, expected, actual);
+    printf("%s:%d, %s => %d expected but got %d\n", filename, line, code,
+           expected, actual);
     exit(1);
   }
 }
