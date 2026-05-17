@@ -526,14 +526,15 @@ static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
     // we can't load them so we just return the ptr
     return ptr;
   }
-  if (pointee_ty->kind == TY_PTR && (pointee_ty->base->kind == TY_FUNC ||
-                                     pointee_ty->base->kind == TY_ARRAY)) {
-    // func and array maybe decay to pointer
-    // we still can't load them so we just return the pointer
-    return ptr;
-  }
 
   return LLVMBuildLoad2(B, type_convert(pointee_ty), ptr, "load");
+}
+
+static LLVMValueRef array_decay(Type *ty, LLVMValueRef ptr) {
+  assert(ty->kind == TY_ARRAY);
+  LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(C), 0, false);
+  return LLVMBuildGEP2(B, type_convert(ty), ptr, (LLVMValueRef[]){zero, zero},
+                       2, "array_decay");
 }
 
 static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
@@ -633,13 +634,24 @@ static LLVMValueRef gen_expr(Node *node) {
     return cast(gen_expr(node->lhs), node->lhs->ty, node->ty, node->tok);
   }
   case ND_VAR: {
-    // Arrays and functions (including string literals) —
-    // gen_addr already returns the pointer value; don't load.
-    if (node->var->ty->kind == TY_ARRAY || node->var->ty->kind == TY_FUNC)
+    if (node->var->ty->kind == TY_ARRAY)
+      return array_decay(node->var->ty, gen_addr(node));
+    if (node->var->ty->kind == TY_FUNC) {
+      // gen_addr already returns the function pointer value; don't load.
       return gen_addr(node);
+    }
     return load(node->ty, gen_addr(node));
   }
   case ND_DEREF: {
+    if (node->lhs->ty->base && node->lhs->ty->base->kind == TY_ARRAY) {
+      LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(C), 0, false);
+      return LLVMBuildGEP2(B, type_convert(node->lhs->ty->base->base),
+                           gen_expr(node->lhs), (LLVMValueRef[]){zero}, 1,
+                           "deref_array");
+    }
+    if (node->lhs->ty->base && node->lhs->ty->base->kind == TY_FUNC) {
+      return gen_expr(node->lhs);
+    }
     return load(node->ty, gen_expr(node->lhs));
   }
   case ND_ADDR: {
@@ -648,7 +660,9 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_MEMBER: {
     // If the member is an array or function — gen_addr already returns
     // the pointer value; don't load.
-    if (node->member->ty->kind == TY_ARRAY || node->member->ty->kind == TY_FUNC)
+    if (node->member->ty->kind == TY_ARRAY)
+      return array_decay(node->member->ty, gen_addr(node));
+    if (node->member->ty->kind == TY_FUNC)
       return gen_addr(node);
     return load(node->ty, gen_addr(node));
   }
