@@ -515,17 +515,24 @@ static LLVMValueRef gen_addr(Node *node) {
 }
 
 static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
+
   switch (pointee_ty->kind) {
   case TY_ARRAY:
+  case TY_FUNC:
+    unreachable();
   case TY_STRUCT:
   case TY_UNION:
-  case TY_FUNC:
   case TY_VLA:
     // we can't load them so we just return the ptr
     return ptr;
-  default:
-    break;
   }
+  if (pointee_ty->kind == TY_PTR && (pointee_ty->base->kind == TY_FUNC ||
+                                     pointee_ty->base->kind == TY_ARRAY)) {
+    // func and array maybe decay to pointer
+    // we still can't load them so we just return the pointer
+    return ptr;
+  }
+
   return LLVMBuildLoad2(B, type_convert(pointee_ty), ptr, "load");
 }
 
@@ -626,6 +633,10 @@ static LLVMValueRef gen_expr(Node *node) {
     return cast(gen_expr(node->lhs), node->lhs->ty, node->ty, node->tok);
   }
   case ND_VAR: {
+    // Arrays and functions (including string literals) —
+    // gen_addr already returns the pointer value; don't load.
+    if (node->var->ty->kind == TY_ARRAY || node->var->ty->kind == TY_FUNC)
+      return gen_addr(node);
     return load(node->ty, gen_addr(node));
   }
   case ND_DEREF: {
@@ -635,6 +646,10 @@ static LLVMValueRef gen_expr(Node *node) {
     return gen_addr(node->lhs);
   }
   case ND_MEMBER: {
+    // If the member is an array or function — gen_addr already returns
+    // the pointer value; don't load.
+    if (node->member->ty->kind == TY_ARRAY || node->member->ty->kind == TY_FUNC)
+      return gen_addr(node);
     return load(node->ty, gen_addr(node));
   }
   case ND_STMT_EXPR: {
@@ -759,14 +774,10 @@ static LLVMValueRef gen_expr(Node *node) {
       }
       args[arg_idx++] = arg_vr;
     }
-    Type *F_ty;
-    if (node->lhs->ty->kind == TY_PTR) {
-      // extract the function type from ponter because LLVM just can recognise
-      // function this in call format
-      F_ty = node->lhs->ty->base;
-    } else {
-      F_ty = node->lhs->ty;
-    }
+    assert(node->lhs->ty->kind == TY_PTR);
+    // extract the function type from ponter because LLVM just can recognise
+    // function this in call format
+    Type *F_ty = node->lhs->ty->base;
     LLVMValueRef r =
         LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count,
                        F_ty->return_ty->kind == TY_VOID ? "" : "funcall");

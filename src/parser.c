@@ -124,23 +124,6 @@ static int align_down(int n, int align) {
   return align_to(n - align + 1, align);
 }
 
-// degrade array type except:
-// - sizeof(arr)
-// - &arr
-// - char arr[] = "hello";
-// - alignof(arr)
-// - typeof(arr)
-// so normally, we should degrade array/ptr(if(ty->base != NULL)) in compute
-// process. And all the pointer operations are located in new_add and new_sub
-static Type *array_degrad(Type *ty) {
-  assert(ty->kind == TY_ARRAY || ty->kind == TY_PTR);
-  if (ty->kind == TY_ARRAY) {
-    Type *nt = pointer_to(ty->base);
-    return nt;
-  }
-  return ty;
-}
-
 static void enter_scope(void) {
   Scope *sc = calloc(1, sizeof(Scope));
   sc->next = scope;
@@ -224,7 +207,7 @@ static Node *new_vla_ptr(Obj *var, Token *tok) {
 }
 
 Node *new_cast(Node *expr, Type *ty) {
-  add_type(expr);
+  add_type(expr, false);
 
   Node *node = calloc(1, sizeof(Node));
   node->kind = ND_CAST;
@@ -621,18 +604,9 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
     ty2 = declarator(&tok, tok, ty2);
 
     Token *name = ty2->name;
+    ty2 = type_decay(ty2);
+    ty2->name = name;
 
-    if (ty2->kind == TY_ARRAY) {
-      // "array of T" is converted to "pointer to T" only in the parameter
-      // context. For example, *argv[] is converted to **argv by this.
-      ty2 = array_degrad(ty2);
-      ty2->name = name;
-    } else if (ty2->kind == TY_FUNC) {
-      // Likewise, a function is converted to a pointer to a function
-      // only in the parameter context.
-      ty2 = pointer_to(ty2);
-      ty2->name = name;
-    }
     // to avoid modify the basic type's next pointer, copy this type
     cur = cur->next = copy_type(ty2);
   }
@@ -820,7 +794,7 @@ static Type *typeof_specifier(Token **rest, Token *tok) {
     ty = typename(&tok, tok);
   } else {
     Node *node = expr(&tok, tok);
-    add_type(node);
+    add_type(node, true);
     ty = node->ty;
   }
   *rest = skip(tok, ")");
@@ -854,7 +828,7 @@ static Node *new_alloca(Node *sz) {
   node->func_ty = builtin_alloca->ty;
   node->ty = builtin_alloca->ty->return_ty;
   node->args = sz;
-  add_type(sz);
+  add_type(sz, false);
   return node;
 }
 
@@ -1275,7 +1249,7 @@ static void initializer2(Token **rest, Token *tok, Initializer *init) {
     // `struct T x = y;` where y is a variable of type `struct T`.
     // Handle that case first.
     Node *expr = assign(rest, tok);
-    add_type(expr);
+    add_type(expr, false);
     if (expr->ty->kind == TY_STRUCT) {
       init->expr = expr;
       return;
@@ -1497,7 +1471,7 @@ static Node *stmt(Token **rest, Token *tok) {
     Node *exp = expr(&tok, tok->next);
     *rest = skip(tok, ";");
 
-    add_type(exp);
+    add_type(exp, false);
     Type *ty = current_fn->ty->return_ty;
     if (ty->kind != TY_STRUCT && ty->kind != TY_UNION)
       exp = new_cast(exp, current_fn->ty->return_ty);
@@ -1735,7 +1709,7 @@ static Node *compound_stmt(Token **rest, Token *tok) {
     } else {
       cur = cur->next = stmt(&tok, tok);
     }
-    add_type(cur);
+    add_type(cur, false);
   }
 
   leave_scope();
@@ -1778,7 +1752,7 @@ int64_t eval(Node *node) { return eval2(node, NULL); }
 // number. The latter form is accepted only as an initialization
 // expression for a global variable.
 int64_t eval2(Node *node, char ***label) {
-  add_type(node);
+  add_type(node, false);
 
   if (is_flonum(node->ty))
     return eval_double(node);
@@ -1897,7 +1871,7 @@ static int64_t eval_rval(Node *node, char ***label) {
 }
 
 static bool is_const_expr(Node *node) {
-  add_type(node);
+  add_type(node, false);
 
   switch (node->kind) {
   case ND_ADD:
@@ -1942,7 +1916,7 @@ int64_t const_expr(Token **rest, Token *tok) {
 }
 
 double eval_double(Node *node) {
-  add_type(node);
+  add_type(node, false);
 
   if (is_integer(node->ty)) {
     if (node->ty->is_unsigned)
@@ -2032,14 +2006,15 @@ static Node *conditional(Token **rest, Token *tok) {
   }
 
   if (equal(tok->next, ":")) {
-    // [GNU] Compile `a ?: b` as `tmp = a, tmp ? tmp : b`.
-    add_type(cond);
+    // [GNU] Compile `a ?: b` as `tmp = a, (tmp ? tmp : b)`.
+    add_type(cond, false);
     Obj *var = new_lvar("", cond->ty);
     Node *lhs = new_binary(ND_ASSIGN, new_var_node(var, tok), cond, tok);
     Node *rhs = new_node(ND_COND, tok);
     rhs->cond = new_var_node(var, tok);
     rhs->then = new_var_node(var, tok);
     rhs->_else = conditional(rest, tok->next->next);
+    add_type(rhs->_else, false);
     return new_binary(ND_COMMA, lhs, rhs, tok);
   }
 
@@ -2188,8 +2163,8 @@ static Node *shift(Token **rest, Token *tok) {
 // In other words, we need to scale an integer value before adding to a
 // pointer value. This function takes care of the scaling.
 static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
-  add_type(lhs);
-  add_type(rhs);
+  add_type(lhs, false);
+  add_type(rhs, false);
 
   // num + num
   if (is_numeric(lhs->ty) && is_numeric(rhs->ty)) {
@@ -2218,6 +2193,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
       error_tok(tok, "it's not allowed to use <VLA> += <num>");
     rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
                      tok);
+    //  TODO: see VLA - num, is it necessary to add type process in there?
     return new_binary(ND_ADD, lhs, rhs, tok);
   }
 
@@ -2226,17 +2202,14 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
     return new_binary(ND_SA_PTR_ADD, lhs, rhs, tok);
   } else {
     // ptr + num
-    Type *ptr_ty = array_degrad(lhs->ty);
-    lhs = new_cast(lhs, ptr_ty);
-
     return new_binary(ND_PTR_ADD, lhs, rhs, tok);
   }
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
 static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
-  add_type(lhs);
-  add_type(rhs);
+  add_type(lhs, false);
+  add_type(rhs, false);
 
   // num - num
   if (is_numeric(lhs->ty) && is_numeric(rhs->ty)) {
@@ -2253,7 +2226,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
 
     rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
                      tok);
-    add_type(rhs);
+    add_type(rhs, false);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node->ty = lhs->ty;
     return node;
@@ -2264,11 +2237,6 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
     if (self_assign) {
       return new_binary(ND_SA_PTR_SUB, lhs, rhs, tok);
     }
-    // typeof(ptr)((ulong)ptr - <extracted-num>)
-    Type *ptr_ty = array_degrad(lhs->ty);
-    lhs = new_cast(lhs, ptr_ty);
-    // we should not add_type here because the caller maybe to_assign and it
-    // needs the binary style
     return new_binary(ND_PTR_SUB, lhs, rhs, tok);
   }
 
@@ -2370,7 +2338,8 @@ static Node *unary(Token **rest, Token *tok) {
 
   if (equal(tok, "&")) {
     Node *lhs = cast(rest, tok->next);
-    add_type(lhs);
+    // NO TYPE DECAY
+    add_type(lhs, true);
     if (lhs->kind == ND_MEMBER && lhs->member->is_bitfield)
       error_tok(tok, "cannot take address of bitfield");
     return new_unary(ND_ADDR, lhs, tok);
@@ -2382,9 +2351,9 @@ static Node *unary(Token **rest, Token *tok) {
     // anything. If foo is a function, `*foo`, `**foo` or `*****foo`
     // are all equivalent to just `foo`.
     Node *node = cast(rest, tok->next);
-    add_type(node);
-    if (node->ty->kind == TY_FUNC)
-      return node;
+
+    add_type(node, false);
+
     return new_unary(ND_DEREF, node, tok);
   }
 
@@ -2640,7 +2609,7 @@ static Member *get_struct_member(Type *ty, Token *tok) {
 //
 // This function takes care of anonymous structs.
 static Node *struct_ref(Node *node, Token *tok) {
-  add_type(node);
+  add_type(node, true); // unused supress_decay
   if (node->ty->kind != TY_STRUCT && node->ty->kind != TY_UNION)
     error_tok(node->tok, "not a struct nor a union");
 
@@ -2661,7 +2630,7 @@ static Node *struct_ref(Node *node, Token *tok) {
 
 // Convert A++ to `(typeof A)((A += 1) - 1)`
 static Node *new_inc_dec(Node *node, Token *tok, int addend) {
-  add_type(node);
+  add_type(node, true);
   return new_cast(new_add(new_add(node, new_num(addend, tok), tok, true),
                           new_num(-addend, tok), tok, false),
                   node->ty);
@@ -2746,13 +2715,13 @@ static Node *postfix(Token **rest, Token *tok) {
 
 // funcall = (assign ("," assign)*)? ")"
 static Node *funcall(Token **rest, Token *tok, Node *fn) {
-  add_type(fn);
+  add_type(fn, false);
 
-  if (fn->ty->kind != TY_FUNC &&
-      (fn->ty->kind != TY_PTR || fn->ty->base->kind != TY_FUNC))
+  assert(fn->ty->kind != TY_FUNC);
+  if ((fn->ty->kind != TY_PTR || fn->ty->base->kind != TY_FUNC))
     error_tok(fn->tok, "not a function");
 
-  Type *ty = (fn->ty->kind == TY_FUNC) ? fn->ty : fn->ty->base;
+  Type *ty = fn->ty->base;
   Type *param_ty = ty->params;
 
   Node head = {};
@@ -2763,7 +2732,7 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
       tok = skip(tok, ",");
 
     Node *arg = assign(&tok, tok);
-    add_type(arg);
+    add_type(arg, false);
 
     if (!param_ty && !ty->is_variadic)
       error_tok(tok, "too many arguments");
@@ -2802,19 +2771,17 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
 //
 // generic-assoc = type-name ":" assign
 //               | "default" ":" assign
+// e.g. _Generic(({char a[2];a;}), char [2]:"char [2]",char *: "char
+// *",default:"default" );
 static Node *generic_selection(Token **rest, Token *tok) {
   Token *start = tok;
   tok = skip(tok, "(");
 
   Node *ctrl = assign(&tok, tok);
-  add_type(ctrl);
+  add_type(ctrl, false);
+  assert(ctrl->ty->kind != TY_ARRAY || ctrl->ty->kind != TY_FUNC);
 
   Type *t1 = ctrl->ty;
-  if (t1->kind == TY_FUNC)
-    t1 = pointer_to(t1);
-  else if (t1->kind == TY_ARRAY)
-    t1 = pointer_to(t1->base);
-
   Node *ret = NULL;
 
   while (!consume(rest, tok, ")")) {
@@ -2883,28 +2850,30 @@ static Node *primary(Token **rest, Token *tok) {
       Node *rhs = new_var_node(ty->vla_size, tok);
       return new_binary(ND_COMMA, lhs, rhs, tok);
     }
-
     return new_ulong(ty->size, start);
   }
   // "sizeof" unary
   if (equal(tok, "sizeof")) {
     Node *node = unary(rest, tok->next);
-    add_type(node);
-    if (node->ty->kind == TY_VLA)
+    add_type(node, true);
+    if (node->ty->kind == TY_VLA) {
       return new_var_node(node->ty->vla_size, tok);
+    }
     return new_ulong(node->ty->size, tok);
   }
   // "_Alignof" "(" type-name ")"
   if (equal(tok, "_Alignof") && equal(tok->next, "(") &&
       is_typename(tok->next->next)) {
+
     Type *ty = typename(&tok, tok->next->next);
     *rest = skip(tok, ")");
+
     return new_ulong(ty->align, tok);
   }
   //  "_Alignof" unary
   if (equal(tok, "_Alignof")) {
     Node *node = unary(rest, tok->next);
-    add_type(node);
+    add_type(node, true);
     return new_ulong(node->ty->align, tok);
   }
   // "_Generic" generic-selection

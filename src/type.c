@@ -230,10 +230,8 @@ static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
   if (t1->kind == TY_PTR || t2->kind == TY_PTR) {
     return ty_ulong;
   }
-  if (t1->kind == TY_FUNC)
-    return pointer_to(t1);
-  if (t2->kind == TY_FUNC)
-    return pointer_to(t2);
+  assert(t1->kind != TY_FUNC && t2->kind != TY_FUNC);
+
   t1 = type_integer_promotion(t1);
   t2 = type_integer_promotion(t2);
 
@@ -307,23 +305,45 @@ static void integer_binary_operator_type_check(Node *lhs, Node *rhs) {
   }
 }
 
-void add_type(Node *node) {
+Type *type_decay(Type *ty) {
+  if (!ty)
+    return NULL;
+  if (ty->kind == TY_ARRAY) {
+    Type *nt = pointer_to(ty->base);
+    return nt;
+  }
+  if (ty->kind == TY_FUNC) {
+    Type *nt = pointer_to(ty);
+    return nt;
+  }
+  return ty;
+}
+
+static bool is_null_pointer_constant(Node *node) {
+  if (node->kind == ND_NUM)
+    return node->val == 0;
+  if (node->kind == ND_CAST)
+    return is_null_pointer_constant(node->lhs);
+  return false;
+}
+
+static void add_type2(Node *node) {
   if (!node || node->ty) {
     return;
   }
-  add_type(node->lhs);
-  add_type(node->rhs);
-  add_type(node->cond);
-  add_type(node->then);
-  add_type(node->_else);
-  add_type(node->init);
-  add_type(node->inc);
+  add_type(node->lhs, false);
+  add_type(node->rhs, false);
+  add_type(node->cond, false);
+  add_type(node->then, false);
+  add_type(node->_else, false);
+  add_type(node->init, false);
+  add_type(node->inc, false);
 
   for (Node *n = node->body; n; n = n->next) {
-    add_type(n);
+    add_type(n, false);
   }
   for (Node *n = node->args; n; n = n->next) {
-    add_type(n);
+    add_type(n, false);
   }
 
   switch (node->kind) {
@@ -433,7 +453,16 @@ void add_type(Node *node) {
     return;
   case ND_COND:
     if (node->then->ty->kind == TY_VOID || node->_else->ty->kind == TY_VOID) {
+      // support return void from ternary operator
       node->ty = ty_void;
+    } else if (is_null_pointer_constant(node->_else)) {
+      // support <cond>? NULL: <ty> return <ty>
+      node->_else = new_cast(node->_else, node->then->ty);
+      node->ty = node->then->ty;
+    } else if (is_null_pointer_constant(node->then)) {
+      // same as above
+      node->then = new_cast(node->then, node->_else->ty);
+      node->ty = node->_else->ty;
     } else {
       node->ty = usual_arith_conv(&node->then, &node->_else);
     }
@@ -445,6 +474,12 @@ void add_type(Node *node) {
     node->ty = node->member->ty;
     return;
   case ND_ADDR: {
+    if (node->lhs->ty->kind == TY_PTR && node->lhs->ty->base->kind == TY_FUNC) {
+      // in previous, we decay the lhs,if there is a function , it will become a
+      // function pointer, we just need to return this
+      node->ty = node->lhs->ty;
+      return;
+    }
     node->ty = pointer_to(node->lhs->ty);
     return;
   }
@@ -473,9 +508,9 @@ void add_type(Node *node) {
     node->ty = pointer_to(ty_void);
     return;
   case ND_CAS:
-    add_type(node->cas_addr);
-    add_type(node->cas_old);
-    add_type(node->cas_new);
+    add_type(node->cas_addr, false);
+    add_type(node->cas_old, false);
+    add_type(node->cas_new, false);
     node->ty = ty_bool;
 
     if (node->cas_addr->ty->kind != TY_PTR)
@@ -490,5 +525,13 @@ void add_type(Node *node) {
     return;
   default:
     break;
+  }
+}
+
+void add_type(Node *node, bool supress_decay) {
+  add_type2(node);
+  if (node && !supress_decay) {
+    node->ty = type_decay(node->ty);
+    return;
   }
 }

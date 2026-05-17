@@ -191,7 +191,9 @@ Type *array_of(Type *base, int size);
 Type *vla_of(Type *base, Node *expr);
 Type *enum_type(void);
 Type *struct_type(void);
-void add_type(Node *node);
+void add_type(Node *node, bool supress_decay);
+Type *type_decay(Type *ty);
+
 //
 /// parser.c
 //
@@ -398,7 +400,7 @@ double eval_double(Node *node);
 // codegen
 //
 
-void codegen(Obj *prog, FILE *out,bool gen_asm);
+void codegen(Obj *prog, FILE *out, bool gen_asm);
 
 //
 /// strings.c
