@@ -1395,7 +1395,8 @@ static void codegen_global_init(Obj *prog) {
           LLVMSetInitializer(old_v, init_val);
         }
       } else {
-        LLVMSetInitializer(old_v, LLVMConstNull(type_convert(var->ty)));
+        if (var->is_definition)
+          LLVMSetInitializer(old_v, LLVMConstNull(type_convert(var->ty)));
       }
       continue;
     }
