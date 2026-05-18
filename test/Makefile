@@ -1,5 +1,6 @@
 CC := $(CURDIR)/../build/dcc
 CFLAGS := -I$(CURDIR)/include
+LIBS :=
 TEST_PATH := $(CURDIR)
 EXT_CFLAGS := 
 
@@ -21,7 +22,7 @@ run-all: $(TEST_RUNS)
 
 %.out: %.c $(CC)
 	@echo "Compiling $<..."
-	@$(CC) -o $@ $< $(CFLAGS) $(EXT_CFLAGS)
+	@$(CC) -o $@ $< $(LIBS) $(CFLAGS) $(EXT_CFLAGS)
 
 %.run: %.out FORCE
 	@echo "Running $<..."
@@ -30,5 +31,9 @@ run-all: $(TEST_RUNS)
 clean:
 	@echo "Cleaning test outputs..."
 	rm -f $(TEST_EXES)
+
+chibicc/commonsym.out: CFLAGS += -fcommon
+
+chibicc/%.out: LIBS += $(CURDIR)/chibicc/common.lib
 
 FORCE:

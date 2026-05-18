@@ -13,12 +13,4 @@ int vsprintf();
 long strlen(char *s);
 void *memcpy(void *dest, void *src, long n);
 void *memset(void *s, int c, long n);
-
-static inline void assert(int expected, int actual, char *filename, int line,
-                          char *code) {
-  if (expected != actual) {
-    printf("%s:%d, %s => %d expected but got %d\n", filename, line, code,
-           expected, actual);
-    exit(1);
-  }
-}
+void assert(int expected, int actual, char *filename, int line, char *code);
