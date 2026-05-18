@@ -266,7 +266,8 @@ static Initializer *new_initializer(Type *ty, bool is_flexible) {
 static Initializer *new_string_literal_initializer(Type *ty, char *lit,
                                                    Token *tok) {
   Initializer *init = new_initializer(ty, false);
-  size_t len = strlen(lit) + 1;
+  size_t len = ty->array_len;
+  assert(len);
   switch (init->ty->base->size) {
   case 1: {
     char *str = lit;

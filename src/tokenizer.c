@@ -204,8 +204,6 @@ static char *string_literal_end(char *p) {
   return p;
 }
 
-// We need to support u8"", u"" and L"" in the future.
-// So we need split out 'start' and 'quote' arguments
 static Token *read_string_literal(char *start, char *quote) {
   char *end = string_literal_end(quote + 1);
   char *buf = calloc(end - quote, sizeof(char));
