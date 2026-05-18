@@ -2347,10 +2347,6 @@ static Node *unary(Token **rest, Token *tok) {
   }
 
   if (equal(tok, "*")) {
-    // [https://www.sigbus.info/n1570#6.5.3.2p4] This is an oddity
-    // in the C spec, but dereferencing a function shouldn't do
-    // anything. If foo is a function, `*foo`, `**foo` or `*****foo`
-    // are all equivalent to just `foo`.
     Node *node = cast(rest, tok->next);
 
     add_type(node, false);

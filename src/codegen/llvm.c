@@ -635,13 +635,15 @@ static LLVMValueRef gen_expr(Node *node) {
     return load(node->ty, gen_addr(node));
   }
   case ND_DEREF: {
-    if (node->lhs->ty->base && node->lhs->ty->base->kind == TY_ARRAY) {
-      LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(C), 0, false);
-      return LLVMBuildGEP2(B, type_convert(node->lhs->ty->base->base),
-                           gen_expr(node->lhs), (LLVMValueRef[]){zero}, 1,
-                           "deref_array");
-    }
-    if (node->lhs->ty->base && node->lhs->ty->base->kind == TY_FUNC) {
+    if (node->lhs->ty->base && (node->lhs->ty->base->kind == TY_FUNC ||
+                                node->lhs->ty->base->kind == TY_ARRAY)) {
+      // [https://www.sigbus.info/n1570#6.5.3.2p4] This is an oddity
+      // in the C spec, but dereferencing a function shouldn't do
+      // anything. If foo is a function, `*foo`, `**foo` or `*****foo`
+      // are all equivalent to just `foo`.
+      // Same as array type, we don't do GEP or anything for the pointer to
+      // array. Because this pointer(int (*)[n]) has the same content
+      // as the array type(int [n]), and deref is this convert process.
       return gen_expr(node->lhs);
     }
     return load(node->ty, gen_expr(node->lhs));
