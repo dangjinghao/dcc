@@ -1,3 +1,4 @@
 /build/
 /astrepr/data.json
 /.vscode/
+*.out
