@@ -4,28 +4,31 @@ TEST_PATH := $(CURDIR)
 EXT_CFLAGS := 
 
 TESTS := $(wildcard $(TEST_PATH)/**/*.c)
-TEST_OUTPUTS := $(TESTS:.c=.out)
+TEST_EXES := $(TESTS:.c=.out)
 TEST_RUNS := $(TESTS:.c=.run)
 
+.PHONY: test clean run-all FORCE
 
-$(CC):
-	@echo "Building dcc..."
-	@cmake -S .. -B ../build
+test:
+	@echo "Ensuring dcc is up to date..."
 	@cmake --build ../build
+	@$(MAKE) --no-print-directory run-all
 
-test: $(TEST_RUNS)
+run-all: $(TEST_RUNS)
 	@echo "All tests completed!"
+
+.PRECIOUS: %.out
 
 %.out: %.c $(CC)
 	@echo "Compiling $<..."
-	$(CC) -o $@ $< $(CFLAGS) $(EXT_CFLAGS)
+	@$(CC) -o $@ $< $(CFLAGS) $(EXT_CFLAGS)
 
-%.run: %.out
+%.run: %.out FORCE
 	@echo "Running $<..."
-	@$<
+	@$<  2>&1
 
 clean:
 	@echo "Cleaning test outputs..."
-	@rm -f $(TEST_OUTPUTS)
+	rm -f $(TEST_EXES)
 
-.PHONY: test clean %.run $(CC)
+FORCE:
