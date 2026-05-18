@@ -72,6 +72,7 @@ noreturn void error_tok(Token *tok, char *fmt, ...);
 noreturn void error_at(char *loc, char *fmt, ...);
 void warn_tok(Token *tok, char *fmt, ...);
 
+Token *tokenize_string_literal(Token *tok, Type *basety);
 Token *tokenize_file(char *path);
 DFile *get_current_file();
 
