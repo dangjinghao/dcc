@@ -3146,8 +3146,8 @@ static void declare_builtin_functions(void) {
 
 // program = (typedef | function-definition | global-variable)*
 Obj *parse(Token *tok) {
-  declare_builtin_functions();
   globals = NULL;
+  declare_builtin_symbols();
 
   while (tok->kind != TK_EOF) {
     VarAttr attr = {};
