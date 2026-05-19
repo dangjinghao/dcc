@@ -25,22 +25,20 @@ static LLVMValueRef cmp_ez(LLVMValueRef v);
 static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
                          LLVMValueRef is_volatile) {
 
-  static LLVMValueRef llvm_memset_declare;
-  static LLVMTypeRef llvm_memset_declare_ty;
-  if (!llvm_memset_declare) {
+  static LLVMValueRef declare;
+  static LLVMTypeRef declare_ty;
+  if (!declare) {
     LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
                 i64 = LLVMInt64TypeInContext(C), i1 = LLVMInt1TypeInContext(C),
                 i8 = LLVMInt8TypeInContext(C),
                 void_ty = LLVMVoidTypeInContext(C);
     LLVMTypeRef memset_param_tys[] = {ptr, i8, i64, i1};
 
-    llvm_memset_declare_ty =
-        LLVMFunctionType(void_ty, memset_param_tys, 4, false);
+    declare_ty = LLVMFunctionType(void_ty, memset_param_tys, 4, false);
 
-    llvm_memset_declare =
-        LLVMAddFunction(M, "llvm.memset.p0.i64", llvm_memset_declare_ty);
+    declare = LLVMAddFunction(M, "llvm.memset.p0.i64", declare_ty);
   }
-  LLVMBuildCall2(B, llvm_memset_declare_ty, llvm_memset_declare,
+  LLVMBuildCall2(B, declare_ty, declare,
                  (LLVMValueRef[4]){ptr, byte, n, is_volatile}, 4, "");
 }
 
@@ -53,21 +51,19 @@ static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
 
 static void llvm_memcpy2(LLVMValueRef dest, LLVMValueRef src, LLVMValueRef n,
                          LLVMValueRef is_volatile) {
-  static LLVMValueRef llvm_memcpy_declare;
-  static LLVMTypeRef llvm_memcpy_declare_ty;
-  if (!llvm_memcpy_declare) {
+  static LLVMValueRef declare;
+  static LLVMTypeRef declare_ty;
+  if (!declare) {
     // declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
     LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
                 i64 = LLVMInt64TypeInContext(C), i1 = LLVMInt1TypeInContext(C),
                 void_ty = LLVMVoidTypeInContext(C);
     LLVMTypeRef memcpy_param_tys[] = {ptr, ptr, i64, i1};
 
-    llvm_memcpy_declare_ty =
-        LLVMFunctionType(void_ty, memcpy_param_tys, 4, false);
-    llvm_memcpy_declare =
-        LLVMAddFunction(M, "llvm.memcpy.p0.p0.i64", llvm_memcpy_declare_ty);
+    declare_ty = LLVMFunctionType(void_ty, memcpy_param_tys, 4, false);
+    declare = LLVMAddFunction(M, "llvm.memcpy.p0.p0.i64", declare_ty);
   }
-  LLVMBuildCall2(B, llvm_memcpy_declare_ty, llvm_memcpy_declare,
+  LLVMBuildCall2(B, declare_ty, declare,
                  (LLVMValueRef[4]){dest, src, n, is_volatile}, 4, "");
 }
 
@@ -75,6 +71,45 @@ static void llvm_memcpy(LLVMValueRef dest, LLVMValueRef src, size_t n,
                         bool is_volatile) {
   llvm_memcpy2(dest, src, LLVMConstInt(LLVMInt64TypeInContext(C), n, false),
                LLVMConstInt(LLVMInt1TypeInContext(C), is_volatile, false));
+}
+
+static void llvm_va_start(LLVMValueRef ptr) {
+  static LLVMValueRef declare;
+  static LLVMTypeRef declare_ty;
+  if (!declare) {
+    // declare void @llvm.va_start.p0(ptr)
+    LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
+                void_ty = LLVMVoidTypeInContext(C);
+    declare_ty = LLVMFunctionType(void_ty, &ptr, 1, false);
+    declare = LLVMAddFunction(M, "llvm.va_start.p0", declare_ty);
+  }
+  LLVMBuildCall2(B, declare_ty, declare, &ptr, 1, "");
+}
+
+static void llvm_va_end(LLVMValueRef ptr) {
+  static LLVMValueRef declare;
+  static LLVMTypeRef declare_ty;
+  if (!declare) {
+    // declare void @llvm.va_end.p0(ptr)
+    LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
+                void_ty = LLVMVoidTypeInContext(C);
+    declare_ty = LLVMFunctionType(void_ty, &ptr, 1, false);
+    declare = LLVMAddFunction(M, "llvm.va_end.p0", declare_ty);
+  }
+  LLVMBuildCall2(B, declare_ty, declare, &ptr, 1, "");
+}
+
+static void llvm_va_copy(LLVMValueRef dest, LLVMValueRef src) {
+  static LLVMValueRef declare;
+  static LLVMTypeRef declare_ty;
+  if (!declare) {
+    // declare void @llvm.va_copy.p0(ptr)
+    LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
+                void_ty = LLVMVoidTypeInContext(C);
+    declare_ty = LLVMFunctionType(void_ty, (LLVMTypeRef[]){ptr, ptr}, 2, false);
+    declare = LLVMAddFunction(M, "llvm.va_copy.p0", declare_ty);
+  }
+  LLVMBuildCall2(B, declare_ty, declare, (LLVMValueRef[]){dest, src}, 2, "");
 }
 
 static LLVMValueRef gen_expr(Node *node);
@@ -1096,6 +1131,21 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
+  case ND_VA_START: {
+    llvm_va_start(gen_expr(node->lhs));
+    return NULL;
+  }
+  case ND_VA_END: {
+    llvm_va_end(gen_expr(node->lhs));
+    return NULL;
+  }
+  case ND_VA_COPY: {
+    llvm_va_copy(gen_expr(node->lhs), gen_expr(node->rhs));
+    return NULL;
+  }
+  case ND_VA_ARG: {
+    todo_impl("ND_VA_ARG");
+  }
   }
   error_tok(node->tok, "invalid expression");
 }
@@ -1371,10 +1421,6 @@ static void codegen_global_declare(Obj *var) {
     return;
   }
 
-  if (var->is_builtin) {
-    return;
-  }
-
   codegen_global_declare(var->next);
   LLVMValueRef vr = NULL;
   if (var->is_function) {
@@ -1397,9 +1443,6 @@ static void codegen_global_declare(Obj *var) {
 // stage 2. initialize global variable
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
-    if (var->is_builtin) {
-      continue;
-    }
     if (!var->is_function) {
       LLVMValueRef old_v = (LLVMValueRef)var->codegen_data;
       assert(old_v);

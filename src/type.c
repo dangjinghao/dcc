@@ -191,6 +191,30 @@ Type *enum_type(void) {
 
 Type *struct_type(void) { return new_type(TY_STRUCT, 0, alignof(struct {})); }
 
+Type *struct_full_type2(size_t nmem, Type **members, int *members_attr_align) {
+  Type *ty = struct_type();
+  Member head = {};
+  Member *cur = &head;
+  for (size_t i = 0; i < nmem; i++) {
+    Type *basety = members[i];
+    Member *mem = calloc(1, sizeof(Member));
+    mem->ty = basety;
+    mem->idx = i;
+    if (members_attr_align && members_attr_align[i]) {
+      mem->align = members_attr_align[i];
+    } else {
+      mem->align = mem->ty->align;
+    }
+    cur = cur->next = mem;
+  }
+  ty->members = head.next;
+  return ty;
+}
+
+Type *struct_full_type(size_t nmem, Type **members) {
+  return struct_full_type2(nmem, members, NULL);
+}
+
 /* --------------------------------------------------------------------------
    Integer promotions and usual arithmetic conversions (C11 6.3.1.8)
    -------------------------------------------------------------------------- */
@@ -525,6 +549,14 @@ static void add_type2(Node *node) {
     return;
   case ND_ALLOCA:
     node->ty = pointer_to(ty_void);
+    return;
+  case ND_VA_START:
+  case ND_VA_END:
+  case ND_VA_COPY:
+    node->ty = ty_void;
+    return;
+  case ND_VA_ARG:
+    unreachable();
     return;
   default:
     break;
