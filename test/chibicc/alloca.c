@@ -1,7 +1,5 @@
 #include "test.h"
 
-// void *fn(int x, void *p, int y) { return p; }
-
 int main() {
   int i = 0;
 

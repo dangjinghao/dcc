@@ -523,6 +523,9 @@ static void add_type2(Node *node) {
       error_tok(node->cas_addr->tok, "pointer expected");
     node->ty = node->lhs->ty->base;
     return;
+  case ND_ALLOCA:
+    node->ty = pointer_to(ty_void);
+    return;
   default:
     break;
   }

@@ -68,8 +68,6 @@ static char *cont_label;
 // a switch statement. Otherwise, NULL.
 static Node *current_switch;
 
-static Obj *builtin_alloca;
-
 static bool is_typename(Token *tok);
 static Type *declspec(Token **rest, Token *tok, VarAttr *attr);
 static Type *typename(Token **rest, Token *tok);
@@ -824,12 +822,8 @@ static Node *compute_vla_size(Type *ty, Token *tok) {
 }
 
 static Node *new_alloca(Node *sz) {
-  Node *node =
-      new_unary(ND_FUNCALL, new_var_node(builtin_alloca, sz->tok), sz->tok);
-  node->func_ty = builtin_alloca->ty;
-  node->ty = builtin_alloca->ty->return_ty;
-  node->args = sz;
   add_type(sz, false);
+  Node *node = new_unary(ND_ALLOCA, sz, sz->tok);
   return node;
 }
 
@@ -2885,6 +2879,14 @@ static Node *primary(Token **rest, Token *tok) {
     Type *t2 = typename(&tok, tok);
     *rest = skip(tok, ")");
     return new_num(is_compatible(t1, t2), start);
+  }
+
+  if (equal(tok, "__builtin_alloca")) {
+    Node *node = new_node(ND_ALLOCA, tok);
+    tok = skip(tok->next, "(");
+    node->lhs = assign(&tok, tok);
+    *rest = skip(tok, ")");
+    return node;
   }
 
   if (equal(tok, "__builtin_compare_and_swap")) {

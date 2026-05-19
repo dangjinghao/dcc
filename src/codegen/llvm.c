@@ -773,15 +773,12 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_LOGOR: {
     return logic_short_circuit(node, false);
   }
+  case ND_ALLOCA: {
+    LLVMValueRef sz = gen_expr(node->lhs);
+    return LLVMBuildArrayAlloca(B, LLVMInt8TypeInContext(C), sz,
+                                "builtin_alloca");
+  }
   case ND_FUNCALL: {
-    // built-in alloca function
-    if (node->lhs->kind == ND_VAR &&
-        !strcmp(node->lhs->var->name, "__builtin_alloca")) {
-      LLVMValueRef sz = gen_expr(node->args);
-      return LLVMBuildArrayAlloca(B, LLVMInt8TypeInContext(C), sz,
-                                  "builtin_alloca");
-    }
-
     LLVMValueRef F = gen_expr(node->lhs);
 
     if (node->ret_buffer) {

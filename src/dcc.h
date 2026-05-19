@@ -262,7 +262,7 @@ typedef enum {
   ND_SA_BITXOR,  // ^=
   ND_SA_SHL,     // <<=
   ND_SA_SHR,     // >>=
-
+  ND_ALLOCA,     // alloca
 } NodeKind;
 
 // AST node type
@@ -361,7 +361,7 @@ struct Obj {
   // Function
   bool is_inline;
   bool is_builtin; // builtin declaration, skip codegen
-  Obj *params; // positive order
+  Obj *params;     // positive order
   Node *body;
   // locals is special. the local variables are reversed order but the param
   // variables are positive ordered. Both of them are stored in this variable
