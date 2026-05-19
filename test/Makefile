@@ -32,8 +32,8 @@ clean:
 	@echo "Cleaning test outputs..."
 	rm -f $(TEST_EXES)
 
-chibicc/commonsym.out: CFLAGS += -fcommon
+$(TEST_PATH)/chibicc/commonsym.out: CFLAGS += -fcommon
 
-chibicc/%.out: LIBS += $(CURDIR)/chibicc/common.lib
+$(TEST_PATH)/chibicc/%.out: LIBS += $(CURDIR)/chibicc/common.lib
 
 FORCE:
