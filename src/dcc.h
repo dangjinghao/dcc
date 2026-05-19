@@ -360,6 +360,7 @@ struct Obj {
 
   // Function
   bool is_inline;
+  bool is_builtin; // builtin declaration, skip codegen
   Obj *params; // positive order
   Node *body;
   // locals is special. the local variables are reversed order but the param

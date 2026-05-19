@@ -19,16 +19,27 @@ static LLVMValueRef F;
 
 static HashMap func_labels;
 
-static LLVMValueRef llvm_memset_declare;
-static LLVMTypeRef llvm_memset_declare_ty;
-static LLVMValueRef llvm_memcpy_declare;
-static LLVMTypeRef llvm_memcpy_declare_ty;
-
 static LLVMValueRef cmp_nz(LLVMValueRef v);
 static LLVMValueRef cmp_ez(LLVMValueRef v);
 
 static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
                          LLVMValueRef is_volatile) {
+
+  static LLVMValueRef llvm_memset_declare;
+  static LLVMTypeRef llvm_memset_declare_ty;
+  if (!llvm_memset_declare) {
+    LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
+                i64 = LLVMInt64TypeInContext(C), i1 = LLVMInt1TypeInContext(C),
+                i8 = LLVMInt8TypeInContext(C),
+                void_ty = LLVMVoidTypeInContext(C);
+    LLVMTypeRef memset_param_tys[] = {ptr, i8, i64, i1};
+
+    llvm_memset_declare_ty =
+        LLVMFunctionType(void_ty, memset_param_tys, 4, false);
+
+    llvm_memset_declare =
+        LLVMAddFunction(M, "llvm.memset.p0.i64", llvm_memset_declare_ty);
+  }
   LLVMBuildCall2(B, llvm_memset_declare_ty, llvm_memset_declare,
                  (LLVMValueRef[4]){ptr, byte, n, is_volatile}, 4, "");
 }
@@ -42,6 +53,20 @@ static void llvm_memset(LLVMValueRef ptr, char byte, size_t n,
 
 static void llvm_memcpy2(LLVMValueRef dest, LLVMValueRef src, LLVMValueRef n,
                          LLVMValueRef is_volatile) {
+  static LLVMValueRef llvm_memcpy_declare;
+  static LLVMTypeRef llvm_memcpy_declare_ty;
+  if (!llvm_memcpy_declare) {
+    // declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+    LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0),
+                i64 = LLVMInt64TypeInContext(C), i1 = LLVMInt1TypeInContext(C),
+                void_ty = LLVMVoidTypeInContext(C);
+    LLVMTypeRef memcpy_param_tys[] = {ptr, ptr, i64, i1};
+
+    llvm_memcpy_declare_ty =
+        LLVMFunctionType(void_ty, memcpy_param_tys, 4, false);
+    llvm_memcpy_declare =
+        LLVMAddFunction(M, "llvm.memcpy.p0.p0.i64", llvm_memcpy_declare_ty);
+  }
   LLVMBuildCall2(B, llvm_memcpy_declare_ty, llvm_memcpy_declare,
                  (LLVMValueRef[4]){dest, src, n, is_volatile}, 4, "");
 }
@@ -93,6 +118,9 @@ static LLVMTypeRef type_convert(Type *ty) {
     {
       size_t members_type_idx = 0;
       for (Member *m = ty->members; m; m = m->next) {
+        if (m->align != m->ty->align) {
+          todo_impl("aligned member in struct");
+        }
         members_type[members_type_idx++] = type_convert(m->ty);
       }
       assert(member_count == members_type_idx);
@@ -751,7 +779,7 @@ static LLVMValueRef gen_expr(Node *node) {
         !strcmp(node->lhs->var->name, "__builtin_alloca")) {
       LLVMValueRef sz = gen_expr(node->args);
       return LLVMBuildArrayAlloca(B, LLVMInt8TypeInContext(C), sz,
-                                  "__builtin_alloca");
+                                  "builtin_alloca");
     }
 
     LLVMValueRef F = gen_expr(node->lhs);
@@ -1345,6 +1373,11 @@ static void codegen_global_declare(Obj *var) {
   if (!var) {
     return;
   }
+
+  if (var->is_builtin) {
+    return;
+  }
+
   codegen_global_declare(var->next);
   LLVMValueRef vr = NULL;
   if (var->is_function) {
@@ -1367,6 +1400,9 @@ static void codegen_global_declare(Obj *var) {
 // stage 2. initialize global variable
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
+    if (var->is_builtin) {
+      continue;
+    }
     if (!var->is_function) {
       LLVMValueRef old_v = (LLVMValueRef)var->codegen_data;
       assert(old_v);
@@ -1407,38 +1443,10 @@ static void codegen_global_init(Obj *prog) {
   }
 }
 
-void declare_built_function() {
-
-  // declare void @llvm.memset.p0.i64(ptr, i8, i64, i1)
-  LLVMTypeRef ptr = LLVMPointerTypeInContext(C, 0);
-  LLVMTypeRef i8 = LLVMInt8TypeInContext(C);
-  LLVMTypeRef i64 = LLVMInt64TypeInContext(C);
-  LLVMTypeRef i1 = LLVMInt1TypeInContext(C);
-  LLVMTypeRef void_ty = LLVMVoidTypeInContext(C);
-
-  LLVMTypeRef memset_param_tys[] = {ptr, i8, i64, i1};
-
-  llvm_memset_declare_ty =
-      LLVMFunctionType(void_ty, memset_param_tys, 4, false);
-
-  llvm_memset_declare =
-      LLVMAddFunction(M, "llvm.memset.p0.i64", llvm_memset_declare_ty);
-
-  // declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
-  LLVMTypeRef memcpy_param_tys[] = {ptr, ptr, i64, i1};
-
-  llvm_memcpy_declare_ty =
-      LLVMFunctionType(void_ty, memcpy_param_tys, 4, false);
-  llvm_memcpy_declare =
-      LLVMAddFunction(M, "llvm.memcpy.p0.p0.i64", llvm_memcpy_declare_ty);
-}
-
 void codegen(Obj *prog, FILE *out, bool gen_asm) {
   C = LLVMContextCreate();
   M = LLVMModuleCreateWithNameInContext(get_current_file()->name, C);
   B = LLVMCreateBuilderInContext(C);
-
-  declare_built_function();
 
   codegen_global_declare(prog);
 
