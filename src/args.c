@@ -13,6 +13,15 @@ bool opt_fcommon;
 bool opt_fpic;
 char *opt_o;
 
+bool opt_M;
+bool opt_MD;
+bool opt_MM;
+bool opt_MMD;
+bool opt_MP;
+bool opt_MG;
+char *opt_MF;
+char *opt_MT;
+
 StringArray opt_input_paths;
 StringArray opt_ld_extra_args;
 StringArray opt_cpp_extra_args;
@@ -123,16 +132,55 @@ void parse_args(int argc, char **argv) {
       continue;
     }
 
-    if (!strncmp(argv[i], "-M", 2)) {
-      strarray_push(&opt_cpp_extra_args, argv[i]);
-      switch (argv[i][2]) {
-      case 'F':
-      case 'Q':
-      case 'T':
-        strarray_push(&opt_cpp_extra_args, argv[++i]);
-      default:
-        break;
-      }
+    if (!strcmp(argv[i], "-M")) {
+      opt_M = true;
+      opt_E = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MD")) {
+      opt_MD = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MM")) {
+      opt_MM = true;
+      opt_E = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MMD")) {
+      opt_MMD = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MF")) {
+      opt_MF = argv[++i];
+      continue;
+    }
+
+    if (!strncmp(argv[i], "-MF", 3)) {
+      opt_MF = argv[i] + 3;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MT")) {
+      opt_MT = argv[++i];
+      continue;
+    }
+
+    if (!strncmp(argv[i], "-MT", 3)) {
+      opt_MT = argv[i] + 3;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MG")) {
+      opt_MG = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-MP")) {
+      opt_MP = true;
       continue;
     }
 

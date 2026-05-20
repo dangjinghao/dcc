@@ -484,6 +484,15 @@ extern StringArray opt_input_paths;
 extern StringArray opt_ld_extra_args;
 extern StringArray opt_cpp_extra_args;
 
+extern bool opt_M;
+extern bool opt_MD;
+extern bool opt_MM;
+extern bool opt_MMD;
+extern bool opt_MP;
+extern bool opt_MG;
+extern char *opt_MF;
+extern char *opt_MT;
+
 //
 /// pathlib.c
 //

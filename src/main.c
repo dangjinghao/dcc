@@ -118,15 +118,51 @@ static void expand_macro(char *input, char *output, char *argv0) {
                   "-I/usr/local/include",
                   "-I/usr/include/x86_64-linux-gnu",
                   "-I/usr/include",
-                  "-o",
-                  output,
-                  input,
                   NULL};
 
   StringArray args_full = {};
 
   strarray_push_batch(&args_full, argv);
   strarray_push_batch2(&args_full, &opt_cpp_extra_args);
+
+  if (opt_M)
+    strarray_push(&args_full, "-M");
+  if (opt_MD)
+    strarray_push(&args_full, "-MD");
+  if (opt_MM)
+    strarray_push(&args_full, "-MM");
+  if (opt_MMD)
+    strarray_push(&args_full, "-MMD");
+  if (opt_MP)
+    strarray_push(&args_full, "-MP");
+  if (opt_MG)
+    strarray_push(&args_full, "-MG");
+
+  if (opt_MT) {
+    strarray_push(&args_full, "-MT");
+    strarray_push(&args_full, opt_MT);
+  } else if (opt_MD || opt_MMD || opt_M || opt_MM) {
+    strarray_push(&args_full, "-MT");
+    strarray_push(
+        &args_full,
+        opt_o ?: path_new_replaced_suffix(basename(strdup(input)), ".o"));
+  }
+
+  if (opt_MF) {
+    strarray_push(&args_full, "-MF");
+    strarray_push(&args_full, opt_MF);
+  } else if (opt_MD || opt_MMD) {
+    strarray_push(&args_full, "-MF");
+    strarray_push(
+        &args_full,
+        opt_o ? path_new_replaced_suffix(strdup(opt_o), ".d")
+              : path_new_replaced_suffix(basename(strdup(input)), ".d"));
+  }
+
+  strarray_push(&args_full, "-o");
+  strarray_push(&args_full, output);
+  strarray_push(&args_full, input);
+  strarray_push(&args_full, NULL);
 
   run_subprocess(args_full.data);
 }
