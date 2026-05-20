@@ -140,7 +140,7 @@ static LLVMTypeRef type_convert(Type *ty) {
   case TY_DOUBLE:
     return LLVMDoubleTypeInContext(C);
   case TY_LDOUBLE:
-    return LLVMFP128TypeInContext(C);
+    return LLVMX86FP80TypeInContext(C);
   case TY_PTR:
     return LLVMPointerTypeInContext(C, 0);
   case TY_ARRAY:
@@ -303,7 +303,7 @@ static void new_block(char *name) {
   LLVMPositionBuilderAtEnd(B, blk_name);
 }
 
-enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F128, PTR };
+enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F80, PTR };
 
 static int getTypeId(Type *ty) {
   switch (ty->kind) {
@@ -322,7 +322,7 @@ static int getTypeId(Type *ty) {
   case TY_DOUBLE:
     return F64;
   case TY_LDOUBLE:
-    return F128;
+    return F80;
   case TY_FUNC:
   case TY_ARRAY:
   case TY_PTR:
@@ -349,7 +349,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMSExt,
             [F32] = LLVMSIToFP,
             [F64] = LLVMSIToFP,
-            [F128] = LLVMSIToFP,
+            [F80] = LLVMSIToFP,
             [PTR] = LLVMIntToPtr,
         },
     [I16] =
@@ -365,7 +365,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMSExt,
             [F32] = LLVMSIToFP,
             [F64] = LLVMSIToFP,
-            [F128] = LLVMSIToFP,
+            [F80] = LLVMSIToFP,
         },
     [I32] =
         {
@@ -380,7 +380,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMSExt,
             [F32] = LLVMSIToFP,
             [F64] = LLVMSIToFP,
-            [F128] = LLVMSIToFP,
+            [F80] = LLVMSIToFP,
         },
     [I64] =
         {
@@ -395,7 +395,7 @@ static int cast_table[12][12] = {
             [U64] = CAST_NOP,
             [F32] = LLVMSIToFP,
             [F64] = LLVMSIToFP,
-            [F128] = LLVMSIToFP,
+            [F80] = LLVMSIToFP,
         },
     [U8] =
         {
@@ -410,7 +410,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMZExt,
             [F32] = LLVMUIToFP,
             [F64] = LLVMUIToFP,
-            [F128] = LLVMUIToFP,
+            [F80] = LLVMUIToFP,
         },
     [U16] =
         {
@@ -425,7 +425,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMZExt,
             [F32] = LLVMUIToFP,
             [F64] = LLVMUIToFP,
-            [F128] = LLVMUIToFP,
+            [F80] = LLVMUIToFP,
         },
     [U32] =
         {
@@ -440,7 +440,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMZExt,
             [F32] = LLVMUIToFP,
             [F64] = LLVMUIToFP,
-            [F128] = LLVMUIToFP,
+            [F80] = LLVMUIToFP,
         },
     [U64] =
         {
@@ -455,7 +455,7 @@ static int cast_table[12][12] = {
             [U64] = CAST_NOP,
             [F32] = LLVMUIToFP,
             [F64] = LLVMUIToFP,
-            [F128] = LLVMUIToFP,
+            [F80] = LLVMUIToFP,
         },
     [F32] =
         {
@@ -469,7 +469,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMFPToUI,
             [F32] = CAST_NOP,
             [F64] = LLVMFPExt,
-            [F128] = LLVMFPExt,
+            [F80] = LLVMFPExt,
             [PTR] = CAST_INVALID,
         },
     [F64] =
@@ -484,10 +484,10 @@ static int cast_table[12][12] = {
             [U64] = LLVMFPToUI,
             [F32] = LLVMFPTrunc,
             [F64] = CAST_NOP,
-            [F128] = LLVMFPExt,
+            [F80] = LLVMFPExt,
             [PTR] = CAST_INVALID,
         },
-    [F128] =
+    [F80] =
         {
             [I8] = LLVMFPToSI,
             [I16] = LLVMFPToSI,
@@ -499,7 +499,7 @@ static int cast_table[12][12] = {
             [U64] = LLVMFPToUI,
             [F32] = LLVMFPTrunc,
             [F64] = LLVMFPTrunc,
-            [F128] = CAST_NOP,
+            [F80] = CAST_NOP,
             [PTR] = CAST_INVALID,
         },
     [PTR] =
@@ -515,7 +515,7 @@ static int cast_table[12][12] = {
             [PTR] = CAST_NOP,
             [F32] = CAST_INVALID,
             [F64] = CAST_INVALID,
-            [F128] = CAST_INVALID,
+            [F80] = CAST_INVALID,
         },
 };
 
