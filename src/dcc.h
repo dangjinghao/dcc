@@ -267,7 +267,6 @@ typedef enum {
   ND_ALLOCA,     // alloca
   ND_VA_START,   // va_start
   ND_VA_END,     // va_end
-  ND_VA_ARG,     // va_arg
   ND_VA_COPY,    // va_copy
 } NodeKind;
 

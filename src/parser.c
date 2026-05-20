@@ -2806,8 +2806,11 @@ static Node *generic_selection(Token **rest, Token *tok) {
 //         | "_Alignof" "(" type-name ")"
 //         | "_Alignof" unary
 //         | "_Generic" generic-selection
-//         | "__builtin_types_compatible_p" "(" type-name, type-name, ")"
+//         | "__builtin_types_compatible_p" "(" type-name, type-name ")"
 //         | "__builtin_reg_class" "(" type-name ")" // [chibicc] used in va_arg
+//         | "__builtin_alloca" "(" assign ")"
+//         | "__builtin_va_start" "(" assign, assign ")"
+//         | "__builtin_va_end" "(" assign ")"
 //         | ident
 //         | str
 //         | num
@@ -2881,6 +2884,18 @@ static Node *primary(Token **rest, Token *tok) {
     return new_num(is_compatible(t1, t2), start);
   }
 
+  if (equal(tok, "__builtin_reg_class")) {
+    tok = skip(tok->next, "(");
+    Type *ty = typename(&tok, tok);
+    *rest = skip(tok, ")");
+
+    if (is_integer(ty) || ty->kind == TY_PTR)
+      return new_num(0, start);
+    if (is_flonum(ty))
+      return new_num(1, start);
+    return new_num(2, start);
+  }
+
   if (equal(tok, "__builtin_alloca")) {
     Node *node = new_node(ND_ALLOCA, tok);
     tok = skip(tok->next, "(");
@@ -2903,22 +2918,6 @@ static Node *primary(Token **rest, Token *tok) {
     Node *node = new_node(ND_VA_END, tok);
     tok = skip(tok->next, "(");
     node->lhs = assign(&tok, tok);
-    *rest = skip(tok, ")");
-    return node;
-  }
-
-  if (equal(tok, "__builtin_va_arg")) {
-    Node *node = new_node(ND_VA_ARG, tok);
-    tok = skip(tok->next, "(");
-    node->lhs = assign(&tok, tok);
-    tok = skip(tok, ",");
-    if (!is_typename(tok)) {
-      error_tok(tok, "Expected a type");
-    }
-    Type *ty = typename(&tok, tok);
-    // we just decay it. I'm not sure it's right or not
-    ty = type_decay(ty);
-    node->ty = ty; // declare node type to avoid add_type handle this
     *rest = skip(tok, ")");
     return node;
   }
@@ -3185,17 +3184,6 @@ static bool is_function(Token *tok) {
 
 static void declare_builtin_symbols(void) {
   {
-    // __builtin_va_list
-    // typedef struct va_list_tag{
-    //   unsigned int gp_offset;
-    //   unsigned int fp_offset;
-    //   void *reg_save_area;
-    //   void *overflow_arg_area;
-    // } __builtin_va_list[1];
-    Type *ms[] = {ty_uint, ty_uint, pointer_to(ty_void), pointer_to(ty_void)};
-    Type *va_list_tag = struct_full_type(4, ms);
-    Type *va_list_tag_arr_ty = array_of(va_list_tag, 1);
-    push_scope("__builtin_va_list")->type_def = va_list_tag_arr_ty;
   }
 }
 

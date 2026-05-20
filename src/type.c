@@ -555,9 +555,6 @@ static void add_type2(Node *node) {
   case ND_VA_COPY:
     node->ty = ty_void;
     return;
-  case ND_VA_ARG:
-    unreachable();
-    return;
   default:
     break;
   }

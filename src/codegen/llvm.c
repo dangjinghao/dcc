@@ -128,7 +128,6 @@ static LLVMTypeRef type_convert(Type *ty) {
   case TY_BOOL:
     return LLVMInt8TypeInContext(C);
   case TY_CHAR:
-    assert(ty->size == sizeof(char));
     return LLVMInt8TypeInContext(C);
   case TY_SHORT:
     return LLVMInt16TypeInContext(C);
@@ -1156,9 +1155,6 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_VA_COPY: {
     llvm_va_copy(gen_expr(node->lhs), gen_expr(node->rhs));
     return NULL;
-  }
-  case ND_VA_ARG: {
-    todo_impl("ND_VA_ARG");
   }
   }
   error_tok(node->tok, "invalid expression");
