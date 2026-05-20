@@ -633,6 +633,7 @@ static LLVMValueRef cmp_ez(LLVMValueRef v) {
 }
 
 static LLVMValueRef logic_short_circuit(Node *node, bool is_and) {
+  new_block("logic_short_circuit");
   LLVMValueRef lhs = gen_expr(node->lhs);
   LLVMValueRef lhs_check = cmp_nz(lhs);
   LLVMBasicBlockRef start_block = LLVMGetInsertBlock(B);
@@ -650,6 +651,8 @@ static LLVMValueRef logic_short_circuit(Node *node, bool is_and) {
   LLVMPositionBuilderAtEnd(B, next_block);
   LLVMValueRef rhs = gen_expr(node->rhs);
   LLVMValueRef rhs_check = cmp_nz(rhs);
+  // update then block which maybe updated by sub-expression
+  next_block = LLVMGetInsertBlock(B);
   LLVMBuildBr(B, merge_block);
 
   LLVMPositionBuilderAtEnd(B, merge_block);
