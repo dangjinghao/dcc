@@ -898,12 +898,17 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_PTR_SUB: {
     LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "ptr_sub_neg");
-    return LLVMBuildGEP2(B, type_convert(node->lhs->ty->base),
-                         gen_expr(node->lhs), &neg, 1, "ptr_sub");
+    // [gnu ext]: void* ptr calculate
+    Type *pointee_ty =
+        node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+    return LLVMBuildGEP2(B, type_convert(pointee_ty), gen_expr(node->lhs), &neg,
+                         1, "ptr_sub");
   }
   case ND_PTR_ADD: {
-    return LLVMBuildGEP2(B, type_convert(node->lhs->ty->base),
-                         gen_expr(node->lhs),
+    // [gnu ext]: void* ptr calculate
+    Type *pointee_ty =
+        node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+    return LLVMBuildGEP2(B, type_convert(pointee_ty), gen_expr(node->lhs),
                          &(LLVMValueRef){gen_expr(node->rhs)}, 1, "ptr_add");
   }
   case ND_MUL: {
@@ -1018,8 +1023,11 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_PTR_ADD: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
+    // [gnu ext]: void* ptr calculate
+    Type *pointee_ty =
+        node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
     LLVMValueRef tmp_v =
-        LLVMBuildGEP2(B, type_convert(node->lhs->ty->base), val,
+        LLVMBuildGEP2(B, type_convert(pointee_ty), val,
                       &(LLVMValueRef){gen_expr(node->rhs)}, 1, "sa_ptr_add");
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
@@ -1028,9 +1036,11 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
     LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "sa_ptr_sub_neg");
-    LLVMValueRef tmp_v =
-        LLVMBuildGEP2(B, type_convert(node->lhs->ty->base), val,
-                      &(LLVMValueRef){neg}, 1, "sa_ptr_sub");
+    // [gnu ext]: void* ptr calculate
+    Type *pointee_ty =
+        node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+    LLVMValueRef tmp_v = LLVMBuildGEP2(B, type_convert(pointee_ty), val,
+                                       &(LLVMValueRef){neg}, 1, "sa_ptr_sub");
     LLVMBuildStore(B, tmp_v, ptr);
     return load(node->ty, ptr);
   }
