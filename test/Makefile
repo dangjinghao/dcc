@@ -1,19 +1,24 @@
 CC := $(CURDIR)/../build/dcc
 CFLAGS := -I$(CURDIR)/include
 LIBS :=
-TEST_PATH := $(CURDIR)
 EXT_CFLAGS := 
 
-TESTS := $(wildcard $(TEST_PATH)/**/*.c)
+TESTS := $(wildcard ./**/*.c)
 TEST_EXES := $(TESTS:.c=.out)
 TEST_RUNS := $(TESTS:.c=.run)
+TEST_CASE := 
 
 .PHONY: test clean run-all FORCE
 
 test:
 	@echo "Ensuring dcc is up to date..."
 	@cmake --build ../build
-	@$(MAKE) --no-print-directory run-all
+	@if [ -n "$(TEST_CASE)" ]; then \
+		echo "Running test case: $(TEST_CASE)"; \
+		$(MAKE) --no-print-directory $(TEST_CASE); \
+	else \
+		$(MAKE) --no-print-directory run-all; \
+	fi
 
 run-all: $(TEST_RUNS)
 	@echo "All tests completed!"
@@ -32,8 +37,8 @@ clean:
 	@echo "Cleaning test outputs..."
 	rm -f $(TEST_EXES)
 
-$(TEST_PATH)/chibicc/commonsym.out: CFLAGS += -fcommon
+chibicc/commonsym.out: CFLAGS += -fcommon
 
-$(TEST_PATH)/chibicc/%.out: LIBS += $(CURDIR)/chibicc/common.lib
+chibicc/%.out: LIBS += $(CURDIR)/chibicc/common.lib
 
 FORCE:
