@@ -766,12 +766,16 @@ static LLVMValueRef gen_expr(Node *node) {
     if (!then_v) {
       error_tok(node->tok, "there isn't any value returned from true path");
     }
+    // update then block which maybe updated by sub-expression
+    bb_then = LLVMGetInsertBlock(B);
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_else);
     LLVMValueRef else_v = gen_expr(node->_else);
     if (!else_v) {
       error_tok(node->tok, "there isn't any value returned from false path");
     }
+    // update else block which maybe updated by sub-expression
+    bb_else = LLVMGetInsertBlock(B);
     LLVMBuildBr(B, bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_merge);
     // ternary operator returns void, e.g.
