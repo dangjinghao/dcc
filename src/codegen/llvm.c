@@ -560,8 +560,14 @@ static LLVMValueRef gen_addr(Node *node) {
   }
   case ND_FUNCALL:
     if (node->ret_buffer) {
-      todo_impl("gen_addr funcall return struct/union");
-      return gen_expr(node);
+      if (is_large_agg_type(node->ty)) {
+        todo_impl("gen_addr large agg type");
+      }
+      LLVMValueRef ret_struct = gen_expr(node);
+      LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
+      assert(ptr);
+      LLVMBuildStore(B, ret_struct, ptr);
+      return ptr;
     }
     break;
   case ND_ASSIGN:
@@ -822,10 +828,6 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_FUNCALL: {
     LLVMValueRef F = gen_expr(node->lhs);
 
-    if (node->ret_buffer) {
-      todo_impl("return struct from funcall");
-    }
-
     size_t arg_count = next_iter_count(node->args);
     LLVMValueRef *args = calloc(arg_count, sizeof(LLVMValueRef));
     size_t arg_idx = 0;
@@ -854,6 +856,18 @@ static LLVMValueRef gen_expr(Node *node) {
         LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count,
                        F_ty->return_ty->kind == TY_VOID ? "" : "funcall");
     free(args);
+
+    if (node->ret_buffer) {
+      if (is_large_agg_type(node->ty)) {
+        todo_impl("gen_expr large agg funcall");
+      }
+      LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
+      assert(ptr);
+      LLVMBuildStore(B, r, ptr);
+      // replace r with ptr to return a valid struct ptr
+      r = ptr;
+    }
+
     return r;
   }
   case ND_LABEL_VAL: {
@@ -1173,6 +1187,16 @@ static LLVMValueRef gen_stmt(Node *node) {
   }
   case ND_RETURN: {
     new_block("return");
+    if (is_agg_type(node->lhs->ty)) {
+      if (is_large_agg_type(node->lhs->ty)) {
+        todo_impl("return large agg");
+      }
+      LLVMValueRef ptr = gen_expr(node->lhs);
+      LLVMValueRef r = LLVMBuildLoad2(B, type_convert(node->lhs->ty), ptr,
+                                      "return_small_agg_load");
+      LLVMBuildRet(B, r);
+      return NULL;
+    }
     LLVMBuildRet(B, gen_expr(node->lhs));
     return NULL;
   }
@@ -1334,8 +1358,8 @@ static LLVMValueRef declare_agg_function(Obj *var) {
   }
 
   // return-as-value struct
-  if (is_agg_type(var->ty->return_ty)) {
-    todo_impl("return-as-value struct");
+  if (is_large_agg_type(var->ty->return_ty)) {
+    todo_impl("declare return-as-value large agg");
   }
 
   // build llvm value
