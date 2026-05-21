@@ -173,7 +173,8 @@ static LLVMTypeRef type_convert(Type *ty) {
         if (is_agg_type(p)) {
           // large struct type -> struct pointer type
           if (is_large_agg_type(p)) {
-            p = pointer_to(p);
+            params[params_idx++] = type_convert(pointer_to(p));
+            continue;
           }
           // else: for small struct type, treat them as normal type, LLVM
           // basically support this
