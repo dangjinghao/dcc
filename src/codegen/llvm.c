@@ -115,12 +115,6 @@ static void llvm_va_copy(LLVMValueRef dest, LLVMValueRef src) {
 static LLVMValueRef gen_expr(Node *node);
 static LLVMValueRef gen_stmt(Node *node);
 
-static bool is_large_agg_type(Type *ty) {
-  if (!is_agg_type(ty))
-    return false;
-  return ty->size > 16;
-}
-
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
   case TY_VOID:
@@ -166,16 +160,35 @@ static LLVMTypeRef type_convert(Type *ty) {
   }
   case TY_FUNC: {
     size_t param_count = next_iter_count(ty->params);
+    if (is_large_agg_type(ty->return_ty)) {
+      param_count++;
+    }
     LLVMTypeRef *params = calloc(param_count, sizeof(LLVMTypeRef));
     {
       size_t params_idx = 0;
+      if (is_large_agg_type(ty->return_ty)) {
+        params[params_idx++] = type_convert(pointer_to(ty->return_ty));
+      }
       for (Type *p = ty->params; p; p = p->next) {
+        if (is_agg_type(p)) {
+          // large struct type -> struct pointer type
+          if (is_large_agg_type(p)) {
+            p = pointer_to(p);
+          }
+          // else: for small struct type, treat them as normal type, LLVM
+          // basically support this
+        }
         params[params_idx++] = type_convert(p);
       }
       assert(params_idx == param_count);
     }
-    LLVMTypeRef r = LLVMFunctionType(type_convert(ty->return_ty), params,
-                                     param_count, ty->is_variadic);
+
+    LLVMTypeRef ret_ty = is_large_agg_type(ty->return_ty)
+                             ? LLVMVoidTypeInContext(C)
+                             : type_convert(ty->return_ty);
+
+    LLVMTypeRef r =
+        LLVMFunctionType(ret_ty, params, param_count, ty->is_variadic);
     free(params);
     return r;
   }
@@ -559,14 +572,14 @@ static LLVMValueRef gen_addr(Node *node) {
                                node->member->idx, "mem_GEP");
   }
   case ND_FUNCALL:
-    if (node->ret_buffer) {
-      if (is_large_agg_type(node->ty)) {
-        todo_impl("gen_addr large agg type");
-      }
+    if (is_agg_type(node->ty)) {
       LLVMValueRef ret_struct = gen_expr(node);
+      assert(node->ret_buffer);
       LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
       assert(ptr);
-      LLVMBuildStore(B, ret_struct, ptr);
+      if (!is_large_agg_type(node->ty)) {
+        LLVMBuildStore(B, ret_struct, ptr);
+      }
       return ptr;
     }
     break;
@@ -826,11 +839,24 @@ static LLVMValueRef gen_expr(Node *node) {
                                 "builtin_alloca");
   }
   case ND_FUNCALL: {
+    assert(node->lhs->ty->kind == TY_PTR);
     LLVMValueRef F = gen_expr(node->lhs);
-
+    // extract the function type from ponter because LLVM only can recognise
+    // this format
+    Type *F_ty = node->lhs->ty->base;
     size_t arg_count = next_iter_count(node->args);
+    if (is_large_agg_type(F_ty->return_ty)) {
+      arg_count++;
+    }
     LLVMValueRef *args = calloc(arg_count, sizeof(LLVMValueRef));
     size_t arg_idx = 0;
+    if (is_large_agg_type(F_ty->return_ty)) {
+      // pass the ret_buffer ptr as the 1st argument
+      assert(node->ret_buffer);
+      assert(node->ret_buffer->codegen_data);
+      args[arg_idx++] = (LLVMValueRef)node->ret_buffer->codegen_data;
+    }
+
     for (Node *arg = node->args; arg; arg = arg->next) {
       LLVMValueRef arg_vr = gen_expr(arg);
       if (is_agg_type(arg->ty)) {
@@ -848,24 +874,26 @@ static LLVMValueRef gen_expr(Node *node) {
       }
       args[arg_idx++] = arg_vr;
     }
-    assert(node->lhs->ty->kind == TY_PTR);
-    // extract the function type from ponter because LLVM just can recognise
-    // function this in call format
-    Type *F_ty = node->lhs->ty->base;
-    LLVMValueRef r =
-        LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count,
-                       F_ty->return_ty->kind == TY_VOID ? "" : "funcall");
+
+    bool ret_void = false;
+    if (F_ty->return_ty->kind == TY_VOID ||
+        is_large_agg_type(F_ty->return_ty)) {
+      ret_void = true;
+    }
+
+    LLVMValueRef r = LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count,
+                                    ret_void ? "" : "funcall");
     free(args);
 
-    if (node->ret_buffer) {
-      if (is_large_agg_type(node->ty)) {
-        todo_impl("gen_expr large agg funcall");
-      }
+    if (is_agg_type(node->ty)) {
       LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
       assert(ptr);
-      LLVMBuildStore(B, r, ptr);
-      // replace r with ptr to return a valid struct ptr
-      r = ptr;
+      if (!is_large_agg_type(node->ty)) {
+        LLVMBuildStore(B, r, ptr);
+      }
+      // if it's large agg type, when codegen return statement it will memcpy
+      // data to ret_buffer ptr
+      return ptr;
     }
 
     return r;
@@ -1188,10 +1216,13 @@ static LLVMValueRef gen_stmt(Node *node) {
   case ND_RETURN: {
     new_block("return");
     if (is_agg_type(node->lhs->ty)) {
-      if (is_large_agg_type(node->lhs->ty)) {
-        todo_impl("return large agg");
-      }
       LLVMValueRef ptr = gen_expr(node->lhs);
+      if (is_large_agg_type(node->lhs->ty)) {
+        // it's not very standard
+        llvm_memcpy(LLVMGetParam(F, 0), ptr, node->lhs->ty->size, false);
+        LLVMBuildRetVoid(B);
+        return NULL;
+      }
       LLVMValueRef r = LLVMBuildLoad2(B, type_convert(node->lhs->ty), ptr,
                                       "return_small_agg_load");
       LLVMBuildRet(B, r);
@@ -1337,37 +1368,8 @@ static bool is_function_agg_declare(Obj *var) {
 static LLVMValueRef declare_agg_function(Obj *var) {
   assert(var->is_function);
   Type *ty = var->ty;
-  // pass-as-value struct
 
-  size_t param_count = next_iter_count(ty->params);
-  LLVMTypeRef *params = calloc(param_count, sizeof(LLVMTypeRef));
-  {
-    size_t params_idx = 0;
-    for (Type *p = ty->params; p; p = p->next) {
-      if (is_agg_type(p)) {
-        // large struct type -> struct pointer type
-        if (is_large_agg_type(p)) {
-          p = pointer_to(p);
-        }
-        // else: for small struct type, treat them as normal type, support
-        // basically support this
-      }
-      params[params_idx++] = type_convert(p);
-    }
-    assert(params_idx == param_count);
-  }
-
-  // return-as-value struct
-  if (is_large_agg_type(var->ty->return_ty)) {
-    todo_impl("declare return-as-value large agg");
-  }
-
-  // build llvm value
-  LLVMTypeRef ft = LLVMFunctionType(type_convert(ty->return_ty), params,
-                                    param_count, ty->is_variadic);
-  free(params);
-
-  LLVMValueRef func = LLVMAddFunction(M, var->name, ft);
+  LLVMValueRef func = LLVMAddFunction(M, var->name, type_convert(ty));
 
   // attach 'byval' label
   LLVMAttributeIndex params_idx = 1;

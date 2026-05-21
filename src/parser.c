@@ -3078,7 +3078,7 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
   // A buffer for a struct/union return value is passed
   // as the hidden first parameter.
   Type *rty = ty->return_ty;
-  if (is_agg_type(rty) && rty->size > 16)
+  if (is_large_agg_type(rty))
     new_lvar("", pointer_to(rty));
 
   fn->params = locals;

@@ -93,6 +93,12 @@ bool is_agg_type(Type *ty) {
   return ty->kind == TY_STRUCT || ty->kind == TY_UNION;
 };
 
+bool is_large_agg_type(Type *ty) {
+  if (!is_agg_type(ty))
+    return false;
+  return ty->size > 16;
+}
+
 // used in generic_selection and __builtin_types_compatible_p
 bool is_compatible(Type *t1, Type *t2) {
   if (t1 == t2)
