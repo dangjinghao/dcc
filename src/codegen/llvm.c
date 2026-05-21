@@ -1215,6 +1215,11 @@ static LLVMValueRef gen_stmt(Node *node) {
   }
   case ND_RETURN: {
     new_block("return");
+    if (!node->lhs) {
+      // return;
+      LLVMBuildRetVoid(B);
+      return NULL;
+    }
     if (is_agg_type(node->lhs->ty)) {
       LLVMValueRef ptr = gen_expr(node->lhs);
       if (is_large_agg_type(node->lhs->ty)) {
