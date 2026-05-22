@@ -18,6 +18,7 @@ static LLVMBuilderRef B;
 static LLVMValueRef F;
 
 static HashMap func_labels;
+static HashMap func_labels_as_values;
 
 static LLVMValueRef cmp_nz(LLVMValueRef v);
 static LLVMValueRef cmp_ez(LLVMValueRef v);
@@ -907,6 +908,7 @@ static LLVMValueRef gen_expr(Node *node) {
       bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
       hashmap_put(&func_labels, node->unique_label, bb);
     }
+    hashmap_put(&func_labels_as_values, node->unique_label, bb);
     return LLVMBlockAddress(F, bb);
   }
   case ND_EXCH: {
@@ -1370,9 +1372,18 @@ static LLVMValueRef gen_stmt(Node *node) {
 
     return NULL;
   }
-  case ND_GOTO_EXPR:
+  case ND_GOTO_EXPR: {
+    LLVMValueRef addr = gen_expr(node->lhs);
+    LLVMValueRef indirect_br =
+        LLVMBuildIndirectBr(B, addr, func_labels_as_values.used);
+    hashmap_foreach(&func_labels_as_values, L) {
+      assert(L->val);
+      LLVMAddDestination(indirect_br, L->val);
+    }
+    return NULL;
+  }
   case ND_ASM:
-    todo_impl(" goto_expr, asm");
+    todo_impl("asm");
   default:
     unreachable();
   }
@@ -1519,6 +1530,7 @@ static void codegen_build_function_body(Obj *fn) {
   codegen_build_function_default_return(fn);
   F = NULL;
   hashmap_clear(&func_labels);
+  hashmap_clear(&func_labels_as_values);
 }
 
 // stage 1. Only declare global variable to avoid dependency order

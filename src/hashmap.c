@@ -32,7 +32,7 @@ static void rehash(HashMap *map) {
   // Compute the size of the new hashmap.
   int nkeys = 0;
   for (int i = 0; i < map->capacity; i++)
-    if (map->buckets[i].key && map->buckets[i].key != TOMBSTONE)
+    if (hashmap_entry_valid(map->buckets + i))
       nkeys++;
 
   int cap = map->capacity;
@@ -47,7 +47,7 @@ static void rehash(HashMap *map) {
 
   for (int i = 0; i < map->capacity; i++) {
     HashEntry *ent = &map->buckets[i];
-    if (ent->key && ent->key != TOMBSTONE)
+    if (hashmap_entry_valid(ent))
       hashmap_put2(&map2, ent->key, ent->keylen, ent->val);
   }
 
@@ -57,7 +57,7 @@ static void rehash(HashMap *map) {
 }
 
 static bool match(HashEntry *ent, char *key, int keylen) {
-  return ent->key && ent->key != TOMBSTONE && ent->keylen == keylen &&
+  return hashmap_entry_valid(ent) && ent->keylen == keylen &&
          memcmp(ent->key, key, keylen) == 0;
 }
 
@@ -159,4 +159,8 @@ void hashmap_clear(HashMap *map) {
     map->used = 0;
     memset(map->buckets, 0, map->capacity * sizeof(HashEntry));
   }
+}
+
+bool hashmap_entry_valid(HashEntry *e) {
+  return e && e->key && e->key != TOMBSTONE;
 }

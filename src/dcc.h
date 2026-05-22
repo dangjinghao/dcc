@@ -449,6 +449,13 @@ void hashmap_delete(HashMap *map, char *key);
 void hashmap_delete2(HashMap *map, char *key, int keylen);
 void hashmap_destroy(HashMap *map);
 void hashmap_clear(HashMap *map);
+bool hashmap_entry_valid(HashEntry *e);
+
+#define hashmap_foreach(map, entry)                                            \
+  for (int __hashmap_i = 0; __hashmap_i < (map)->capacity; __hashmap_i++)      \
+    if (hashmap_entry_valid((map)->buckets + __hashmap_i))                     \
+      for (HashEntry *entry = (map)->buckets + __hashmap_i, *__once = NULL;    \
+           !__once; __once = (void *)1)
 
 //
 /// unicode.c
