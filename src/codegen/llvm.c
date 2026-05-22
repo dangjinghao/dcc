@@ -22,6 +22,9 @@ static HashMap func_labels;
 static LLVMValueRef cmp_nz(LLVMValueRef v);
 static LLVMValueRef cmp_ez(LLVMValueRef v);
 
+static void gen_switch_cmp_algo_rev_direct(Node *node,
+                                           LLVMBasicBlockRef bb_after);
+
 static void llvm_memset2(LLVMValueRef ptr, LLVMValueRef byte, LLVMValueRef n,
                          LLVMValueRef is_volatile) {
 
@@ -1342,13 +1345,77 @@ static LLVMValueRef gen_stmt(Node *node) {
     // not necessary just like those ir after br in same block.
     return NULL;
   }
-  case ND_SWITCH:
-  case ND_CASE:
+  case ND_SWITCH: {
+    new_block("switch");
+    LLVMBasicBlockRef bb_after =
+        LLVMAppendBasicBlockInContext(C, F, "switch_after");
+    assert(node->break_label);
+    hashmap_put(&func_labels, node->break_label, bb_after);
+    LLVMBasicBlockRef bb_body =
+        LLVMAppendBasicBlockInContext(C, F, "switch_body");
+    LLVMBasicBlockRef bb_cond =
+        LLVMAppendBasicBlockInContext(C, F, "switch_cond");
+    LLVMBuildBr(B, bb_cond);
+    LLVMPositionBuilderAtEnd(B, bb_body);
+    gen_stmt(node->then);
+    LLVMBuildBr(B, bb_after);
+    LLVMPositionBuilderAtEnd(B, bb_cond);
+    gen_switch_cmp_algo_rev_direct(node, bb_after);
+    LLVMPositionBuilderAtEnd(B, bb_after);
+    return NULL;
+  }
+  case ND_CASE: {
+    LLVMBasicBlockRef bb = LLVMAppendBasicBlockInContext(C, F, "case");
+    hashmap_put(&func_labels, node->label, bb);
+    LLVMBuildBr(B, bb);
+    LLVMPositionBuilderAtEnd(B, bb);
+    gen_stmt(node->lhs);
+
+    return NULL;
+  }
   case ND_GOTO_EXPR:
   case ND_ASM:
-    todo_impl("switch, case, goto_expr, asm");
+    todo_impl(" goto_expr, asm");
   default:
     unreachable();
+  }
+}
+
+// directly reversed traverse all case
+static void gen_switch_cmp_algo_rev_direct(Node *node,
+                                           LLVMBasicBlockRef switch_after) {
+  LLVMValueRef v = gen_expr(node->cond);
+
+  for (Node *n = node->case_next; n; n = n->case_next) {
+    LLVMBasicBlockRef bb_case = hashmap_get(&func_labels, n->label);
+    assert(bb_case);
+    LLVMValueRef case_cmp = NULL;
+    if (n->begin == n->end) {
+      case_cmp =
+          LLVMBuildICmp(B, LLVMIntEQ, v,
+                        LLVMConstInt(LLVMInt64TypeInContext(C), n->begin, true),
+                        "switch_cmp");
+    } else {
+      // gnu ext: case range
+      LLVMValueRef sub = LLVMBuildSub(
+          B, v, LLVMConstInt(LLVMInt64TypeInContext(C), n->begin, true),
+          "switch_range_sub");
+      case_cmp = LLVMBuildICmp(
+          B, LLVMIntULE, sub,
+          LLVMConstInt(LLVMInt64TypeInContext(C), n->end - n->begin, true),
+          "switch_rang_cmp");
+    }
+    LLVMBasicBlockRef case_after =
+        LLVMAppendBasicBlockInContext(C, F, "case_after");
+    LLVMBuildCondBr(B, case_cmp, bb_case, case_after);
+    LLVMPositionBuilderAtEnd(B, case_after);
+  }
+  if (node->default_case) {
+    LLVMBasicBlockRef bb_default =
+        hashmap_get(&func_labels, node->default_case->label);
+    LLVMBuildBr(B, bb_default);
+  } else {
+    LLVMBuildBr(B, switch_after);
   }
 }
 

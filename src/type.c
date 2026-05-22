@@ -437,6 +437,12 @@ static void add_type2(Node *node) {
     node->ty = node->lhs->ty;
     return;
   }
+  case ND_SWITCH: {
+    // now we just use long
+    // because now the case value is stored in long type
+    node->cond = new_cast(node->cond, ty_long);
+    return;
+  }
   case ND_ASSIGN:
   case ND_SA_ADD:
   case ND_SA_SUB:
