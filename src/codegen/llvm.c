@@ -577,13 +577,10 @@ static LLVMValueRef gen_addr(Node *node) {
   }
   case ND_FUNCALL:
     if (is_agg_type(node->ty)) {
-      LLVMValueRef ret_struct = gen_expr(node);
+      gen_expr(node);
       assert(node->ret_buffer);
       LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
       assert(ptr);
-      if (!is_large_agg_type(node->ty)) {
-        LLVMBuildStore(B, ret_struct, ptr);
-      }
       return ptr;
     }
     break;
