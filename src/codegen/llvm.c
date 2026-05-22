@@ -1012,7 +1012,8 @@ static LLVMValueRef gen_expr(Node *node) {
       iop = LLVMIntEQ;
       break;
     case ND_NE:
-      fop = LLVMRealONE;
+      // IEEE 754 NaN != NaN
+      fop = LLVMRealUNE;
       iop = LLVMIntNE;
       break;
     case ND_LT:
