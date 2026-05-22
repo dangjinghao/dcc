@@ -407,22 +407,22 @@ int main() {
            struct_test15(x, 2);
          }));
 
-  // ASSERT(10, struct_test24().a);
-  // ASSERT(20, struct_test24().b);
-  // ASSERT(30, struct_test24().c);
-  // ASSERT(40, struct_test24().d);
+  ASSERT(10, struct_test24().a);
+  ASSERT(20, struct_test24().b);
+  ASSERT(30, struct_test24().c);
+  ASSERT(40, struct_test24().d);
 
-  // ASSERT(10, struct_test25().a);
-  // ASSERT(20, struct_test25().b);
-  // ASSERT(30, struct_test25().c);
+  ASSERT(10, struct_test25().a);
+  ASSERT(20, struct_test25().b);
+  ASSERT(30, struct_test25().c);
 
-  // ASSERT(10, struct_test26().a[0]);
-  // ASSERT(20, struct_test26().a[1]);
-  // ASSERT(30, struct_test26().a[2]);
+  ASSERT(10, struct_test26().a[0]);
+  ASSERT(20, struct_test26().a[1]);
+  ASSERT(30, struct_test26().a[2]);
 
-  // ASSERT(10, struct_test27().a[0]);
-  // ASSERT(60, struct_test27().a[5]);
-  // ASSERT(100, struct_test27().a[9]);
+  ASSERT(10, struct_test27().a[0]);
+  ASSERT(60, struct_test27().a[5]);
+  ASSERT(100, struct_test27().a[9]);
 
   ASSERT(1, struct_test28().a[0]);
   ASSERT(5, struct_test28().a[4]);
@@ -430,22 +430,22 @@ int main() {
   ASSERT(15, struct_test28().a[14]);
   ASSERT(20, struct_test28().a[19]);
 
-  // ASSERT(10, struct_test34().a);
-  // ASSERT(20, struct_test34().b);
-  // ASSERT(30, struct_test34().c);
-  // ASSERT(40, struct_test34().d);
+  ASSERT(10, struct_test34().a);
+  ASSERT(20, struct_test34().b);
+  ASSERT(30, struct_test34().c);
+  ASSERT(40, struct_test34().d);
 
-  // ASSERT(10, struct_test35().a);
-  // ASSERT(20, struct_test35().b);
-  // ASSERT(30, struct_test35().c);
+  ASSERT(10, struct_test35().a);
+  ASSERT(20, struct_test35().b);
+  ASSERT(30, struct_test35().c);
 
-  // ASSERT(10, struct_test36().a[0]);
-  // ASSERT(20, struct_test36().a[1]);
-  // ASSERT(30, struct_test36().a[2]);
+  ASSERT(10, struct_test36().a[0]);
+  ASSERT(20, struct_test36().a[1]);
+  ASSERT(30, struct_test36().a[2]);
 
-  // ASSERT(10, struct_test37().a[0]);
-  // ASSERT(60, struct_test37().a[5]);
-  // ASSERT(100, struct_test37().a[9]);
+  ASSERT(10, struct_test37().a[0]);
+  ASSERT(60, struct_test37().a[5]);
+  ASSERT(100, struct_test37().a[9]);
 
   ASSERT(1, struct_test38().a[0]);
   ASSERT(5, struct_test38().a[4]);
