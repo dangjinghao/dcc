@@ -129,6 +129,7 @@ static LLVMTypeRef type_convert(Type *ty) {
   case TY_SHORT:
     return LLVMInt16TypeInContext(C);
   case TY_INT:
+  case TY_ENUM:
     return LLVMInt32TypeInContext(C);
   case TY_LONG:
     return LLVMInt64TypeInContext(C);
@@ -207,7 +208,6 @@ static LLVMTypeRef type_convert(Type *ty) {
   }
   case TY_VLA:
     todo_impl("vla");
-  case TY_ENUM:
   default:
     break;
   }
