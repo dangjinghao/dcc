@@ -308,6 +308,9 @@ struct Node {
   char *label;
   char *unique_label;
   Node *goto_next;
+  // now it's used in LLVM backend
+  // to support static variable in function refers labels-as-values
+  Obj *parent_fn;
 
   // Switch
   Node *case_next;
@@ -400,7 +403,7 @@ Node *new_cast(Node *expr, Type *ty);
 int64_t const_expr(Token **rest, Token *tok);
 Obj *parse(Token *tok);
 int64_t eval(Node *node);
-int64_t eval2(Node *node, char ***label);
+int64_t eval2(Node *node, Node **label_node);
 double eval_double(Node *node);
 
 //

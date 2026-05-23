@@ -17,7 +17,7 @@ static LLVMModuleRef M;
 static LLVMBuilderRef B;
 static LLVMValueRef F;
 
-static HashMap func_labels;
+static HashMap block_labels;
 static HashMap func_labels_as_values;
 
 static LLVMValueRef cmp_nz(LLVMValueRef v);
@@ -266,22 +266,32 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
     init_val = LLVMConstNull(llvm_ty);
   } else {
     // integer family and ptr
-    char **var_ref = NULL;
-    int64_t eval_val = eval2(init->expr, &var_ref);
-    if (var_ref) {
-      // Relocation pointer, real data: label + eval_val
-      LLVMValueRef target_val = LLVMGetNamedGlobal(M, *var_ref);
-      if (!target_val) {
-        // maybe it's a function
-        target_val = LLVMGetNamedFunction(M, *var_ref);
+    Node *var_node = NULL;
+    int64_t eval_val = eval2(init->expr, &var_node);
+    if (var_node) {
+      if (var_node->kind == ND_LABEL_VAL) {
+        LLVMValueRef target_fn =
+            (LLVMValueRef)var_node->parent_fn->codegen_data;
+        assert(target_fn);
+        LLVMBasicBlockRef bb =
+            hashmap_get(&block_labels, var_node->unique_label);
+        if (!bb) {
+          bb = LLVMAppendBasicBlockInContext(C, target_fn,
+                                             var_node->unique_label);
+          hashmap_put(&block_labels, var_node->unique_label, bb);
+        }
+        init_val = LLVMBlockAddress(target_fn, bb);
+      } else {
+        // Relocation pointer, real data: label + eval_val
+        LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
+        assert(target_val);
+        assert(ty->base);
+        LLVMTypeRef pointee_ty = type_convert(ty->base);
+        LLVMValueRef indices =
+            LLVMConstInt(LLVMInt64TypeInContext(C),
+                         (uint64_t)eval_val / ty->base->size, false);
+        init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
       }
-      assert(target_val);
-      assert(ty->base);
-      LLVMTypeRef pointee_ty = type_convert(ty->base);
-      LLVMValueRef indices =
-          LLVMConstInt(LLVMInt64TypeInContext(C),
-                       (uint64_t)eval_val / ty->base->size, false);
-      init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
     } else {
       // int family
       init_val = LLVMConstInt(llvm_ty, eval_val, ty->is_unsigned);
@@ -909,12 +919,12 @@ static LLVMValueRef gen_expr(Node *node) {
     return r;
   }
   case ND_LABEL_VAL: {
-    LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
+    LLVMBasicBlockRef bb = hashmap_get(&block_labels, node->unique_label);
     if (!bb) {
       // if bb exists, goto statement create this before.
       // we just reuse this, or we  create a new one
       bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
-      hashmap_put(&func_labels, node->unique_label, bb);
+      hashmap_put(&block_labels, node->unique_label, bb);
     }
     hashmap_put(&func_labels_as_values, node->unique_label, bb);
     return LLVMBlockAddress(F, bb);
@@ -1280,8 +1290,8 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMBasicBlockRef bb_cond = LLVMAppendBasicBlockInContext(C, F, "for_cond");
     LLVMBasicBlockRef bb_body = LLVMAppendBasicBlockInContext(C, F, "for_body");
     LLVMBasicBlockRef bb_inc = LLVMAppendBasicBlockInContext(C, F, "for_inc");
-    hashmap_put(&func_labels, node->break_label, bb_merge);
-    hashmap_put(&func_labels, node->cont_label, bb_inc);
+    hashmap_put(&block_labels, node->break_label, bb_merge);
+    hashmap_put(&block_labels, node->cont_label, bb_inc);
     if (node->init) {
       gen_stmt(node->init);
     }
@@ -1312,8 +1322,8 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMBasicBlockRef bb_cond = LLVMAppendBasicBlockInContext(C, F, "do_cond");
     LLVMBasicBlockRef bb_merge =
         LLVMAppendBasicBlockInContext(C, F, "do_merge");
-    hashmap_put(&func_labels, node->break_label, bb_merge);
-    hashmap_put(&func_labels, node->cont_label, bb_cond);
+    hashmap_put(&block_labels, node->break_label, bb_merge);
+    hashmap_put(&block_labels, node->cont_label, bb_cond);
     llvm_build_terminator_br(bb_body);
     LLVMPositionBuilderAtEnd(B, bb_body);
     gen_stmt(node->then);
@@ -1327,12 +1337,12 @@ static LLVMValueRef gen_stmt(Node *node) {
   }
   case ND_LABEL: {
     new_block("labeled_stmt");
-    LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
+    LLVMBasicBlockRef bb = hashmap_get(&block_labels, node->unique_label);
     if (!bb) {
       // if bb exists, goto statement create this before.
       // we just reuse this, or we  create a new one
       bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
-      hashmap_put(&func_labels, node->unique_label, bb);
+      hashmap_put(&block_labels, node->unique_label, bb);
     }
     llvm_build_terminator_br(bb);
     LLVMPositionBuilderAtEnd(B, bb);
@@ -1341,12 +1351,12 @@ static LLVMValueRef gen_stmt(Node *node) {
   case ND_GOTO: {
     new_block("goto");
 
-    LLVMBasicBlockRef bb = hashmap_get(&func_labels, node->unique_label);
+    LLVMBasicBlockRef bb = hashmap_get(&block_labels, node->unique_label);
     if (!bb) {
       // if bb exists, labeled statement create this before.
       // we just reuse this, or we  create a new one
       bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
-      hashmap_put(&func_labels, node->unique_label, bb);
+      hashmap_put(&block_labels, node->unique_label, bb);
     }
     llvm_build_terminator_br(bb);
     // we keep current Builder position because the later code is
@@ -1358,7 +1368,7 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMBasicBlockRef bb_after =
         LLVMAppendBasicBlockInContext(C, F, "switch_after");
     assert(node->break_label);
-    hashmap_put(&func_labels, node->break_label, bb_after);
+    hashmap_put(&block_labels, node->break_label, bb_after);
     LLVMBasicBlockRef bb_body =
         LLVMAppendBasicBlockInContext(C, F, "switch_body");
     LLVMBasicBlockRef bb_cond =
@@ -1374,7 +1384,7 @@ static LLVMValueRef gen_stmt(Node *node) {
   }
   case ND_CASE: {
     LLVMBasicBlockRef bb = LLVMAppendBasicBlockInContext(C, F, "case");
-    hashmap_put(&func_labels, node->label, bb);
+    hashmap_put(&block_labels, node->label, bb);
     llvm_build_terminator_br(bb);
     LLVMPositionBuilderAtEnd(B, bb);
     gen_stmt(node->lhs);
@@ -1404,7 +1414,7 @@ static void gen_switch_cmp_algo_rev_direct(Node *node,
   LLVMValueRef v = gen_expr(node->cond);
 
   for (Node *n = node->case_next; n; n = n->case_next) {
-    LLVMBasicBlockRef bb_case = hashmap_get(&func_labels, n->label);
+    LLVMBasicBlockRef bb_case = hashmap_get(&block_labels, n->label);
     assert(bb_case);
     LLVMValueRef case_cmp = NULL;
     if (n->begin == n->end) {
@@ -1429,7 +1439,7 @@ static void gen_switch_cmp_algo_rev_direct(Node *node,
   }
   if (node->default_case) {
     LLVMBasicBlockRef bb_default =
-        hashmap_get(&func_labels, node->default_case->label);
+        hashmap_get(&block_labels, node->default_case->label);
     llvm_build_terminator_br(bb_default);
   } else {
     llvm_build_terminator_br(switch_after);
@@ -1506,17 +1516,17 @@ static void codegen_alloca_function_local_argument(Obj *args) {
 
 // Recurisvely declare them in reversed order, so that the codegen result will
 // keep a same order as source code
-static void codegen_alloca_function_local_variable(Obj *local_vars) {
+static void alloca_function_local_variable(Obj *local_vars) {
 
   if ((!local_vars) || local_vars->codegen_data)
     return;
-  codegen_alloca_function_local_variable(local_vars->next);
+  alloca_function_local_variable(local_vars->next);
   LLVMValueRef lv =
       LLVMBuildAlloca(B, type_convert(local_vars->ty), local_vars->name);
   local_vars->codegen_data = (intptr_t)lv;
 }
 
-static void codegen_build_function_default_return(Obj *var) {
+static void build_function_default_return(Obj *var) {
   if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(B))) {
     // If there isn't any terminator(return) in the last BB, create a new one
     if (var->ty->return_ty->kind == TY_VOID) {
@@ -1527,19 +1537,38 @@ static void codegen_build_function_default_return(Obj *var) {
   }
 }
 
-static void codegen_build_function_body(Obj *fn) {
+static void restore_function_labels(LLVMValueRef fn) {
+  // Restore labels for the current function from block_labels
+  hashmap_clear(&func_labels_as_values);
+  hashmap_foreach(&block_labels, entry) {
+    LLVMBasicBlockRef bb = (LLVMBasicBlockRef)entry->val;
+    if (LLVMGetBasicBlockParent(bb) == fn) {
+      hashmap_put(&func_labels_as_values, entry->key, bb);
+    }
+  }
+}
+
+static void build_function_body(Obj *fn) {
   F = (LLVMValueRef)fn->codegen_data;
   assert(F);
+  // Restore labels for the current function that were created during global
+  // initialization
+  // e.g. static void *p[]={&&l1,&&l2,&&l3};
+  restore_function_labels(F);
   // prologue
-  LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(C, F, "entry");
+  LLVMBasicBlockRef entry = LLVMGetFirstBasicBlock(F);
+  assert(entry);
   LLVMPositionBuilderAtEnd(B, entry);
   codegen_alloca_function_local_argument(fn->params);
-  codegen_alloca_function_local_variable(fn->locals);
+  alloca_function_local_variable(fn->locals);
   gen_stmt(fn->body);
-  codegen_build_function_default_return(fn);
+  build_function_default_return(fn);
   F = NULL;
-  hashmap_clear(&func_labels);
   hashmap_clear(&func_labels_as_values);
+}
+
+static void ensure_function_entry_block(LLVMValueRef fn) {
+  LLVMAppendBasicBlockInContext(C, fn, "entry");
 }
 
 // stage 1. Only declare global variable to avoid dependency order
@@ -1561,6 +1590,18 @@ static void codegen_global_declare(Obj *var) {
     } else {
       LLVMTypeRef ty = type_convert(var->ty);
       vr = LLVMAddFunction(M, var->name, ty);
+    }
+    if (var->is_definition) {
+      // create entry block early to avoid some blocks that created in global declare
+      // process be the first block.
+      // e.g.
+      // int F(){
+      // static void *p[]={&&v41,&&v42,&&v43}; int i=0; goto *p[0]; v41:i++;
+      // v42:i++; v43:i++; i;
+      // }
+      // it will create v41, v42, v43 block in global declare process and if
+      // there isn't entry block those block will be the first block
+      ensure_function_entry_block(vr);
     }
   } else {
     LLVMTypeRef ty = type_convert(var->ty);
@@ -1607,7 +1648,7 @@ static void codegen_global_init(Obj *prog) {
       continue;
     }
     if (var->is_function && var->body) {
-      codegen_build_function_body(var);
+      build_function_body(var);
       continue;
     }
   }

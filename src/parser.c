@@ -89,7 +89,7 @@ static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
 static Node *expr(Token **rest, Token *tok);
-static int64_t eval_rval(Node *node, char ***label);
+static int64_t eval_rval(Node *node, Node **label_node);
 static bool is_const_expr(Node *node);
 static Node *assign(Token **rest, Token *tok);
 static Node *logor(Token **rest, Token *tok);
@@ -1746,7 +1746,7 @@ int64_t eval(Node *node) { return eval2(node, NULL); }
 // is a pointer to a global variable and n is a positive/negative
 // number. The latter form is accepted only as an initialization
 // expression for a global variable.
-int64_t eval2(Node *node, char ***label) {
+int64_t eval2(Node *node, Node **label_node) {
   add_type(node, false);
 
   if (is_flonum(node->ty))
@@ -1754,9 +1754,9 @@ int64_t eval2(Node *node, char ***label) {
 
   switch (node->kind) {
   case ND_ADD:
-    return eval2(node->lhs, label) + eval(node->rhs);
+    return eval2(node->lhs, label_node) + eval(node->rhs);
   case ND_SUB:
-    return eval2(node->lhs, label) - eval(node->rhs);
+    return eval2(node->lhs, label_node) - eval(node->rhs);
   case ND_MUL:
     return eval(node->lhs) * eval(node->rhs);
   case ND_DIV:
@@ -1794,10 +1794,10 @@ int64_t eval2(Node *node, char ***label) {
       return (uint64_t)eval(node->lhs) <= eval(node->rhs);
     return eval(node->lhs) <= eval(node->rhs);
   case ND_COND:
-    return eval(node->cond) ? eval2(node->then, label)
-                            : eval2(node->_else, label);
+    return eval(node->cond) ? eval2(node->then, label_node)
+                            : eval2(node->_else, label_node);
   case ND_COMMA:
-    return eval2(node->rhs, label);
+    return eval2(node->rhs, label_node);
   case ND_NOT:
     return !eval(node->lhs);
   case ND_BITNOT:
@@ -1807,7 +1807,7 @@ int64_t eval2(Node *node, char ***label) {
   case ND_LOGOR:
     return eval(node->lhs) || eval(node->rhs);
   case ND_CAST: {
-    int64_t val = eval2(node->lhs, label);
+    int64_t val = eval2(node->lhs, label_node);
     if (is_integer(node->ty)) {
       switch (node->ty->size) {
       case 1:
@@ -1821,22 +1821,23 @@ int64_t eval2(Node *node, char ***label) {
     return val;
   }
   case ND_ADDR:
-    return eval_rval(node->lhs, label);
+    return eval_rval(node->lhs, label_node);
   case ND_LABEL_VAL:
-    *label = &node->unique_label;
+    if (label_node)
+      *label_node = node;
     return 0;
   case ND_MEMBER:
-    if (!label)
+    if (!label_node)
       error_tok(node->tok, "not a compile-time constant");
     if (node->ty->kind != TY_ARRAY)
       error_tok(node->tok, "invalid initializer");
-    return eval_rval(node->lhs, label) + node->member->offset;
+    return eval_rval(node->lhs, label_node) + node->member->offset;
   case ND_VAR:
-    if (!label)
+    if (!label_node)
       error_tok(node->tok, "not a compile-time constant");
     if (node->var->ty->kind != TY_ARRAY && node->var->ty->kind != TY_FUNC)
       error_tok(node->tok, "invalid initializer");
-    *label = &node->var->name;
+    *label_node = node;
     return 0;
   case ND_NUM:
     return node->val;
@@ -1847,17 +1848,17 @@ int64_t eval2(Node *node, char ***label) {
   error_tok(node->tok, "not a compile-time constant");
 }
 
-static int64_t eval_rval(Node *node, char ***label) {
+static int64_t eval_rval(Node *node, Node **label_node) {
   switch (node->kind) {
   case ND_VAR:
     if (node->var->is_local)
       error_tok(node->tok, "not a compile-time constant");
-    *label = &node->var->name;
+    *label_node = node;
     return 0;
   case ND_DEREF:
-    return eval2(node->lhs, label);
+    return eval2(node->lhs, label_node);
   case ND_MEMBER:
-    return eval_rval(node->lhs, label) + node->member->offset;
+    return eval_rval(node->lhs, label_node) + node->member->offset;
   default:
     break;
   }
@@ -2367,6 +2368,7 @@ static Node *unary(Token **rest, Token *tok) {
     Node *node = new_node(ND_LABEL_VAL, tok);
     node->label = get_ident(tok->next);
     node->goto_next = gotos;
+    node->parent_fn = current_fn;
     gotos = node;
     *rest = tok->next->next;
     return node;
