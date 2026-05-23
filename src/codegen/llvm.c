@@ -315,9 +315,17 @@ static void llvm_set_value_attr(Obj *o, LLVMValueRef v) {
   }
 }
 
+// create br instruction if current block is not terminataed. It seems that if
+// there are more than one br in same block, it will be an ub situation
+static void llvm_build_terminator_br(LLVMBasicBlockRef dest) {
+  if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(B))) {
+    LLVMBuildBr(B, dest);
+  }
+}
+
 static void new_block(char *name) {
   LLVMBasicBlockRef blk_name = LLVMAppendBasicBlockInContext(C, F, name);
-  LLVMBuildBr(B, blk_name);
+  llvm_build_terminator_br(blk_name);
   LLVMPositionBuilderAtEnd(B, blk_name);
 }
 
@@ -674,7 +682,7 @@ static LLVMValueRef logic_short_circuit(Node *node, bool is_and) {
   LLVMValueRef rhs_check = cmp_nz(rhs);
   // update then block which maybe updated by sub-expression
   next_block = LLVMGetInsertBlock(B);
-  LLVMBuildBr(B, merge_block);
+  llvm_build_terminator_br(merge_block);
 
   LLVMPositionBuilderAtEnd(B, merge_block);
   LLVMValueRef phi =
@@ -791,7 +799,7 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     // update then block which maybe updated by sub-expression
     bb_then = LLVMGetInsertBlock(B);
-    LLVMBuildBr(B, bb_merge);
+    llvm_build_terminator_br(bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_else);
     LLVMValueRef else_v = gen_expr(node->_else);
     if (!else_v) {
@@ -799,7 +807,7 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     // update else block which maybe updated by sub-expression
     bb_else = LLVMGetInsertBlock(B);
-    LLVMBuildBr(B, bb_merge);
+    llvm_build_terminator_br(bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_merge);
     // ternary operator returns void, e.g.
     // 1 ? -2 : (void)-1;
@@ -1255,12 +1263,12 @@ static LLVMValueRef gen_stmt(Node *node) {
     LLVMBuildCondBr(B, cond, bb_then, bb_else);
     LLVMPositionBuilderAtEnd(B, bb_then);
     gen_stmt(node->then);
-    LLVMBuildBr(B, bb_merge);
+    llvm_build_terminator_br(bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_else);
     if (node->_else) {
       gen_stmt(node->_else);
     }
-    LLVMBuildBr(B, bb_merge);
+    llvm_build_terminator_br(bb_merge);
     LLVMPositionBuilderAtEnd(B, bb_merge);
     return NULL;
   }
@@ -1277,23 +1285,23 @@ static LLVMValueRef gen_stmt(Node *node) {
     if (node->init) {
       gen_stmt(node->init);
     }
-    LLVMBuildBr(B, bb_cond);
+    llvm_build_terminator_br(bb_cond);
     LLVMPositionBuilderAtEnd(B, bb_cond);
     if (node->cond) {
       LLVMValueRef cond = gen_expr(node->cond);
       cond = cmp_nz(cond);
       LLVMBuildCondBr(B, cond, bb_body, bb_merge);
     } else {
-      LLVMBuildBr(B, bb_body);
+      llvm_build_terminator_br(bb_body);
     }
     LLVMPositionBuilderAtEnd(B, bb_body);
     gen_stmt(node->then);
-    LLVMBuildBr(B, bb_inc);
+    llvm_build_terminator_br(bb_inc);
     LLVMPositionBuilderAtEnd(B, bb_inc);
 
     if (node->inc)
       gen_expr(node->inc);
-    LLVMBuildBr(B, bb_cond);
+    llvm_build_terminator_br(bb_cond);
 
     LLVMPositionBuilderAtEnd(B, bb_merge);
     return NULL;
@@ -1306,10 +1314,10 @@ static LLVMValueRef gen_stmt(Node *node) {
         LLVMAppendBasicBlockInContext(C, F, "do_merge");
     hashmap_put(&func_labels, node->break_label, bb_merge);
     hashmap_put(&func_labels, node->cont_label, bb_cond);
-    LLVMBuildBr(B, bb_body);
+    llvm_build_terminator_br(bb_body);
     LLVMPositionBuilderAtEnd(B, bb_body);
     gen_stmt(node->then);
-    LLVMBuildBr(B, bb_cond);
+    llvm_build_terminator_br(bb_cond);
     LLVMPositionBuilderAtEnd(B, bb_cond);
     LLVMValueRef cond = gen_expr(node->cond);
     cond = cmp_nz(cond);
@@ -1326,7 +1334,7 @@ static LLVMValueRef gen_stmt(Node *node) {
       bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
       hashmap_put(&func_labels, node->unique_label, bb);
     }
-    LLVMBuildBr(B, bb);
+    llvm_build_terminator_br(bb);
     LLVMPositionBuilderAtEnd(B, bb);
     return gen_stmt(node->lhs);
   }
@@ -1340,7 +1348,7 @@ static LLVMValueRef gen_stmt(Node *node) {
       bb = LLVMAppendBasicBlockInContext(C, F, node->unique_label);
       hashmap_put(&func_labels, node->unique_label, bb);
     }
-    LLVMBuildBr(B, bb);
+    llvm_build_terminator_br(bb);
     // we keep current Builder position because the later code is
     // not necessary just like those ir after br in same block.
     return NULL;
@@ -1355,10 +1363,10 @@ static LLVMValueRef gen_stmt(Node *node) {
         LLVMAppendBasicBlockInContext(C, F, "switch_body");
     LLVMBasicBlockRef bb_cond =
         LLVMAppendBasicBlockInContext(C, F, "switch_cond");
-    LLVMBuildBr(B, bb_cond);
+    llvm_build_terminator_br(bb_cond);
     LLVMPositionBuilderAtEnd(B, bb_body);
     gen_stmt(node->then);
-    LLVMBuildBr(B, bb_after);
+    llvm_build_terminator_br(bb_after);
     LLVMPositionBuilderAtEnd(B, bb_cond);
     gen_switch_cmp_algo_rev_direct(node, bb_after);
     LLVMPositionBuilderAtEnd(B, bb_after);
@@ -1367,7 +1375,7 @@ static LLVMValueRef gen_stmt(Node *node) {
   case ND_CASE: {
     LLVMBasicBlockRef bb = LLVMAppendBasicBlockInContext(C, F, "case");
     hashmap_put(&func_labels, node->label, bb);
-    LLVMBuildBr(B, bb);
+    llvm_build_terminator_br(bb);
     LLVMPositionBuilderAtEnd(B, bb);
     gen_stmt(node->lhs);
 
@@ -1422,9 +1430,9 @@ static void gen_switch_cmp_algo_rev_direct(Node *node,
   if (node->default_case) {
     LLVMBasicBlockRef bb_default =
         hashmap_get(&func_labels, node->default_case->label);
-    LLVMBuildBr(B, bb_default);
+    llvm_build_terminator_br(bb_default);
   } else {
-    LLVMBuildBr(B, switch_after);
+    llvm_build_terminator_br(switch_after);
   }
 }
 
