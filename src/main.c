@@ -47,7 +47,7 @@ static void run_cc1(char *input, char *output, PtrArray *args) {
   strarray_push(args, output);
   strarray_push(args, NULL);
 
-  run_subprocess(args->data);
+  run_subprocess((char **)args->data);
 }
 
 noreturn void cc1() {
@@ -164,7 +164,7 @@ static void expand_macro(char *input, char *output, char *argv0) {
   strarray_push(&args_full, input);
   strarray_push(&args_full, NULL);
 
-  run_subprocess(args_full.data);
+  run_subprocess((char **)args_full.data);
 }
 
 static void assemble(char *input, char *output) {
@@ -259,7 +259,7 @@ static void run_linker(PtrArray *inputs, char *output) {
   strarray_push(&arr, format("%s/crtn.o", libpath));
   strarray_push(&arr, NULL);
 
-  run_subprocess(arr.data);
+  run_subprocess((char **)arr.data);
 }
 
 int main(int argc, char *argv[]) {
@@ -270,48 +270,71 @@ int main(int argc, char *argv[]) {
     unreachable();
   }
 
-  if (opt_input_paths.len > 1 && opt_o && (opt_c || opt_S | opt_E))
+  if (opt_inputfiles.len > 1 && opt_o && (opt_c || opt_S | opt_E))
     error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
 
   PtrArray ld_objs = {0};
-  for (int i = 0; i < opt_input_paths.len; i++) {
-    char *input_file = opt_input_paths.data[i];
-    char *expanded_file = path_new_tmpfile();
-    char *asm_file = path_new_tmpfile();
-    char *obj_file = path_new_tmpfile();
-    // generate *.c
-    expand_macro(input_file, expanded_file, argv[0]);
-    if (opt_E) {
-      path_cp(opt_o ?: "-", expanded_file);
+  for (int i = 0; i < opt_inputfiles.len; i++) {
+    InputFile *input_file = opt_inputfiles.data[i];
+    if (input_file->type == FILETYPE_C) {
+      char *expanded_file = path_new_tmpfile();
+      char *asm_file = path_new_tmpfile();
+      char *obj_file = path_new_tmpfile();
+
+      expand_macro(input_file->path, expanded_file, argv[0]);
+      if (opt_E) {
+        path_cp(opt_o ?: "-", expanded_file);
+        continue;
+      }
+      PtrArray args = {0};
+      pack_args(argc, argv, &args);
+
+      // generate *.s
+      run_cc1(expanded_file, asm_file, &args);
+
+      if (opt_ir)
+        opt_S = true;
+      if (opt_S) {
+        path_cp(opt_o ?: "-", asm_file);
+        continue;
+      }
+      // generate *.o
+      assemble(asm_file, obj_file);
+
+      if (opt_c) {
+        path_cp(opt_o
+                    ?: path_new_replaced_suffix(
+                           basename(strdup(input_file->path)), ".o"),
+                obj_file);
+        continue;
+      }
+      strarray_push(&ld_objs, obj_file);
+      continue;
+    } else if (input_file->type == FILETYPE_ASM) {
+      char *asm_file = input_file->path;
+      char *obj_file = path_new_tmpfile();
+      // generate *.o
+      assemble(asm_file, obj_file);
+
+      if (opt_c) {
+        path_cp(opt_o
+                    ?: path_new_replaced_suffix(
+                           basename(strdup(input_file->path)), ".o"),
+                obj_file);
+        continue;
+      }
+      strarray_push(&ld_objs, obj_file);
+      continue;
+    } else {
+      strarray_push(&ld_objs, input_file->path);
       continue;
     }
-    PtrArray args = {0};
-    pack_args(argc, argv, &args);
-
-    // generate *.s
-    run_cc1(expanded_file, asm_file, &args);
-
-    if (opt_ir)
-      opt_S = true;
-    if (opt_S) {
-      path_cp(opt_o ?: "-", asm_file);
-      continue;
-    }
-    // generate *.o
-    assemble(asm_file, obj_file);
-
-    if (opt_c) {
-      path_cp(
-          opt_o ?: path_new_replaced_suffix(basename(strdup(input_file)), ".o"),
-          obj_file);
-      continue;
-    }
-
-    strarray_push(&ld_objs, obj_file);
   }
+
   if (opt_E || opt_S || opt_c) {
     return 0;
   }
+
   run_linker(&ld_objs, opt_o ?: "a.out");
   return 0;
 }

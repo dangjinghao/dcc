@@ -22,7 +22,7 @@ bool opt_MG;
 char *opt_MF;
 char *opt_MT;
 
-PtrArray opt_input_paths;
+PtrArray opt_inputfiles;
 PtrArray opt_ld_extra_args;
 PtrArray opt_cpp_extra_args;
 
@@ -31,13 +31,77 @@ bool opt_cc1;
 char *opt_cc1_input;
 char *opt_cc1_output;
 
+static InputFileType force_input_file_type = FILETYPE_NONE;
+
+static InputFileType get_file_type(char *filename) {
+  if (force_input_file_type != FILETYPE_NONE) {
+    return force_input_file_type;
+  }
+
+  if (str_endswith(filename, ".a"))
+    return FILETYPE_AR;
+  if (str_endswith(filename, ".so"))
+    return FILETYPE_DSO;
+  if (str_endswith(filename, ".o"))
+    return FILETYPE_OBJ;
+  if (str_endswith(filename, ".c"))
+    return FILETYPE_C;
+  if (str_endswith(filename, ".s"))
+    return FILETYPE_ASM;
+
+  return FILETYPE_NONE;
+}
+
 static void usage(int status, char *argv0) {
   fprintf(stderr,
-          "%s [ -o <path> ] <file>\n"
+          "Usage: %s [options] <file>...\n"
+          "Options:\n"
+          "  -o <path>             place output into <path>\n"
+          "  -I<dir> / -I <dir>    add include directory\n"
+          "  -D<macro> / -D <macro> define macro\n"
+          "  -U<macro> / -U <macro> undefine macro\n"
+          "  -include <file>       include header before main input\n"
+          "  -x <lang>             force input language (c|assembler|none)\n"
+          "  -l<lib>               link with library\n"
+          "  -Wl,<args>            pass comma-separated args to linker\n"
+          "  -Xlinker <arg>        pass arg to linker\n"
+          "  -s                    pass -s to linker\n"
+          "  -M, -MD, -MM, -MMD    dependency generation options\n"
+          "  -MF <file>            write deps to file\n"
+          "  -MT <target>          set dependency target\n"
+          "  -MG, -MP              dependency options\n"
+          "  -fpic, -fPIC          generate position-independent code\n"
+          "  -idirafter <dir>      add include directory after others\n"
+          "  -###                  dump subprocess command line\n"
+          "  -ir                   generate LLVM IR\n"
+          "  -S                    stop after assembly (output .s)\n"
+          "  -E                    preprocess only (output .i)\n"
+          "  -c                    compile only (output .o)\n"
+          "  -static, -shared      pass to linker\n"
+          "  -L<dir> / -L <dir>    add library search path\n"
+          "  -fcommon / -fno-common\n"
+          "  --help                show this help\n"
           "cc1 mode:\n"
           "\t-cc1 -cc1-input <path> -cc1-output <path> [-ir]\n",
           argv0);
   exit(status);
+}
+
+static InputFile *new_inputfile(char *filepath, InputFileType t) {
+  InputFile *r = calloc(1, sizeof(InputFile));
+  r->path = filepath;
+  r->type = t;
+  return r;
+}
+
+static InputFileType parse_opt_x(char *s) {
+  if (!strcmp(s, "c"))
+    return FILETYPE_C;
+  if (!strcmp(s, "assembler"))
+    return FILETYPE_ASM;
+  if (!strcmp(s, "none"))
+    return FILETYPE_NONE;
+  error("CLI: unknown argument for -x: %s", s);
 }
 
 void parse_args(int argc, char **argv) {
@@ -107,15 +171,15 @@ void parse_args(int argc, char **argv) {
       continue;
     }
 
-    // if (!strcmp(argv[i], "-x")) {
-    //   opt_x = parse_opt_x(argv[++i]);
-    //   continue;
-    // }
+    if (!strcmp(argv[i], "-x")) {
+      force_input_file_type = parse_opt_x(argv[++i]);
+      continue;
+    }
 
-    // if (!strncmp(argv[i], "-x", 2)) {
-    //   opt_x = parse_opt_x(argv[i] + 2);
-    //   continue;
-    // }
+    if (!strncmp(argv[i], "-x", 2)) {
+      force_input_file_type = parse_opt_x(argv[i] + 2);
+      continue;
+    }
 
     if (!strncmp(argv[i], "-l", 2)) {
       strarray_push(&opt_ld_extra_args, argv[i]);
@@ -282,11 +346,12 @@ void parse_args(int argc, char **argv) {
     if (argv[i][0] == '-' && argv[i][1] != '\0')
       error("unknown argument: %s", argv[i]);
 
-    strarray_push(&opt_input_paths, argv[i]);
+    inputfiles_push(&opt_inputfiles,
+                    new_inputfile(argv[i], get_file_type(argv[i])));
   }
 
   if (!opt_cc1) {
-    if (opt_input_paths.len == 0)
+    if (opt_inputfiles.len == 0)
       error("no input file");
   }
 }

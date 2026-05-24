@@ -417,7 +417,7 @@ void codegen(Obj *prog, FILE *out, bool gen_asm);
 //
 
 typedef struct {
-  char **data;
+  void **data;
   int capacity;
   int len;
 } PtrArray;
@@ -440,6 +440,7 @@ bool str_endswith(char *p, char *q);
 #define PTRARRAY_PREFIX strarray
 #include "ptrarray_expand.h"
 #undef PTRARRAY_PTR_TYPE
+#undef PTRARRAY_PREFIX
 
 //
 /// hashmap.c
@@ -487,6 +488,25 @@ int display_width(char *p, int len);
 /// args.c
 //
 
+typedef enum {
+  FILETYPE_NONE,
+  FILETYPE_C,
+  FILETYPE_ASM,
+  FILETYPE_OBJ,
+  FILETYPE_AR,
+  FILETYPE_DSO,
+} InputFileType;
+typedef struct {
+  char *path;
+  InputFileType type;
+} InputFile;
+
+#define PTRARRAY_PTR_TYPE InputFile *
+#define PTRARRAY_PREFIX inputfiles
+#include "ptrarray_expand.h"
+#undef PTRARRAY_PREFIX
+#undef PTRARRAY_PTR_TYPE
+
 void parse_args(int argc, char **argv);
 extern bool opt_cc1;
 extern bool opt_S;
@@ -503,7 +523,7 @@ extern char *opt_cc1_output;
 extern char *opt_cc1_input;
 extern char *opt_o;
 
-extern PtrArray opt_input_paths;
+extern PtrArray opt_inputfiles;
 extern PtrArray opt_ld_extra_args;
 extern PtrArray opt_cpp_extra_args;
 
