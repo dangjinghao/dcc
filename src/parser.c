@@ -2185,12 +2185,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
 
   // VLA + num
   if (lhs->ty->base->kind == TY_VLA) {
-    if (self_assign)
-      error_tok(tok, "it's not allowed to use <VLA> += <num>");
-    rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
-                     tok);
-    //  TODO: see VLA - num, is it necessary to add type process in there?
-    return new_binary(ND_ADD, lhs, rhs, tok);
+    return new_binary(self_assign ? ND_SA_PTR_ADD : ND_PTR_ADD, lhs, rhs, tok);
   }
 
   if (self_assign) {
@@ -2217,15 +2212,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
 
   // VLA - num
   if (lhs->ty->base->kind == TY_VLA) {
-    if (self_assign)
-      error_tok(tok, "it's not allowed to use <VLA> -= <num>");
-
-    rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok),
-                     tok);
-    add_type(rhs, false);
-    Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-    node->ty = lhs->ty;
-    return node;
+    return new_binary(self_assign ? ND_SA_PTR_SUB : ND_PTR_SUB, lhs, rhs, tok);
   }
 
   // ptr - num

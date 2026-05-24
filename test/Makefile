@@ -39,6 +39,6 @@ clean:
 
 chibicc/commonsym.out: CFLAGS += -fcommon
 
-chibicc/%.out: LIBS += $(CURDIR)/chibicc/common.lib
+chibicc/%.out: LIBS += -x c $(CURDIR)/chibicc/common.lib
 
 FORCE:

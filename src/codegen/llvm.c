@@ -208,7 +208,7 @@ static LLVMTypeRef type_convert(Type *ty) {
     return type_convert(max_ty);
   }
   case TY_VLA:
-    todo_impl("vla");
+    return type_convert(pointer_to(ty->base));
   default:
     break;
   }
@@ -362,8 +362,8 @@ static int getTypeId(Type *ty) {
   case TY_FUNC:
   case TY_ARRAY:
   case TY_PTR:
-    return PTR;
   case TY_VLA:
+    return PTR;
   case TY_STRUCT:
   case TY_UNION:
     break;
@@ -609,7 +609,7 @@ static LLVMValueRef gen_addr(Node *node) {
       return gen_expr(node);
     break;
   case ND_VLA_PTR:
-    todo_impl("vla ptr");
+    return (LLVMValueRef)node->var->codegen_data;
   }
 
   error_tok(node->tok, "not an lvalue");
@@ -731,6 +731,11 @@ static LLVMValueRef gen_expr(Node *node) {
     return cast(gen_expr(node->lhs), node->lhs->ty, node->ty, node->tok);
   }
   case ND_VAR: {
+    if (node->var->ty->kind == TY_VLA) {
+      // load the vla pointer
+      return LLVMBuildLoad2(B, type_convert(pointer_to(node->var->ty->base)),
+                            gen_addr(node), "vla_load");
+    }
     if (node->var->ty->kind == TY_FUNC || node->var->ty->kind == TY_ARRAY) {
       // gen_addr already returns the function and array pointer value; don't
       // load.
@@ -966,6 +971,19 @@ static LLVMValueRef gen_expr(Node *node) {
     }
   }
   case ND_PTR_SUB: {
+    if (node->lhs->ty->base->kind == TY_VLA) {
+      LLVMValueRef ptr = gen_expr(node->lhs);
+      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+          B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_sub_idx");
+      LLVMValueRef step = LLVMBuildLoad2(
+          B, type_convert(node->lhs->ty->base->vla_size->ty),
+          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
+          "vla_sub_step");
+      LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_sub_bytes");
+      LLVMValueRef neg = LLVMBuildNeg(B, bytes, "vla_sub_neg");
+      return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &neg, 1,
+                           "vla_sub");
+    }
     LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "ptr_sub_neg");
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
@@ -974,6 +992,18 @@ static LLVMValueRef gen_expr(Node *node) {
                          1, "ptr_sub");
   }
   case ND_PTR_ADD: {
+    if (node->lhs->ty->base->kind == TY_VLA) {
+      LLVMValueRef ptr = gen_expr(node->lhs);
+      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+          B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_add_idx");
+      LLVMValueRef step = LLVMBuildLoad2(
+          B, type_convert(node->lhs->ty->base->vla_size->ty),
+          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
+          "vla_add_step");
+      LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_add_bytes");
+      return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &bytes, 1,
+                           "vla_add");
+    }
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
         node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
@@ -1093,6 +1123,19 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_PTR_ADD: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
+    if (node->lhs->ty->base->kind == TY_VLA) {
+      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+          B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "sa_vla_add_idx");
+      LLVMValueRef step = LLVMBuildLoad2(
+          B, type_convert(node->lhs->ty->base->vla_size->ty),
+          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
+          "sa_vla_add_step");
+      LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_add_bytes");
+      LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val,
+                                         &bytes, 1, "sa_vla_ptr_add");
+      LLVMBuildStore(B, tmp_v, ptr);
+      return load(node->ty, ptr);
+    }
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
         node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
@@ -1105,6 +1148,20 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_PTR_SUB: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
+    if (node->lhs->ty->base->kind == TY_VLA) {
+      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+          B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "sa_vla_sub_idx");
+      LLVMValueRef step = LLVMBuildLoad2(
+          B, type_convert(node->lhs->ty->base->vla_size->ty),
+          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
+          "sa_vla_sub_step");
+      LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_sub_bytes");
+      LLVMValueRef neg = LLVMBuildNeg(B, bytes, "sa_vla_sub_neg");
+      LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &neg,
+                                         1, "sa_vla_ptr_sub");
+      LLVMBuildStore(B, tmp_v, ptr);
+      return load(node->ty, ptr);
+    }
     LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "sa_ptr_sub_neg");
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
@@ -1492,6 +1549,7 @@ static void codegen_alloca_function_local_argument(Obj *args) {
   for (Obj *p = args; p; p = p->next) {
     LLVMValueRef arg_vr = NULL;
     LLVMValueRef arg = LLVMGetParam(F, args_count);
+    Type *alloc_ty = p->ty->kind == TY_VLA ? pointer_to(p->ty->base) : p->ty;
     if (is_agg_type(p->ty)) {
       if (is_large_agg_type(p->ty)) {
         // gep arg only
@@ -1500,12 +1558,12 @@ static void codegen_alloca_function_local_argument(Obj *args) {
       } else {
         // same as normal variable
         // TODO: correct system v implementation
-        arg_vr = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
+        arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
         // store arg to alloca variable
         LLVMBuildStore(B, arg, arg_vr);
       }
     } else {
-      arg_vr = LLVMBuildAlloca(B, type_convert(p->ty), p->name);
+      arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
       // store arg to alloca variable
       LLVMBuildStore(B, arg, arg_vr);
     }
@@ -1521,8 +1579,11 @@ static void alloca_function_local_variable(Obj *local_vars) {
   if ((!local_vars) || local_vars->codegen_data)
     return;
   alloca_function_local_variable(local_vars->next);
+  Type *alloc_ty = local_vars->ty->kind == TY_VLA
+                       ? pointer_to(local_vars->ty->base)
+                       : local_vars->ty;
   LLVMValueRef lv =
-      LLVMBuildAlloca(B, type_convert(local_vars->ty), local_vars->name);
+      LLVMBuildAlloca(B, type_convert(alloc_ty), local_vars->name);
   local_vars->codegen_data = (intptr_t)lv;
 }
 
@@ -1592,12 +1653,10 @@ static void codegen_global_declare(Obj *var) {
       vr = LLVMAddFunction(M, var->name, ty);
     }
     if (var->is_definition) {
-      // create entry block early to avoid some blocks that created in global declare
-      // process be the first block.
-      // e.g.
-      // int F(){
-      // static void *p[]={&&v41,&&v42,&&v43}; int i=0; goto *p[0]; v41:i++;
-      // v42:i++; v43:i++; i;
+      // create entry block early to avoid some blocks that created in global
+      // declare process be the first block. e.g. int F(){ static void
+      // *p[]={&&v41,&&v42,&&v43}; int i=0; goto *p[0]; v41:i++; v42:i++;
+      // v43:i++; i;
       // }
       // it will create v41, v42, v43 block in global declare process and if
       // there isn't entry block those block will be the first block

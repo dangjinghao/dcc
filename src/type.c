@@ -338,6 +338,8 @@ static void integer_binary_operator_type_check(Node *lhs, Node *rhs) {
 Type *type_decay(Type *ty) {
   if (!ty)
     return NULL;
+  // it's not good to decay VLA because there are some code
+  // need VLA node data, e.g. sizeof(<VLA>)
   if (ty->kind == TY_ARRAY) {
     Type *nt = pointer_to(ty->base);
     return nt;
