@@ -18,13 +18,6 @@ static Token *copy_token(Token *tok) {
   return t;
 }
 
-static bool str_startswith(char *str, char *substr) {
-  return strncmp(str, substr, strlen(substr)) == 0;
-}
-
-static bool str_startswithcase(char *str, char *substr) {
-  return strncasecmp(str, substr, strlen(substr)) == 0;
-}
 
 // Throw an error message with this format:
 // <filename>:<line>: a = b + c;

@@ -432,6 +432,9 @@ void ptrarray_push_batch2(PtrArray *arr, PtrArray *append_array);
 
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
 char *visual_bytes(char *s, size_t len);
+bool str_startswithcase(char *str, char *substr);
+bool str_startswith(char *str, char *substr);
+bool str_endswith(char *p, char *q);
 
 #define PTRARRAY_PTR_TYPE char *
 #define PTRARRAY_PREFIX strarray

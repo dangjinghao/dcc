@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Takes a printf-style format string and returns a formatted string.
 char *format(char *fmt, ...) {
@@ -38,4 +39,18 @@ char *visual_bytes(char *s, size_t len) {
   fflush(out);
   fclose(out);
   return buf;
+}
+
+bool str_endswith(char *p, char *q) {
+  int len1 = strlen(p);
+  int len2 = strlen(q);
+  return (len1 >= len2) && !strcmp(p + len1 - len2, q);
+}
+
+bool str_startswith(char *str, char *substr) {
+  return strncmp(str, substr, strlen(substr)) == 0;
+}
+
+bool str_startswithcase(char *str, char *substr) {
+  return strncasecmp(str, substr, strlen(substr)) == 0;
 }
