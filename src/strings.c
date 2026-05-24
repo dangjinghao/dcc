@@ -39,31 +39,3 @@ char *visual_bytes(char *s, size_t len) {
   fclose(out);
   return buf;
 }
-
-void strarray_push(StringArray *arr, char *s) {
-  if (!arr->data) {
-    arr->data = calloc(8, sizeof(char *));
-    arr->capacity = 8;
-  }
-
-  if (arr->capacity == arr->len) {
-    arr->data = realloc(arr->data, sizeof(char *) * arr->capacity * 2);
-    arr->capacity *= 2;
-    for (int i = arr->len; i < arr->capacity; i++)
-      arr->data[i] = NULL;
-  }
-
-  arr->data[arr->len++] = s;
-}
-
-// append_array should be end with NULL
-void strarray_push_batch(StringArray *arr, char **append_array) {
-  for (char **p = append_array; *p; p++)
-    strarray_push(arr, *p);
-}
-
-void strarray_push_batch2(StringArray *arr, StringArray *append_array) {
-  for (size_t i = 0; i < append_array->len; i++) {
-    strarray_push(arr, append_array->data[i]);
-  }
-}

@@ -22,9 +22,9 @@ bool opt_MG;
 char *opt_MF;
 char *opt_MT;
 
-StringArray opt_input_paths;
-StringArray opt_ld_extra_args;
-StringArray opt_cpp_extra_args;
+PtrArray opt_input_paths;
+PtrArray opt_ld_extra_args;
+PtrArray opt_cpp_extra_args;
 
 // cc1 mode
 bool opt_cc1;
@@ -117,8 +117,19 @@ void parse_args(int argc, char **argv) {
     //   continue;
     // }
 
-    if (!strncmp(argv[i], "-l", 2) || !strncmp(argv[i], "-Wl,", 4)) {
-      strarray_push(&opt_input_paths, argv[i]);
+    if (!strncmp(argv[i], "-l", 2)) {
+      strarray_push(&opt_ld_extra_args, argv[i]);
+      continue;
+    }
+
+    if (!strncmp(argv[i], "-Wl,", 2)) {
+      char *s = strdup(argv[i] + 4);
+      char *arg = strtok(s, ",");
+
+      while (arg) {
+        strarray_push(&opt_ld_extra_args, arg);
+        arg = strtok(NULL, ",");
+      }
       continue;
     }
 
@@ -233,7 +244,7 @@ void parse_args(int argc, char **argv) {
     }
 
     if (!strcmp(argv[i], "-L")) {
-      strarray_push(&opt_ld_extra_args, "-L");
+      strarray_push(&opt_ld_extra_args, argv[i]);
       strarray_push(&opt_ld_extra_args, argv[++i]);
       continue;
     }

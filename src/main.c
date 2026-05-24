@@ -39,7 +39,7 @@ static void run_subprocess(char **argv) {
   }
 }
 
-static void run_cc1(char *input, char *output, StringArray *args) {
+static void run_cc1(char *input, char *output, PtrArray *args) {
   strarray_push(args, "-cc1");
   strarray_push(args, "-cc1-input");
   strarray_push(args, input);
@@ -61,7 +61,7 @@ noreturn void cc1() {
   exit(0);
 }
 
-static void pack_args(int argc, char *argv[], StringArray *arr) {
+static void pack_args(int argc, char *argv[], PtrArray *arr) {
   for (int i = 0; i < argc; i++) {
     strarray_push(arr, argv[i]);
   }
@@ -120,7 +120,7 @@ static void expand_macro(char *input, char *output, char *argv0) {
                   "-I/usr/include",
                   NULL};
 
-  StringArray args_full = {};
+  PtrArray args_full = {};
 
   strarray_push_batch(&args_full, argv);
   strarray_push_batch2(&args_full, &opt_cpp_extra_args);
@@ -196,8 +196,8 @@ static char *find_gcc_libpath(void) {
   error("gcc library path is not found");
 }
 
-static void run_linker(StringArray *inputs, char *output) {
-  StringArray arr = {};
+static void run_linker(PtrArray *inputs, char *output) {
+  PtrArray arr = {};
 
   strarray_push(&arr, "ld");
   strarray_push(&arr, "-o");
@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
   if (opt_input_paths.len > 1 && opt_o && (opt_c || opt_S | opt_E))
     error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
 
-  StringArray ld_objs = {0};
+  PtrArray ld_objs = {0};
   for (int i = 0; i < opt_input_paths.len; i++) {
     char *input_file = opt_input_paths.data[i];
     char *expanded_file = path_new_tmpfile();
@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
       path_cp(opt_o ?: "-", expanded_file);
       continue;
     }
-    StringArray args = {0};
+    PtrArray args = {0};
     pack_args(argc, argv, &args);
 
     // generate *.s

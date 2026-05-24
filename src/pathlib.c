@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static StringArray tmp_files;
+static PtrArray tmp_files;
 
 static void path_tmp_cleanup(void) {
   for (int i = 0; i < tmp_files.len; i++)

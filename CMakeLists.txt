@@ -24,6 +24,7 @@ add_library(dcc_core STATIC src/tokenizer.c
                         src/type.c
                         src/hashmap.c
                         src/unicode.c
+                        src/ptrarray.c
                         )
 
 add_executable(dcc)

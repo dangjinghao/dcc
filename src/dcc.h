@@ -413,20 +413,30 @@ double eval_double(Node *node);
 void codegen(Obj *prog, FILE *out, bool gen_asm);
 
 //
-/// strings.c
+/// ptrarray.c
 //
 
 typedef struct {
   char **data;
   int capacity;
   int len;
-} StringArray;
+} PtrArray;
+
+void ptrarray_push(PtrArray *arr, void *s);
+void ptrarray_push_batch(PtrArray *arr, void **append_array);
+void ptrarray_push_batch2(PtrArray *arr, PtrArray *append_array);
+
+//
+/// strings.c
+//
 
 char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
 char *visual_bytes(char *s, size_t len);
-void strarray_push(StringArray *arr, char *s);
-void strarray_push_batch(StringArray *arr, char **append_array);
-void strarray_push_batch2(StringArray *arr, StringArray *append_array);
+
+#define PTRARRAY_PTR_TYPE char *
+#define PTRARRAY_PREFIX strarray
+#include "ptrarray_expand.h"
+#undef PTRARRAY_PTR_TYPE
 
 //
 /// hashmap.c
@@ -490,9 +500,9 @@ extern char *opt_cc1_output;
 extern char *opt_cc1_input;
 extern char *opt_o;
 
-extern StringArray opt_input_paths;
-extern StringArray opt_ld_extra_args;
-extern StringArray opt_cpp_extra_args;
+extern PtrArray opt_input_paths;
+extern PtrArray opt_ld_extra_args;
+extern PtrArray opt_cpp_extra_args;
 
 extern bool opt_M;
 extern bool opt_MD;
