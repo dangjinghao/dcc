@@ -604,9 +604,21 @@ static LLVMValueRef gen_addr(Node *node) {
     }
     break;
   case ND_ASSIGN:
+    if (is_agg_type(node->ty)) {
+      gen_expr(node);
+      return gen_addr(node->lhs);
+    }
+    break;
   case ND_COND:
-    if (is_agg_type(node->ty))
+    if (is_agg_type(node->ty)) {
+      if (!is_large_agg_type(node->ty)) {
+        LLVMValueRef val = gen_expr(node);
+        LLVMValueRef tmp = LLVMBuildAlloca(B, type_convert(node->ty), "tmp");
+        LLVMBuildStore(B, val, tmp);
+        return tmp;
+      }
       return gen_expr(node);
+    }
     break;
   case ND_VLA_PTR:
     return (LLVMValueRef)node->var->codegen_data;
@@ -615,8 +627,9 @@ static LLVMValueRef gen_addr(Node *node) {
   error_tok(node->tok, "not an lvalue");
 }
 
+// Return the ptr if pointee_ty is large agg or vla.
+// Or load basic type/small agg type value from ptr
 static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
-
   switch (pointee_ty->kind) {
   case TY_ARRAY:
   case TY_FUNC:
@@ -624,6 +637,10 @@ static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
   case TY_STRUCT:
   case TY_UNION:
   case TY_VLA:
+    if (is_agg_type(pointee_ty) && !is_large_agg_type(pointee_ty)) {
+      // load small agg type directly
+      break;
+    }
     // we can't load them so we just return the ptr
     return ptr;
   }
@@ -636,12 +653,11 @@ static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
   case TY_STRUCT:
   case TY_UNION: {
     if (is_large_agg_type(ty)) {
+      // in the large agg situation, v is the agg ptr
       llvm_memcpy(ptr, v, ty->size, false);
       return;
     }
-    // small agg type, we can't use load function because it will always return
-    // ptr
-    v = LLVMBuildLoad2(B, type_convert(ty), v, "store_agg_load");
+    // small agg type is already loaded in v by gen_expr
   }
   default:
     break;
@@ -710,7 +726,7 @@ static LLVMValueRef logic_short_circuit(Node *node, bool is_and) {
 //   } while (!cas(ptr, old, new));
 //   new;
 // })
-static LLVMValueRef build_atomic_rmw(LLVMOpcode kind, LLVMTypeRef ty,
+static LLVMValueRef build_atomic_rmw(LLVMOpcode kind, Type *ty,
                                      LLVMValueRef ptr, LLVMValueRef rhs) {
 
   new_block("atomic_rmw");
@@ -721,7 +737,7 @@ static LLVMValueRef build_atomic_rmw(LLVMOpcode kind, LLVMTypeRef ty,
   llvm_build_terminator_br(bb_body);
   LLVMPositionBuilderAtEnd(B, bb_body);
   // new = *ptr <op> rhs;
-  LLVMValueRef old_v = LLVMBuildLoad2(B, ty, ptr, "armw_load");
+  LLVMValueRef old_v = load(ty, ptr);
   LLVMValueRef new_v = LLVMBuildBinOp(B, kind, old_v, rhs, "armw_op");
   llvm_build_terminator_br(bb_cond);
   LLVMPositionBuilderAtEnd(B, bb_cond);
@@ -764,11 +780,10 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_VAR: {
     if (node->var->ty->kind == TY_VLA) {
       // load the vla pointer
-      return LLVMBuildLoad2(B, type_convert(pointer_to(node->var->ty->base)),
-                            gen_addr(node), "vla_load");
+      return load(pointer_to(node->var->ty->base), gen_addr(node));
     }
     if (node->var->ty->kind == TY_FUNC || node->var->ty->kind == TY_ARRAY) {
-      // gen_addr already returns the function and array pointer value; don't
+      // gen_addr already returns the function and array pointer value, don't
       // load.
       return gen_addr(node);
     }
@@ -862,9 +877,14 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     LLVMTypeRef phi_ty = NULL;
     if (is_agg_type(node->ty)) {
-      // the struct value in ternary expression should be treated as ptr.
-      // because it's store as ptr type in LLVM
-      phi_ty = type_convert(pointer_to(node->ty));
+      if (is_large_agg_type(node->ty)) {
+        // the large agg value in ternary expression should be treated as ptr.
+        // because it's store as ptr type in LLVM
+        phi_ty = type_convert(pointer_to(node->ty));
+      } else {
+        // small agg type, return value directly
+        phi_ty = type_convert(node->ty);
+      }
     } else {
       phi_ty = type_convert(node->ty);
     }
@@ -914,21 +934,7 @@ static LLVMValueRef gen_expr(Node *node) {
     }
 
     for (Node *arg = node->args; arg; arg = arg->next) {
-      LLVMValueRef arg_vr = gen_expr(arg);
-      if (is_agg_type(arg->ty)) {
-        if (!is_large_agg_type(arg->ty)) {
-          // we can't use load function to load it directly, check below
-          LLVMValueRef arg_addr = gen_addr(arg);
-          arg_vr = LLVMBuildLoad2(B, type_convert(arg->ty), arg_addr,
-                                  "funcall_sstruct_load");
-        }
-        // else: large agg type
-        // because the load function always return ptr for struct/union
-        // and large agg pass-as-value in the callee function will be
-        // reinterpreted to pointer to this type. both of them are same type
-        // (pointer) so we don't need to do anything.
-      }
-      args[arg_idx++] = arg_vr;
+      args[arg_idx++] = gen_expr(arg);
     }
 
     bool ret_void = false;
@@ -946,6 +952,7 @@ static LLVMValueRef gen_expr(Node *node) {
       assert(ptr);
       if (!is_large_agg_type(node->ty)) {
         LLVMBuildStore(B, r, ptr);
+        return r;
       }
       // if it's large agg type, when codegen return statement it will memcpy
       // data to ret_buffer ptr
@@ -1006,10 +1013,9 @@ static LLVMValueRef gen_expr(Node *node) {
       LLVMValueRef ptr = gen_expr(node->lhs);
       LLVMValueRef idx = LLVMBuildSExtOrBitCast(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_sub_idx");
-      LLVMValueRef step = LLVMBuildLoad2(
-          B, type_convert(node->lhs->ty->base->vla_size->ty),
-          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
-          "vla_sub_step");
+      LLVMValueRef step =
+          load(node->lhs->ty->base->vla_size->ty,
+               (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
       LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_sub_bytes");
       LLVMValueRef neg = LLVMBuildNeg(B, bytes, "vla_sub_neg");
       return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &neg, 1,
@@ -1027,10 +1033,9 @@ static LLVMValueRef gen_expr(Node *node) {
       LLVMValueRef ptr = gen_expr(node->lhs);
       LLVMValueRef idx = LLVMBuildSExtOrBitCast(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_add_idx");
-      LLVMValueRef step = LLVMBuildLoad2(
-          B, type_convert(node->lhs->ty->base->vla_size->ty),
-          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
-          "vla_add_step");
+      LLVMValueRef step =
+          load(node->lhs->ty->base->vla_size->ty,
+               (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
       LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_add_bytes");
       return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &bytes, 1,
                            "vla_add");
@@ -1176,10 +1181,9 @@ static LLVMValueRef gen_expr(Node *node) {
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef idx = LLVMBuildSExtOrBitCast(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "sa_vla_add_idx");
-      LLVMValueRef step = LLVMBuildLoad2(
-          B, type_convert(node->lhs->ty->base->vla_size->ty),
-          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
-          "sa_vla_add_step");
+      LLVMValueRef step =
+          load(node->lhs->ty->base->vla_size->ty,
+               (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
       LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_add_bytes");
       LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val,
                                          &bytes, 1, "sa_vla_ptr_add");
@@ -1204,10 +1208,9 @@ static LLVMValueRef gen_expr(Node *node) {
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef idx = LLVMBuildSExtOrBitCast(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "sa_vla_sub_idx");
-      LLVMValueRef step = LLVMBuildLoad2(
-          B, type_convert(node->lhs->ty->base->vla_size->ty),
-          (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data,
-          "sa_vla_sub_step");
+      LLVMValueRef step =
+          load(node->lhs->ty->base->vla_size->ty,
+               (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
       LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_sub_bytes");
       LLVMValueRef neg = LLVMBuildNeg(B, bytes, "sa_vla_sub_neg");
       LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &neg,
@@ -1259,11 +1262,9 @@ static LLVMValueRef gen_expr(Node *node) {
 
     if (node->lhs->ty->is_atomic) {
       if (is_flonum(node->lhs->ty)) {
-        return build_atomic_rmw(LLVMFMul, type_convert(node->lhs->ty), ptr,
-                                rhs_v);
+        return build_atomic_rmw(LLVMFMul, node->lhs->ty, ptr, rhs_v);
       } else {
-        return build_atomic_rmw(LLVMMul, type_convert(node->lhs->ty), ptr,
-                                rhs_v);
+        return build_atomic_rmw(LLVMMul, node->lhs->ty, ptr, rhs_v);
       }
     }
     LLVMValueRef tmp_v = NULL;
@@ -1280,14 +1281,11 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef rhs_v = gen_expr(node->rhs);
     if (node->lhs->ty->is_atomic) {
       if (is_flonum(node->lhs->ty)) {
-        return build_atomic_rmw(LLVMFDiv, type_convert(node->lhs->ty), ptr,
-                                rhs_v);
+        return build_atomic_rmw(LLVMFDiv, node->lhs->ty, ptr, rhs_v);
       } else if (node->lhs->ty->is_unsigned) {
-        return build_atomic_rmw(LLVMUDiv, type_convert(node->lhs->ty), ptr,
-                                rhs_v);
+        return build_atomic_rmw(LLVMUDiv, node->lhs->ty, ptr, rhs_v);
       } else {
-        return build_atomic_rmw(LLVMSDiv, type_convert(node->lhs->ty), ptr,
-                                rhs_v);
+        return build_atomic_rmw(LLVMSDiv, node->lhs->ty, ptr, rhs_v);
       }
     }
     LLVMValueRef tmp_v = NULL;
@@ -1424,16 +1422,16 @@ static LLVMValueRef gen_stmt(Node *node) {
       return NULL;
     }
     if (is_agg_type(node->lhs->ty)) {
-      LLVMValueRef ptr = gen_expr(node->lhs);
+      LLVMValueRef v = gen_expr(node->lhs);
       if (is_large_agg_type(node->lhs->ty)) {
         // it's not very standard
-        llvm_memcpy(LLVMGetParam(F, 0), ptr, node->lhs->ty->size, false);
+        // now v is agg ptr
+        llvm_memcpy(LLVMGetParam(F, 0), v, node->lhs->ty->size, false);
         LLVMBuildRetVoid(B);
         return NULL;
       }
-      LLVMValueRef r = LLVMBuildLoad2(B, type_convert(node->lhs->ty), ptr,
-                                      "return_small_agg_load");
-      LLVMBuildRet(B, r);
+      // small agg, v is value
+      LLVMBuildRet(B, v);
       return NULL;
     }
     LLVMBuildRet(B, gen_expr(node->lhs));
