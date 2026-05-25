@@ -647,7 +647,13 @@ static LLVMValueRef load(Type *pointee_ty, LLVMValueRef ptr) {
     return ptr;
   }
 
-  return LLVMBuildLoad2(B, type_convert(pointee_ty), ptr, "load");
+  LLVMValueRef load_v =
+      LLVMBuildLoad2(B, type_convert(pointee_ty), ptr, "load");
+  // LLVM atomic memory operation needs restrict alignment
+  LLVMSetAlignment(load_v, pointee_ty->align);
+  if (pointee_ty->is_atomic)
+    LLVMSetOrdering(load_v, LLVMAtomicOrderingSequentiallyConsistent);
+  return load_v;
 }
 
 static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
@@ -664,7 +670,11 @@ static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
   default:
     break;
   }
-  LLVMBuildStore(B, v, ptr);
+  LLVMValueRef store_v = LLVMBuildStore(B, v, ptr);
+  // LLVM atomic memory operation needs restrict alignment
+  LLVMSetAlignment(store_v, ty->align);
+  if (ty->is_atomic)
+    LLVMSetOrdering(store_v, LLVMAtomicOrderingSequentiallyConsistent);
 }
 
 // Return i1, so do not use it as _Bool(i8) type directly
