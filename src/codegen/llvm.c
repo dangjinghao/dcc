@@ -22,6 +22,8 @@ static HashMap func_labels_as_values;
 
 static LLVMValueRef cmp_nz(LLVMValueRef v);
 static LLVMValueRef cmp_ez(LLVMValueRef v);
+static LLVMValueRef load(Type *ty, LLVMValueRef ptr);
+static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v);
 
 static void gen_switch_cmp_algo_rev_direct(Node *node,
                                            LLVMBasicBlockRef bb_after);
@@ -614,7 +616,7 @@ static LLVMValueRef gen_addr(Node *node) {
       if (!is_large_agg_type(node->ty)) {
         LLVMValueRef val = gen_expr(node);
         LLVMValueRef tmp = LLVMBuildAlloca(B, type_convert(node->ty), "tmp");
-        LLVMBuildStore(B, val, tmp);
+        store(node->ty, tmp, val);
         return tmp;
       }
       return gen_expr(node);
@@ -951,7 +953,7 @@ static LLVMValueRef gen_expr(Node *node) {
       LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
       assert(ptr);
       if (!is_large_agg_type(node->ty)) {
-        LLVMBuildStore(B, r, ptr);
+        store(node->ty, ptr, r);
         return r;
       }
       // if it's large agg type, when codegen return statement it will memcpy
@@ -989,7 +991,7 @@ static LLVMValueRef gen_expr(Node *node) {
         LLVMAtomicOrderingSequentiallyConsistent, false);
     LLVMValueRef actual_old_val =
         LLVMBuildExtractValue(B, result, 0, "cas_actual_old");
-    LLVMBuildStore(B, actual_old_val, old_ptr);
+    store(node->cas_old->ty->base, old_ptr, actual_old_val);
 
     LLVMValueRef success = LLVMBuildExtractValue(B, result, 1, "cas_success");
     return LLVMBuildZExt(B, success, LLVMInt8TypeInContext(C),
@@ -1169,7 +1171,7 @@ static LLVMValueRef gen_expr(Node *node) {
     } else {
       result_v = LLVMBuildAdd(B, load(node->lhs->ty, ptr), rhs_v, "sa_add");
     }
-    LLVMBuildStore(B, result_v, ptr);
+    store(node->lhs->ty, ptr, result_v);
     return load(node->ty, ptr);
   }
   case ND_SA_PTR_ADD: {
@@ -1187,7 +1189,7 @@ static LLVMValueRef gen_expr(Node *node) {
       LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_add_bytes");
       LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val,
                                          &bytes, 1, "sa_vla_ptr_add");
-      LLVMBuildStore(B, tmp_v, ptr);
+      store(node->lhs->ty, ptr, tmp_v);
       return load(node->ty, ptr);
     }
     // [gnu ext]: void* ptr calculate
@@ -1196,7 +1198,7 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef tmp_v =
         LLVMBuildGEP2(B, type_convert(pointee_ty), val,
                       &(LLVMValueRef){gen_expr(node->rhs)}, 1, "sa_ptr_add");
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_PTR_SUB: {
@@ -1215,7 +1217,7 @@ static LLVMValueRef gen_expr(Node *node) {
       LLVMValueRef neg = LLVMBuildNeg(B, bytes, "sa_vla_sub_neg");
       LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &neg,
                                          1, "sa_vla_ptr_sub");
-      LLVMBuildStore(B, tmp_v, ptr);
+      store(node->lhs->ty, ptr, tmp_v);
       return load(node->ty, ptr);
     }
     LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "sa_ptr_sub_neg");
@@ -1224,7 +1226,7 @@ static LLVMValueRef gen_expr(Node *node) {
         node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
     LLVMValueRef tmp_v = LLVMBuildGEP2(B, type_convert(pointee_ty), val,
                                        &(LLVMValueRef){neg}, 1, "sa_ptr_sub");
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_SUB: {
@@ -1253,7 +1255,7 @@ static LLVMValueRef gen_expr(Node *node) {
     } else {
       tmp_v = LLVMBuildSub(B, load(node->lhs->ty, ptr), rhs_v, "sa_sub");
     }
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_MUL: {
@@ -1273,7 +1275,7 @@ static LLVMValueRef gen_expr(Node *node) {
     } else {
       tmp_v = LLVMBuildMul(B, load(node->lhs->ty, ptr), rhs_v, "sa_mul");
     }
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_DIV: {
@@ -1296,7 +1298,7 @@ static LLVMValueRef gen_expr(Node *node) {
     } else {
       tmp_v = LLVMBuildSDiv(B, load(node->lhs->ty, ptr), rhs_v, "sa_sdiv");
     }
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_MOD: {
@@ -1313,7 +1315,7 @@ static LLVMValueRef gen_expr(Node *node) {
       tmp_v = LLVMBuildSRem(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
                             "sa_srem");
     }
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_BITAND: {
@@ -1329,7 +1331,7 @@ static LLVMValueRef gen_expr(Node *node) {
 
     LLVMValueRef tmp_v =
         LLVMBuildAnd(B, load(node->lhs->ty, ptr), rhs_v, "sa_bitand");
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_BITOR: {
@@ -1345,7 +1347,7 @@ static LLVMValueRef gen_expr(Node *node) {
 
     LLVMValueRef tmp_v =
         LLVMBuildOr(B, load(node->lhs->ty, ptr), rhs_v, "sa_bitor");
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_BITXOR: {
@@ -1361,7 +1363,7 @@ static LLVMValueRef gen_expr(Node *node) {
 
     LLVMValueRef tmp_v =
         LLVMBuildXor(B, load(node->lhs->ty, ptr), rhs_v, "sa_bitxor");
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_SHL: {
@@ -1371,7 +1373,7 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     LLVMValueRef tmp_v = LLVMBuildShl(B, load(node->lhs->ty, ptr),
                                       gen_expr(node->rhs), "sa_shl");
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_SHR: {
@@ -1387,7 +1389,7 @@ static LLVMValueRef gen_expr(Node *node) {
       tmp_v = LLVMBuildAShr(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
                             "sa_ashr");
     }
-    LLVMBuildStore(B, tmp_v, ptr);
+    store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_VA_START: {
@@ -1707,12 +1709,12 @@ static void codegen_alloca_function_local_argument(Obj *args) {
         // TODO: correct system v implementation
         arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
         // store arg to alloca variable
-        LLVMBuildStore(B, arg, arg_vr);
+        store(alloc_ty, arg_vr, arg);
       }
     } else {
       arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
       // store arg to alloca variable
-      LLVMBuildStore(B, arg, arg_vr);
+      store(alloc_ty, arg_vr, arg);
     }
     p->codegen_data = (intptr_t)arg_vr;
     args_count++;
