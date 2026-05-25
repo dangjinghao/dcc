@@ -70,7 +70,6 @@ static void pack_args(int argc, char *argv[], PtrArray *arr) {
 static void expand_macro(char *input, char *output, char *argv0) {
   char *compiler_include = format("-I%s/../include", dirname(strdup(argv0)));
   char *argv[] = {"cpp",
-                  "-P",
                   "-E",
                   "-w",
                   "-undef",

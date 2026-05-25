@@ -60,6 +60,7 @@ struct Token {
 
   DFile *file; // Source location
   int line_no;
+  char *filename;
   Token *next;
 };
 

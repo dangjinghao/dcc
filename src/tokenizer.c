@@ -18,7 +18,6 @@ static Token *copy_token(Token *tok) {
   return t;
 }
 
-
 // Throw an error message with this format:
 // <filename>:<line>: a = b + c;
 //                    ^ <error message>
@@ -59,16 +58,16 @@ void error_at(char *loc, char *fmt, ...) {
 void error_tok(Token *tok, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt,
-            ap);
+  verror_at(tok->filename ?: tok->file->name, tok->file->contents, tok->line_no,
+            tok->loc, fmt, ap);
   exit(1);
 }
 
 void warn_tok(Token *tok, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt,
-            ap);
+  verror_at(tok->filename ?: tok->file->name, tok->file->contents, tok->line_no,
+            tok->loc, fmt, ap);
   va_end(ap);
 }
 
@@ -440,17 +439,52 @@ static void convert_number(Token *tok) {
 
 // Initialize line info for all tokens.
 static void add_line_numbers(Token *tok) {
+  if (!tok)
+    return;
   char *p = current_file->contents;
   int n = 1;
+  char *filename = current_file->name;
+  bool at_bol = true;
 
-  do {
+  while (*p) {
     if (p == tok->loc) {
       tok->line_no = n;
+      tok->filename = filename;
       tok = tok->next;
+      if (!tok)
+        break;
     }
-    if (*p == '\n')
+
+    if (at_bol && *p == '#') {
+      p++;
+      while (isspace(*p))
+        p++;
+      if (isdigit(*p)) {
+        n = strtol(p, &p, 10) - 1;
+        while (isspace(*p))
+          p++;
+        if (*p == '"') {
+          char *start = p + 1;
+          p++;
+          while (*p && *p != '"' && *p != '\n')
+            p++;
+          filename = strndup(start, p - start);
+        }
+      }
+      while (*p && *p != '\n') {
+        p++;
+      }
+      continue;
+    }
+
+    if (*p == '\n') {
       n++;
-  } while (*p++);
+      at_bol = true;
+    } else if (!isspace(*p)) {
+      at_bol = false;
+    }
+    p++;
+  }
 }
 
 // Returns the contents of a given file.
@@ -578,11 +612,18 @@ static Token *tokenize(DFile *file) {
 
   Token head = {};
   Token *cur = &head;
+  bool at_bol = true;
 
   while (*p) {
+    if (at_bol && *p == '#') {
+      while (*p && *p != '\n')
+        p++;
+      continue;
+    }
+
     if (str_startswith(p, "//")) {
       p += 2;
-      while (*p != '\n')
+      while (*p != '\n') // it's guaranteed to be \n or \0 eventually
         p++;
       continue;
     }
@@ -597,9 +638,13 @@ static Token *tokenize(DFile *file) {
     }
 
     if (isspace(*p)) {
+      if (*p == '\n')
+        at_bol = true;
       p++;
       continue;
     }
+
+    at_bol = false;
 
     if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
       char *start = p++;
