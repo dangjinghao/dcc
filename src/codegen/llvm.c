@@ -1458,8 +1458,33 @@ static LLVMValueRef gen_stmt(Node *node) {
     }
     return NULL;
   }
-  case ND_ASM:
-    todo_impl("asm");
+  case ND_ASM: {
+    // TODO: full gnu asm support
+    // escape $ to $$
+    int len = strlen(node->asm_str);
+    int new_len = 0;
+    for (int i = 0; i < len; i++) {
+      if (node->asm_str[i] == '$')
+        new_len++;
+      new_len++;
+    }
+    char *escaped = calloc(new_len + 1, sizeof(char));
+    int j = 0;
+    for (int i = 0; i < len; i++) {
+      if (node->asm_str[i] == '$')
+        escaped[j++] = '$';
+      escaped[j++] = node->asm_str[i];
+    }
+
+    LLVMTypeRef void_ty = LLVMVoidTypeInContext(C);
+    LLVMTypeRef func_type = LLVMFunctionType(void_ty, NULL, 0, 0);
+    LLVMValueRef inline_asm =
+        LLVMGetInlineAsm(func_type, escaped, new_len, "", 0, true, false,
+                         LLVMInlineAsmDialectATT, false);
+    free(escaped);
+    LLVMBuildCall2(B, func_type, inline_asm, NULL, 0, "");
+    return NULL;
+  }
   default:
     unreachable();
   }
@@ -1725,6 +1750,7 @@ void codegen(Obj *prog, FILE *out, bool gen_asm) {
   if (gen_asm) {
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
 
     char *triple = LLVMGetDefaultTargetTriple();
 
