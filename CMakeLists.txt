@@ -17,7 +17,6 @@ add_compile_options(
     )
 
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-include_directories(src/)
 
 set(DCC_CORE_SOURCES src/tokenizer.c
                      src/parser.c
@@ -45,6 +44,7 @@ set(DCC_STAGE2_ALL_SOURCES ${DCC_CORE_SOURCES} ${DCC_MAIN_SOURCES})
 ## Stage 1: Build the core library, the tools and the main executable
 #
 add_library(dcc_core STATIC ${DCC_CORE_SOURCES})
+target_include_directories(dcc_core PUBLIC src/)
 
 add_executable(dcc ${DCC_MAIN_SOURCES})
 target_link_libraries(dcc PRIVATE dcc_core)
@@ -57,9 +57,9 @@ if(DCC_BACKEND STREQUAL "llvm")
     find_package(LLVM REQUIRED CONFIG)
     message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
     message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-    include_directories(${LLVM_INCLUDE_DIRS})
+    target_include_directories(dcc PRIVATE ${LLVM_INCLUDE_DIRS})
     separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
-    add_definitions(${LLVM_DEFINITIONS_LIST})
+    target_compile_definitions(dcc PRIVATE ${LLVM_DEFINITIONS_LIST})
 
     if(DCC_BACKEND_LINK_LLVM_DYLIB)
         set(DCC_LLVM_LIBS LLVM)
