@@ -25,12 +25,12 @@ void basic_atomic() {
   a ^= 0x0F;
   ASSERT(0xF0, a);
 
-  //   atomic_uint b = 1;
-  //   b <<= 3;
-  //   ASSERT(8, b);
+    atomic_uint b = 1;
+    b <<= 3;
+    ASSERT(8, b);
 
-  //   b >>= 2;
-  //   ASSERT(2, b);
+    b >>= 2;
+    ASSERT(2, b);
 
   atomic_long c = 100;
   c += 50;
@@ -72,14 +72,14 @@ void basic_atomic() {
   ASSERT(0xF0, r);
   ASSERT(0xF0, a);
 
-  //   b = 1;
-  //   unsigned s = (b <<= 5);
-  //   ASSERT(32, s);
-  //   ASSERT(32, b);
+    b = 1;
+    unsigned s = (b <<= 5);
+    ASSERT(32, s);
+    ASSERT(32, b);
 
-  //   s = (b >>= 3);
-  //   ASSERT(4, s);
-  //   ASSERT(4, b);
+    s = (b >>= 3);
+    ASSERT(4, s);
+    ASSERT(4, b);
 }
 
 atomic_int shared_counter;

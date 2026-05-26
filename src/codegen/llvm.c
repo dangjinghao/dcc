@@ -1232,7 +1232,7 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
     if (node->lhs->ty->is_atomic) {
-      todo_impl("ND_SA_PTR_ADD: atomic");
+      todo_impl("ND_SA_PTR_SUB: atomic");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef idx = LLVMBuildSExtOrBitCast(
@@ -1330,17 +1330,20 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_SA_MOD: {
     LLVMValueRef ptr = gen_addr(node->lhs);
+    LLVMValueRef rhs_v = gen_expr(node->rhs);
     if (node->lhs->ty->is_atomic) {
-      todo_impl("ND_SA_MOD: atomic");
+      if (node->lhs->ty->is_unsigned) {
+        return build_sa_atomic_rmw(LLVMURem, node->lhs->ty, ptr, rhs_v);
+      } else {
+        return build_sa_atomic_rmw(LLVMSRem, node->lhs->ty, ptr, rhs_v);
+      }
     }
     LLVMValueRef tmp_v = NULL;
 
     if (node->lhs->ty->is_unsigned) {
-      tmp_v = LLVMBuildURem(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
-                            "sa_urem");
+      tmp_v = LLVMBuildURem(B, load(node->lhs->ty, ptr), rhs_v, "sa_urem");
     } else {
-      tmp_v = LLVMBuildSRem(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
-                            "sa_srem");
+      tmp_v = LLVMBuildSRem(B, load(node->lhs->ty, ptr), rhs_v, "sa_srem");
     }
     store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
@@ -1395,26 +1398,34 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_SA_SHL: {
     LLVMValueRef ptr = gen_addr(node->lhs);
+    LLVMValueRef rhs = gen_expr(node->rhs);
+    rhs = cast(rhs, node->rhs->ty, node->lhs->ty, node->tok);
+
     if (node->lhs->ty->is_atomic) {
-      todo_impl("ND_SA_SHL: atomic");
+      return build_sa_atomic_rmw(LLVMShl, node->lhs->ty, ptr, rhs);
     }
-    LLVMValueRef tmp_v = LLVMBuildShl(B, load(node->lhs->ty, ptr),
-                                      gen_expr(node->rhs), "sa_shl");
+    LLVMValueRef tmp_v =
+        LLVMBuildShl(B, load(node->lhs->ty, ptr), rhs, "sa_shl");
     store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_SHR: {
     LLVMValueRef ptr = gen_addr(node->lhs);
+    LLVMValueRef rhs = gen_expr(node->rhs);
+    rhs = cast(rhs, node->lhs->ty, node->rhs->ty, node->tok);
+
     if (node->lhs->ty->is_atomic) {
-      todo_impl("ND_SA_SHR: atomic");
+      if (node->lhs->ty->is_unsigned) {
+        return build_sa_atomic_rmw(LLVMLShr, node->lhs->ty, ptr, rhs);
+      } else {
+        return build_sa_atomic_rmw(LLVMAShr, node->lhs->ty, ptr, rhs);
+      }
     }
     LLVMValueRef tmp_v = NULL;
     if (node->lhs->ty->is_unsigned) {
-      tmp_v = LLVMBuildLShr(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
-                            "sa_lshr");
+      tmp_v = LLVMBuildLShr(B, load(node->lhs->ty, ptr), rhs, "sa_lshr");
     } else {
-      tmp_v = LLVMBuildAShr(B, load(node->lhs->ty, ptr), gen_expr(node->rhs),
-                            "sa_ashr");
+      tmp_v = LLVMBuildAShr(B, load(node->lhs->ty, ptr), rhs, "sa_ashr");
     }
     store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
