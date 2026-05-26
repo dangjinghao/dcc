@@ -343,7 +343,7 @@ static void new_block(char *name) {
 
 enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F80, PTR };
 
-static int getTypeId(Type *ty) {
+static int get_type_id(Type *ty) {
   switch (ty->kind) {
   case TY_BOOL:
     return I8;
@@ -353,6 +353,8 @@ static int getTypeId(Type *ty) {
     return ty->is_unsigned ? U16 : I16;
   case TY_INT:
     return ty->is_unsigned ? U32 : I32;
+  case TY_ENUM:
+    return I32;
   case TY_LONG:
     return ty->is_unsigned ? U64 : I64;
   case TY_FLOAT:
@@ -566,8 +568,8 @@ static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
     v = cmp_nz(v);
     return LLVMBuildCast(B, LLVMZExt, v, type_convert(to), "cast_bool");
   }
-  int from_id = getTypeId(from);
-  int to_id = getTypeId(to);
+  int from_id = get_type_id(from);
+  int to_id = get_type_id(to);
   int op = cast_table[from_id][to_id];
   if (op == CAST_NOP) {
     return v;
@@ -1040,7 +1042,7 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_PTR_SUB: {
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef ptr = gen_expr(node->lhs);
-      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+      LLVMValueRef idx = LLVMBuildSExt(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_sub_idx");
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
@@ -1060,7 +1062,7 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_PTR_ADD: {
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef ptr = gen_expr(node->lhs);
-      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+      LLVMValueRef idx = LLVMBuildSExt(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_add_idx");
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
@@ -1208,7 +1210,7 @@ static LLVMValueRef gen_expr(Node *node) {
       todo_impl("ND_SA_PTR_ADD: atomic");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
-      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+      LLVMValueRef idx = LLVMBuildSExt(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "sa_vla_add_idx");
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
@@ -1235,7 +1237,7 @@ static LLVMValueRef gen_expr(Node *node) {
       todo_impl("ND_SA_PTR_SUB: atomic");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
-      LLVMValueRef idx = LLVMBuildSExtOrBitCast(
+      LLVMValueRef idx = LLVMBuildSExt(
           B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "sa_vla_sub_idx");
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,

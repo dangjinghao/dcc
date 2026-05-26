@@ -474,7 +474,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
         tok = tok->next;
       }
       if (is_agg_type(ty) && is_atomic) {
-        error_tok(tok, "Unsupport feature: atomic aggregate declaration");
+        error_tok(tok, "Unsupported feature: atomic aggregate declaration");
       }
       counter += OTHER;
       continue;
