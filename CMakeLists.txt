@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(dcc C CXX) # CXX for llvm
 
+enable_testing()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
@@ -8,6 +10,7 @@ set(CMAKE_C_EXTENSIONS ON)
 set(DCC_BACKEND llvm CACHE STRING "Code generation backend option")
 option(DCC_BACKEND_LINK_LLVM_DYLIB "Link against the LLVM dynamic library for llvm backend" ON)
 
+set(DCC_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/include" CACHE PATH "Path to the candidated include directory for the DCC project")
 
 add_compile_options(
     -g
@@ -48,6 +51,7 @@ target_include_directories(dcc_core PUBLIC src/)
 
 add_executable(dcc ${DCC_MAIN_SOURCES})
 target_link_libraries(dcc PRIVATE dcc_core)
+target_compile_definitions(dcc PRIVATE DCC_INCLUDE_PATH="${DCC_INCLUDE_PATH}")
 
 # tools
 add_executable(astrepr src/tools/astrepr.c)
@@ -72,3 +76,4 @@ if(DCC_BACKEND STREQUAL "llvm")
 endif()
 
 add_subdirectory(stage2)
+# add_subdirectory(test)

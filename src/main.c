@@ -70,8 +70,8 @@ static void pack_args(int argc, char *argv[], PtrArray *arr) {
   }
 }
 
-static void expand_macro(char *input, char *output, char *argv0) {
-  char *compiler_include = format("-I%s/../include", dirname(strdup(argv0)));
+static void expand_macro(char *input, char *output) {
+  char *compiler_include = "-I" DCC_INCLUDE_PATH;
   char *argv[] = {"cpp",
                   "-E",
                   "-w",
@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
       char *asm_file = path_new_tmpfile();
       char *obj_file = path_new_tmpfile();
 
-      expand_macro(input_file->path, expanded_file, argv[0]);
+      expand_macro(input_file->path, expanded_file);
       if (opt_E) {
         path_cp(opt_o ?: "-", expanded_file);
         continue;

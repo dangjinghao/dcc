@@ -8,6 +8,7 @@ foreach(src IN LISTS DCC_STAGE2_ALL_SOURCES)
         OUTPUT "${obj}"
         COMMAND "$<TARGET_FILE:dcc>"
             -I "${CMAKE_SOURCE_DIR}/src"
+            -D DCC_INCLUDE_PATH=\\"${DCC_INCLUDE_PATH}\\"
             -c "${CMAKE_SOURCE_DIR}/${src}"
             -o "${obj}"
         DEPENDS dcc "${CMAKE_SOURCE_DIR}/${src}"

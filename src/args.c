@@ -53,10 +53,10 @@ static InputFileType get_file_type(char *filename) {
   return FILETYPE_NONE;
 }
 
-static void usage(int status, char *argv0) {
+static void usage(int status) {
   fprintf(
       stderr,
-      "Usage: %s [options] <file>...\n"
+      "Usage: dcc [options] <file>...\n"
       "Options:\n"
       "  -o <path>              place output into <path>\n"
       "  -I<dir> / -I <dir>     add include directory\n"
@@ -85,8 +85,9 @@ static void usage(int status, char *argv0) {
       "  --help                show this help\n"
       "cc1 mode:\n"
       "\t-cc1 -cc1-input <path> -cc1-output <path> [-emit-llvm] -cc1-filename "
-      "<path>\n",
-      argv0);
+      "<path>\n"
+      "Infomation:\n"
+      "dcc include path: " DCC_INCLUDE_PATH "\n");
   exit(status);
 }
 
@@ -342,7 +343,7 @@ void parse_args(int argc, char **argv) {
     }
 
     if (!strcmp(argv[i], "--help"))
-      usage(0, argv[0]);
+      usage(0);
 
     // These options are ignored for now.
     if (!strncmp(argv[i], "-O", 2) || !strncmp(argv[i], "-W", 2) ||
