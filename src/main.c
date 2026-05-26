@@ -39,12 +39,15 @@ static void run_subprocess(char **argv) {
   }
 }
 
-static void run_cc1(char *input, char *output, PtrArray *args) {
+static void run_cc1(char *input, char *output, PtrArray *args,
+                    char *real_filename) {
   strarray_push(args, "-cc1");
   strarray_push(args, "-cc1-input");
   strarray_push(args, input);
   strarray_push(args, "-cc1-output");
   strarray_push(args, output);
+  strarray_push(args, "-cc1-filename");
+  strarray_push(args, real_filename);
   strarray_push(args, NULL);
 
   run_subprocess((char **)args->data);
@@ -55,7 +58,7 @@ noreturn void cc1() {
   Obj *ast = parse(tokens);
   FILE *output_file = fopen(opt_cc1_output, "wb");
 
-  codegen(ast, output_file, !opt_ir);
+  codegen(ast, output_file, !opt_emit_llvm);
 
   fclose(output_file);
   exit(0);
@@ -289,10 +292,8 @@ int main(int argc, char *argv[]) {
       pack_args(argc, argv, &args);
 
       // generate *.s
-      run_cc1(expanded_file, asm_file, &args);
+      run_cc1(expanded_file, asm_file, &args, input_file->path);
 
-      if (opt_ir)
-        opt_S = true;
       if (opt_S) {
         path_cp(opt_o ?: "-", asm_file);
         continue;

@@ -6,7 +6,7 @@ bool opt_E;              // expand macro
 bool opt_S;              // generate *.s
 bool opt_c;              // generate *.o
 bool opt_hash_hash_hash; // dump the subprocess's command line
-bool opt_ir;             // generate llvm ir file *.ll
+bool opt_emit_llvm;      // generate llvm ir file *.ll
 bool opt_static;
 bool opt_shared;
 bool opt_fcommon;
@@ -30,6 +30,7 @@ PtrArray opt_cpp_extra_args;
 bool opt_cc1;
 char *opt_cc1_input;
 char *opt_cc1_output;
+char *opt_cc1_filename;
 
 static InputFileType force_input_file_type = FILETYPE_NONE;
 
@@ -53,37 +54,39 @@ static InputFileType get_file_type(char *filename) {
 }
 
 static void usage(int status, char *argv0) {
-  fprintf(stderr,
-          "Usage: %s [options] <file>...\n"
-          "Options:\n"
-          "  -o <path>             place output into <path>\n"
-          "  -I<dir> / -I <dir>    add include directory\n"
-          "  -D<macro> / -D <macro> define macro\n"
-          "  -U<macro> / -U <macro> undefine macro\n"
-          "  -include <file>       include header before main input\n"
-          "  -x <lang>             force input language (c|assembler|none)\n"
-          "  -l<lib>               link with library\n"
-          "  -Wl,<args>            pass comma-separated args to linker\n"
-          "  -Xlinker <arg>        pass arg to linker\n"
-          "  -s                    pass -s to linker\n"
-          "  -M, -MD, -MM, -MMD    dependency generation options\n"
-          "  -MF <file>            write deps to file\n"
-          "  -MT <target>          set dependency target\n"
-          "  -MG, -MP              dependency options\n"
-          "  -fpic, -fPIC          generate position-independent code\n"
-          "  -idirafter <dir>      add include directory after others\n"
-          "  -###                  dump subprocess command line\n"
-          "  -ir                   generate LLVM IR\n"
-          "  -S                    stop after assembly (output .s)\n"
-          "  -E                    preprocess only (output .i)\n"
-          "  -c                    compile only (output .o)\n"
-          "  -static, -shared      pass to linker\n"
-          "  -L<dir> / -L <dir>    add library search path\n"
-          "  -fcommon / -fno-common\n"
-          "  --help                show this help\n"
-          "cc1 mode:\n"
-          "\t-cc1 -cc1-input <path> -cc1-output <path> [-ir]\n",
-          argv0);
+  fprintf(
+      stderr,
+      "Usage: %s [options] <file>...\n"
+      "Options:\n"
+      "  -o <path>              place output into <path>\n"
+      "  -I<dir> / -I <dir>     add include directory\n"
+      "  -D<macro> / -D <macro> define macro\n"
+      "  -U<macro> / -U <macro> undefine macro\n"
+      "  -include <file>        include header before main input\n"
+      "  -x <lang>              force input language (c|assembler|none)\n"
+      "  -l<lib>                link with library\n"
+      "  -Wl,<args>             pass comma-separated args to linker\n"
+      "  -Xlinker <arg>         pass arg to linker\n"
+      "  -s                     pass -s to linker\n"
+      "  -M, -MD, -MM, -MMD     dependency generation options\n"
+      "  -MF <file>             write deps to file\n"
+      "  -MT <target>           set dependency target\n"
+      "  -MG, -MP               dependency options\n"
+      "  -fpic, -fPIC           generate position-independent code\n"
+      "  -idirafter <dir>       add include directory after others\n"
+      "  -###                   dump subprocess command line\n"
+      "  -emit-llvm             generate LLVM IR\n"
+      "  -S                     stop after assembly (output .s)\n"
+      "  -E                     preprocess only (output .i)\n"
+      "  -c                     compile only (output .o)\n"
+      "  -static, -shared       pass to linker\n"
+      "  -L<dir> / -L <dir>     add library search path\n"
+      "  -fcommon / -fno-common\n"
+      "  --help                show this help\n"
+      "cc1 mode:\n"
+      "\t-cc1 -cc1-input <path> -cc1-output <path> [-emit-llvm] -cc1-filename "
+      "<path>\n",
+      argv0);
   exit(status);
 }
 
@@ -113,12 +116,20 @@ void parse_args(int argc, char **argv) {
     }
 
     if (!strcmp(argv[i], "-cc1-input")) {
+      opt_cc1 = true;
       opt_cc1_input = argv[++i];
       continue;
     }
 
     if (!strcmp(argv[i], "-cc1-output")) {
+      opt_cc1 = true;
       opt_cc1_output = argv[++i];
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-cc1-filename")) {
+      opt_cc1 = true;
+      opt_cc1_filename = argv[++i];
       continue;
     }
 
@@ -275,8 +286,9 @@ void parse_args(int argc, char **argv) {
       continue;
     }
 
-    if (!strcmp(argv[i], "-ir")) {
-      opt_ir = true;
+    if (!strcmp(argv[i], "-emit-llvm")) {
+      opt_emit_llvm = true;
+      opt_S = true;
       continue;
     }
 

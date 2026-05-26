@@ -1902,7 +1902,7 @@ static void codegen_global_init(Obj *prog) {
 
 void codegen(Obj *prog, FILE *out, bool gen_asm) {
   C = LLVMContextCreate();
-  M = LLVMModuleCreateWithNameInContext(get_current_file()->name, C);
+  M = LLVMModuleCreateWithNameInContext(opt_cc1_filename ?: "<unknown>", C);
   B = LLVMCreateBuilderInContext(C);
 
   codegen_global_declare(prog);

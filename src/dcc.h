@@ -75,7 +75,6 @@ void warn_tok(Token *tok, char *fmt, ...);
 
 Token *tokenize_string_literal(Token *tok, Type *basety);
 Token *tokenize_file(char *path);
-DFile *get_current_file();
 
 #ifdef unreachable
 #undef unreachable
@@ -514,13 +513,14 @@ extern bool opt_S;
 extern bool opt_c;
 extern bool opt_E;
 extern bool opt_hash_hash_hash;
-extern bool opt_ir;
+extern bool opt_emit_llvm;
 extern bool opt_static;
 extern bool opt_shared;
 extern bool opt_fcommon;
 extern bool opt_fpic; // unused
 
 extern char *opt_cc1_output;
+extern char *opt_cc1_filename;
 extern char *opt_cc1_input;
 extern char *opt_o;
 
