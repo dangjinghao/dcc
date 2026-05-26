@@ -71,3 +71,4 @@ endfunction()
 
 _dcc_add_test_suite(stage1 dcc)
 _dcc_add_test_suite(stage2 dcc_stage2)
+_dcc_add_test_suite(stage3 dcc_stage3)
