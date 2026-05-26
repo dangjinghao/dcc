@@ -84,10 +84,12 @@ static void usage(int status) {
       "  -fcommon / -fno-common\n"
       "  --help                show this help\n"
       "cc1 mode:\n"
-      "\t-cc1 -cc1-input <path> -cc1-output <path> [-emit-llvm] -cc1-filename "
+      "  -cc1 -cc1-input <path> -cc1-output <path> [-emit-llvm] -cc1-filename "
       "<path>\n"
       "Infomation:\n"
-      "dcc include path: " DCC_INCLUDE_PATH "\n");
+      "\n"
+      "dcc include path: %s/../include\n",
+      path_get_exedir());
   exit(status);
 }
 

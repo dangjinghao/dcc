@@ -71,7 +71,7 @@ static void pack_args(int argc, char *argv[], PtrArray *arr) {
 }
 
 static void expand_macro(char *input, char *output) {
-  char *compiler_include = "-I" DCC_INCLUDE_PATH;
+  char *compiler_include = format("-I%s/../include", path_get_exedir());
   char *argv[] = {"cpp",
                   "-E",
                   "-w",

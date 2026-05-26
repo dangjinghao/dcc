@@ -547,5 +547,6 @@ void path_cp(char *dst, char *src);
 char *path_new_replaced_suffix(char *path, char *suffix);
 char *path_find_file(char *pattern);
 bool path_exists(char *path);
+char *path_get_exedir(void);
 
 #endif

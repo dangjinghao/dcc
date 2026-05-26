@@ -8,7 +8,6 @@ foreach(src IN LISTS DCC_STAGE2_ALL_SOURCES)
         OUTPUT "${obj}"
         COMMAND "$<TARGET_FILE:dcc>"
             -I "${CMAKE_SOURCE_DIR}/src"
-            -D DCC_INCLUDE_PATH=\\"${DCC_INCLUDE_PATH}\\"
             -c "${CMAKE_SOURCE_DIR}/${src}"
             -o "${obj}"
         DEPENDS dcc "${CMAKE_SOURCE_DIR}/${src}"
@@ -19,7 +18,10 @@ foreach(src IN LISTS DCC_STAGE2_ALL_SOURCES)
 endforeach()
 
 add_executable(dcc_stage2 ${DCC_STAGE2_OBJECTS})
-set_target_properties(dcc_stage2 PROPERTIES LINKER_LANGUAGE C)
+set_target_properties(dcc_stage2 PROPERTIES
+    LINKER_LANGUAGE C
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
 add_dependencies(dcc_stage2 dcc)
 
 if(DCC_BACKEND STREQUAL "llvm")

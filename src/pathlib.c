@@ -3,6 +3,8 @@
 #include "dcc.h"
 #include <errno.h>
 #include <glob.h>
+#include <libgen.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -107,4 +109,13 @@ char *path_find_file(char *pattern) {
 bool path_exists(char *path) {
   struct stat st;
   return !stat(path, &st);
+}
+
+char *path_get_exedir(void) {
+  char buf[PATH_MAX];
+  ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (n < 0)
+    error("readlink /proc/self/exe: %s", strerror(errno));
+  buf[n] = '\0';
+  return dirname(strdup(buf));
 }
