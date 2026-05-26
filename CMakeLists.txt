@@ -17,33 +17,43 @@ add_compile_options(
     )
 
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-add_library(dcc_core STATIC src/tokenizer.c
-                        src/parser.c
-                        src/strings.c
-                        src/type.c
-                        src/hashmap.c
-                        src/unicode.c
-                        src/ptrarray.c
-                        )
-
-add_executable(dcc)
-target_link_libraries(dcc PRIVATE dcc_core)
-target_sources(dcc PRIVATE src/main.c
-                        src/args.c
-                        src/pathlib.c
-                        )
-
-# tools
-add_executable(astrepr)
-target_link_libraries(astrepr PRIVATE dcc_core)
-target_sources(astrepr PRIVATE src/tools/astrepr.c)
-
-
 include_directories(src/)
 
+set(DCC_CORE_SOURCES src/tokenizer.c
+                     src/parser.c
+                     src/strings.c
+                     src/type.c
+                     src/hashmap.c
+                     src/unicode.c
+                     src/ptrarray.c
+                     )
+
+set(DCC_MAIN_SOURCES src/main.c
+                     src/args.c
+                     src/pathlib.c
+                     )
+
 if(DCC_BACKEND STREQUAL "llvm")
-    target_sources(dcc PRIVATE src/codegen/llvm.c)
+    list(APPEND DCC_MAIN_SOURCES src/codegen/llvm.c)
+else()
+    message(FATAL_ERROR "Unsupported backend: ${DCC_BACKEND}")
+endif()
+
+set(DCC_STAGE2_ALL_SOURCES ${DCC_CORE_SOURCES} ${DCC_MAIN_SOURCES})
+
+#
+## Stage 1: Build the core library, the tools and the main executable
+#
+add_library(dcc_core STATIC ${DCC_CORE_SOURCES})
+
+add_executable(dcc ${DCC_MAIN_SOURCES})
+target_link_libraries(dcc PRIVATE dcc_core)
+
+# tools
+add_executable(astrepr src/tools/astrepr.c)
+target_link_libraries(astrepr PRIVATE dcc_core)
+
+if(DCC_BACKEND STREQUAL "llvm")
     find_package(LLVM REQUIRED CONFIG)
     message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
     message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
@@ -52,13 +62,13 @@ if(DCC_BACKEND STREQUAL "llvm")
     add_definitions(${LLVM_DEFINITIONS_LIST})
 
     if(DCC_BACKEND_LINK_LLVM_DYLIB)
-        target_link_libraries(dcc PRIVATE LLVM)
+        set(DCC_LLVM_LIBS LLVM)
     else()
         # https://llvm.org/docs/CMake.html#embedding-llvm-in-your-project
         llvm_map_components_to_libnames(llvm_libs support core analysis native)
-        target_link_libraries(dcc PRIVATE ${llvm_libs})
+        set(DCC_LLVM_LIBS ${llvm_libs})
     endif()
-
-else()
-    message(FATAL_ERROR "Unsupported backend: ${DCC_BACKEND}")
+    target_link_libraries(dcc PRIVATE ${DCC_LLVM_LIBS})
 endif()
+
+add_subdirectory(stage2)
