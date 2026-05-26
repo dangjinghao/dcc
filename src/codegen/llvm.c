@@ -732,14 +732,27 @@ static LLVMValueRef logic_short_circuit(Node *node, bool is_and) {
   return ext;
 }
 
+static LLVMValueRef build_bitcast_to_integer_type(Type *ty, LLVMValueRef v) {
+  if (is_flonum(ty)) {
+    if (ty->kind == TY_FLOAT) {
+      return LLVMBuildBitCast(B, v, type_convert(ty_int), "bitcast_float_int");
+    }
+    if (ty->kind == TY_DOUBLE) {
+      return LLVMBuildBitCast(B, v, type_convert(ty_long),
+                              "bitcast_double_long");
+    }
+  }
+  return v;
+}
+
 // ({
 //   do {
 //    new = *ptr <op> rhs;
 //   } while (!cas(ptr, old, new));
 //   new;
 // })
-static LLVMValueRef build_atomic_rmw(LLVMOpcode kind, Type *ty,
-                                     LLVMValueRef ptr, LLVMValueRef rhs) {
+static LLVMValueRef build_sa_atomic_rmw(LLVMOpcode kind, Type *ty,
+                                        LLVMValueRef ptr, LLVMValueRef rhs) {
 
   new_block("atomic_rmw");
   LLVMBasicBlockRef bb_body = LLVMAppendBasicBlockInContext(C, F, "armw_body");
@@ -753,6 +766,10 @@ static LLVMValueRef build_atomic_rmw(LLVMOpcode kind, Type *ty,
   LLVMValueRef new_v = LLVMBuildBinOp(B, kind, old_v, rhs, "armw_op");
   llvm_build_terminator_br(bb_cond);
   LLVMPositionBuilderAtEnd(B, bb_cond);
+  // bitcast to integer if it is non integer family
+  // because LLVM doesn't support fp type rmw operation
+  new_v = build_bitcast_to_integer_type(ty, new_v);
+  old_v = build_bitcast_to_integer_type(ty, old_v);
   LLVMValueRef cas_result = LLVMBuildAtomicCmpXchg(
       B, ptr, old_v, new_v, LLVMAtomicOrderingSequentiallyConsistent,
       LLVMAtomicOrderingSequentiallyConsistent, false);
@@ -1274,9 +1291,9 @@ static LLVMValueRef gen_expr(Node *node) {
 
     if (node->lhs->ty->is_atomic) {
       if (is_flonum(node->lhs->ty)) {
-        return build_atomic_rmw(LLVMFMul, node->lhs->ty, ptr, rhs_v);
+        return build_sa_atomic_rmw(LLVMFMul, node->lhs->ty, ptr, rhs_v);
       } else {
-        return build_atomic_rmw(LLVMMul, node->lhs->ty, ptr, rhs_v);
+        return build_sa_atomic_rmw(LLVMMul, node->lhs->ty, ptr, rhs_v);
       }
     }
     LLVMValueRef tmp_v = NULL;
@@ -1293,11 +1310,11 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef rhs_v = gen_expr(node->rhs);
     if (node->lhs->ty->is_atomic) {
       if (is_flonum(node->lhs->ty)) {
-        return build_atomic_rmw(LLVMFDiv, node->lhs->ty, ptr, rhs_v);
+        return build_sa_atomic_rmw(LLVMFDiv, node->lhs->ty, ptr, rhs_v);
       } else if (node->lhs->ty->is_unsigned) {
-        return build_atomic_rmw(LLVMUDiv, node->lhs->ty, ptr, rhs_v);
+        return build_sa_atomic_rmw(LLVMUDiv, node->lhs->ty, ptr, rhs_v);
       } else {
-        return build_atomic_rmw(LLVMSDiv, node->lhs->ty, ptr, rhs_v);
+        return build_sa_atomic_rmw(LLVMSDiv, node->lhs->ty, ptr, rhs_v);
       }
     }
     LLVMValueRef tmp_v = NULL;
