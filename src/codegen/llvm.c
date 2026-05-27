@@ -285,6 +285,7 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
         init_val = LLVMBlockAddress(target_fn, bb);
       } else {
         // Relocation pointer, real data: label + eval_val
+        assert(var_node->var);
         LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
         assert(target_val);
         assert(ty->base);
@@ -1846,11 +1847,13 @@ static void ensure_function_entry_block(LLVMValueRef fn) {
 // Recurisvely declare them in reversed order, so that the codegen result will
 // keep a same order as source code
 static void codegen_global_declare(Obj *var) {
-  if (!var) {
+  if (!var)
     return;
-  }
-
   codegen_global_declare(var->next);
+
+  if (!var->is_live)
+    return;
+
   LLVMValueRef vr = NULL;
   if (var->is_function) {
     if (is_function_agg_declare(var)) {
@@ -1882,6 +1885,9 @@ static void codegen_global_declare(Obj *var) {
 // stage 2. initialize global variable
 static void codegen_global_init(Obj *prog) {
   for (Obj *var = prog; var; var = var->next) {
+    if (!var->is_live) {
+      continue;
+    }
     if (!var->is_function) {
       LLVMValueRef old_v = (LLVMValueRef)var->codegen_data;
       assert(old_v);

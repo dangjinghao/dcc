@@ -358,7 +358,7 @@ struct Obj {
   bool is_function;
   bool is_definition;
   bool is_static;
-
+  bool is_live;
   // Global variable
 
   // common linkage

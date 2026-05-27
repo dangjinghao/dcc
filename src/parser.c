@@ -1825,6 +1825,9 @@ int64_t eval2(Node *node, Node **label_node) {
   case ND_ADDR:
     return eval_rval(node->lhs, label_node);
   case ND_LABEL_VAL:
+    // in fact any ND_LABEL_VAL must be in a function definition
+    // so node->parent_fn->is_live is always true
+    assert(node->parent_fn->is_live);
     if (label_node)
       *label_node = node;
     return 0;
@@ -1839,6 +1842,7 @@ int64_t eval2(Node *node, Node **label_node) {
       error_tok(node->tok, "not a compile-time constant");
     if (node->var->ty->kind != TY_ARRAY && node->var->ty->kind != TY_FUNC)
       error_tok(node->tok, "invalid initializer");
+    node->var->is_live = true;
     *label_node = node;
     return 0;
   case ND_NUM:
@@ -1855,6 +1859,7 @@ static int64_t eval_rval(Node *node, Node **label_node) {
   case ND_VAR:
     if (node->var->is_local)
       error_tok(node->tok, "not a compile-time constant");
+    node->var->is_live = true;
     *label_node = node;
     return 0;
   case ND_DEREF:
@@ -2636,7 +2641,10 @@ static Node *postfix(Token **rest, Token *tok) {
     tok = skip(tok, ")");
 
     if (scope->next == NULL) {
+      // global scope
       Obj *var = new_anon_gvar(ty);
+      // global compound literal reference this anonymous var
+      var->is_live = true;
       gvar_initializer(rest, tok, var);
       return new_var_node(var, start);
     }
@@ -2951,8 +2959,11 @@ static Node *primary(Token **rest, Token *tok) {
     *rest = tok->next;
 
     if (sc) {
-      if (sc->var)
+      if (sc->var) {
+        // referenced variable is live
+        sc->var->is_live = true;
         return new_var_node(sc->var, tok);
+      }
       if (sc->enum_ty)
         return new_num(sc->enum_val, tok);
     }
@@ -2964,6 +2975,9 @@ static Node *primary(Token **rest, Token *tok) {
 
   if (tok->kind == TK_STR) {
     Obj *var = new_string_literal(tok->str, tok->ty);
+    // referenced string literal is a anonymous variable and  must be created in
+    // global scope
+    var->is_live = true;
     *rest = tok->next;
     return new_var_node(var, tok);
   }
@@ -3060,7 +3074,9 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
 
   if (consume(&tok, tok, ";"))
     return tok;
-
+  assert(fn->is_definition);
+  // function is live if it is definition
+  fn->is_live = fn->is_definition;
   current_fn = fn;
   locals = NULL;
   enter_scope();
@@ -3158,6 +3174,9 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
       var->is_tentative = true;
     else
       var->is_tentative = false;
+
+    // global variable is always live
+    var->is_live = true;
   }
   return tok;
 }
