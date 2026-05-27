@@ -89,7 +89,7 @@ static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
 static Node *expr(Token **rest, Token *tok);
-static int64_t eval_rval(Node *node, Node **label_node);
+static int64_t eval_lval_addr_offset(Node *node, Node **label_node);
 static bool is_const_expr(Node *node);
 static Node *assign(Token **rest, Token *tok);
 static Node *logor(Token **rest, Token *tok);
@@ -1823,7 +1823,7 @@ int64_t eval2(Node *node, Node **label_node) {
     return val;
   }
   case ND_ADDR:
-    return eval_rval(node->lhs, label_node);
+    return eval_lval_addr_offset(node->lhs, label_node);
   case ND_LABEL_VAL:
     // in fact any ND_LABEL_VAL must be in a function definition
     // so node->parent_fn->is_live is always true
@@ -1836,7 +1836,7 @@ int64_t eval2(Node *node, Node **label_node) {
       error_tok(node->tok, "not a compile-time constant");
     if (node->ty->kind != TY_ARRAY)
       error_tok(node->tok, "invalid initializer");
-    return eval_rval(node->lhs, label_node) + node->member->offset;
+    return eval_lval_addr_offset(node->lhs, label_node) + node->member->offset;
   case ND_VAR:
     if (!label_node)
       error_tok(node->tok, "not a compile-time constant");
@@ -1854,7 +1854,7 @@ int64_t eval2(Node *node, Node **label_node) {
   error_tok(node->tok, "not a compile-time constant");
 }
 
-static int64_t eval_rval(Node *node, Node **label_node) {
+static int64_t eval_lval_addr_offset(Node *node, Node **label_node) {
   switch (node->kind) {
   case ND_VAR:
     if (node->var->is_local)
@@ -1865,7 +1865,7 @@ static int64_t eval_rval(Node *node, Node **label_node) {
   case ND_DEREF:
     return eval2(node->lhs, label_node);
   case ND_MEMBER:
-    return eval_rval(node->lhs, label_node) + node->member->offset;
+    return eval_lval_addr_offset(node->lhs, label_node) + node->member->offset;
   default:
     break;
   }
