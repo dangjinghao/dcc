@@ -12,7 +12,12 @@
     - `cpp` the C Preprocessor
     - LLVM backend
 - Small struct passed-as-value is simply implemented by LLVM struct, so maybe sometimes it's not correct.
+- Bootstrap support (stage3)
 
+## tested program
+
+- [dangjinghao/dcc](https://github.com/dangjinghao/dcc)
+- [antirez/kilo](https://github.com/antirez/kilo)
 
 ## Reference
 

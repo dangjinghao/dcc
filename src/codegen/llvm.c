@@ -294,6 +294,10 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
                          (uint64_t)eval_val / ty->base->size, false);
         init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
       }
+    } else if (ty->kind == TY_PTR) {
+      init_val =
+          LLVMConstInt(LLVMInt64TypeInContext(C), eval_val, ty->is_unsigned);
+      init_val = LLVMBuildIntToPtr(B, init_val, llvm_ty, "");
     } else {
       // int family
       init_val = LLVMConstInt(llvm_ty, eval_val, ty->is_unsigned);
