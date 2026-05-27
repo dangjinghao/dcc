@@ -425,16 +425,18 @@ typedef struct {
 void ptrarray_push(PtrArray *arr, void *s);
 void ptrarray_push_batch(PtrArray *arr, void **append_array);
 void ptrarray_push_batch2(PtrArray *arr, PtrArray *append_array);
+void ptrarray_free(PtrArray *arr);
 
 //
 /// strings.c
 //
 
-char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
-char *visual_bytes(char *s, size_t len);
-bool str_startswithcase(char *str, char *substr);
-bool str_startswith(char *str, char *substr);
-bool str_endswith(char *p, char *q);
+char *format(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+char *visual_bytes(const char *s, const size_t len);
+bool str_startswithcase(const char *str, const char *substr);
+bool str_startswith(const char *str, const char *substr);
+bool str_endswith(const char *p, const char *q);
+bool str_endswithcase(const char *p, const char *q);
 
 #define PTRARRAY_PTR_TYPE char *
 #define PTRARRAY_PREFIX strarray

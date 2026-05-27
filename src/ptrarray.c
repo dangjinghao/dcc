@@ -28,3 +28,10 @@ void ptrarray_push_batch2(PtrArray *arr, PtrArray *append_array) {
     ptrarray_push(arr, append_array->data[i]);
   }
 }
+
+void ptrarray_free(PtrArray *arr) {
+  free(arr->data);
+  arr->data = NULL;
+  arr->capacity = 0;
+  arr->len = 0;
+}
