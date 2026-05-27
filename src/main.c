@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
   if (opt_inputfiles.len > 1 && opt_o && (opt_c || opt_S | opt_E))
     error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
 
-  PtrArray ld_objs = {0};
+  PtrArray ld_objs = {};
   for (int i = 0; i < opt_inputfiles.len; i++) {
     InputFile *input_file = opt_inputfiles.data[i];
     if (input_file->type == FILETYPE_C) {
@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
         path_cp(opt_o ?: "-", expanded_file);
         continue;
       }
-      PtrArray args = {0};
+      PtrArray args = {};
       pack_args(argc, argv, &args);
 
       // generate *.s

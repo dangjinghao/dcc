@@ -541,12 +541,12 @@ extern char *opt_MT;
 /// pathlib.c
 //
 
-char *path_new_tmpfile(void);
+char *path_new_tmpfile();
 void path_fcp(FILE *dst, FILE *src);
-void path_cp(char *dst, char *src);
-char *path_new_replaced_suffix(char *path, char *suffix);
-char *path_find_file(char *pattern);
-bool path_exists(char *path);
-char *path_get_exedir(void);
+char *path_get_exedir();
+void path_cp(const char *dst, const char *src);
+char *path_new_replaced_suffix(const char *path, const char *suffix);
+char *path_find_file(const char *pattern);
+bool path_exists(const char *path);
 
 #endif

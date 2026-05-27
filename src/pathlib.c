@@ -13,12 +13,12 @@
 
 static PtrArray tmp_files;
 
-static void path_tmp_cleanup(void) {
+static void path_tmp_cleanup() {
   for (int i = 0; i < tmp_files.len; i++)
     unlink(tmp_files.data[i]);
 }
 
-char *path_new_tmpfile(void) {
+char *path_new_tmpfile() {
   if (tmp_files.len == 0) {
     atexit(path_tmp_cleanup);
   }
@@ -43,7 +43,7 @@ void path_fcp(FILE *dst, FILE *src) {
   fflush(dst);
 }
 
-void path_cp(char *dst, char *src) {
+void path_cp(const char *dst, const char *src) {
   FILE *fsrc = NULL;
   FILE *fdst = NULL;
 
@@ -70,11 +70,11 @@ void path_cp(char *dst, char *src) {
     fclose(fsrc);
 }
 
-char *path_new_replaced_suffix(char *path, char *suffix) {
+char *path_new_replaced_suffix(const char *path, const char *suffix) {
   if (!path || !suffix)
     return NULL;
 
-  char *last_dot = strrchr(path, '.');
+  const char *last_dot = strrchr(path, '.');
   size_t base_len;
   if (last_dot) {
     base_len = last_dot - path;
@@ -96,7 +96,7 @@ char *path_new_replaced_suffix(char *path, char *suffix) {
   return new_path;
 }
 
-char *path_find_file(char *pattern) {
+char *path_find_file(const char *pattern) {
   char *path = NULL;
   glob_t buf = {};
   glob(pattern, 0, NULL, &buf);
@@ -106,12 +106,12 @@ char *path_find_file(char *pattern) {
   return path;
 }
 
-bool path_exists(char *path) {
+bool path_exists(const char *path) {
   struct stat st;
   return !stat(path, &st);
 }
 
-char *path_get_exedir(void) {
+char *path_get_exedir() {
   char buf[PATH_MAX];
   ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (n < 0)
