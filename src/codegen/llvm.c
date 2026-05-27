@@ -1212,7 +1212,14 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef val = load(node->lhs->ty, ptr);
     LLVMValueRef rhs = gen_expr(node->rhs);
     if (node->lhs->ty->is_atomic) {
-      todo_impl("ND_SA_PTR_ADD: atomic");
+      rhs = LLVMBuildMul(B, rhs,
+                         LLVMConstInt(LLVMInt64TypeInContext(C),
+                                      node->lhs->ty->base->size, false),
+                         "");
+      LLVMValueRef old_v =
+          LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAdd, ptr, rhs,
+                             LLVMAtomicOrderingSequentiallyConsistent, false);
+      return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef idx =
@@ -1239,7 +1246,15 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef val = load(node->lhs->ty, ptr);
     LLVMValueRef rhs = gen_expr(node->rhs);
     if (node->lhs->ty->is_atomic) {
-      todo_impl("ND_SA_PTR_SUB: atomic");
+      rhs = LLVMBuildMul(B, rhs,
+                         LLVMConstInt(LLVMInt64TypeInContext(C),
+                                      node->lhs->ty->base->size, false),
+                         "");
+      rhs = LLVMBuildNeg(B, rhs, "");
+      LLVMValueRef old_v =
+          LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAdd, ptr, rhs,
+                             LLVMAtomicOrderingSequentiallyConsistent, false);
+      return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef idx =

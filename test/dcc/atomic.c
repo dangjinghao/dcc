@@ -25,12 +25,12 @@ void basic_atomic() {
   a ^= 0x0F;
   ASSERT(0xF0, a);
 
-    atomic_uint b = 1;
-    b <<= 3;
-    ASSERT(8, b);
+  atomic_uint b = 1;
+  b <<= 3;
+  ASSERT(8, b);
 
-    b >>= 2;
-    ASSERT(2, b);
+  b >>= 2;
+  ASSERT(2, b);
 
   atomic_long c = 100;
   c += 50;
@@ -72,14 +72,14 @@ void basic_atomic() {
   ASSERT(0xF0, r);
   ASSERT(0xF0, a);
 
-    b = 1;
-    unsigned s = (b <<= 5);
-    ASSERT(32, s);
-    ASSERT(32, b);
+  b = 1;
+  unsigned s = (b <<= 5);
+  ASSERT(32, s);
+  ASSERT(32, b);
 
-    s = (b >>= 3);
-    ASSERT(4, s);
-    ASSERT(4, b);
+  s = (b >>= 3);
+  ASSERT(4, s);
+  ASSERT(4, b);
 }
 
 atomic_int shared_counter;
@@ -203,11 +203,50 @@ void float_atomic() {
   ASSERT(1, b == 50.0);
 }
 
+_Atomic(long *) shared_long_counter_ptr;
+
+int thread_long_task_ptr1(void *arg) {
+  for (int i = 0; i < 1000; i++) {
+    atomic_fetch_add(&shared_long_counter_ptr, 2);
+  }
+  return 0;
+}
+
+int thread_long_task_ptr2(void *arg) {
+  for (int i = 0; i < 1000; i++) {
+    atomic_fetch_sub(&shared_long_counter_ptr, 1);
+  }
+  return 0;
+}
+
+void ptr_atomic() {
+  shared_long_counter_ptr = NULL;
+  thrd_t t1, t2, t3;
+  thrd_t t5, t6;
+
+  thrd_create(&t1, thread_long_task_ptr1, NULL);
+  thrd_create(&t2, thread_long_task_ptr2, NULL);
+  thrd_create(&t3, thread_long_task_ptr1, NULL);
+  thrd_create(&t5, thread_long_task_ptr2, NULL);
+  thrd_create(&t6, thread_long_task_ptr1, NULL);
+
+  thrd_join(t1, NULL);
+  thrd_join(t2, NULL);
+  thrd_join(t3, NULL);
+
+  thrd_join(t5, NULL);
+  thrd_join(t6, NULL);
+  _Atomic(long *) start = NULL;
+  // It's not allowed to use `shared_long_counter_ptr - (_Atomic(long*))NULL`...
+  ASSERT(4000, shared_long_counter_ptr - start);
+}
+
 int main() {
   basic_atomic();
   concurrent_atomic_mul_div();
   concurrent_atomic_long();
   float_atomic();
+  ptr_atomic();
   printf("OK\n");
   return 0;
 }
