@@ -121,6 +121,14 @@ static void llvm_va_copy(LLVMValueRef dest, LLVMValueRef src) {
 static LLVMValueRef gen_expr(Node *node);
 static LLVMValueRef gen_stmt(Node *node);
 
+// Returns true if the struct type has any bitfield member.
+static bool is_struct_bitfield(Type *ty) {
+  for (Member *m = ty->members; m; m = m->next)
+    if (m->is_bitfield)
+      return true;
+  return false;
+}
+
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
   case TY_VOID:
@@ -148,6 +156,13 @@ static LLVMTypeRef type_convert(Type *ty) {
     assert(ty->array_len > 0);
     return LLVMArrayType2(type_convert(ty->base), ty->array_len);
   case TY_STRUCT: {
+    if (is_struct_bitfield(ty)) {
+      // Bitfield structs may have overlapping storage units that LLVM
+      // typed structs cannot express. Decay to a byte array.
+      LLVMTypeRef i8_arr = LLVMArrayType2(LLVMInt8TypeInContext(C), ty->size);
+      return LLVMStructTypeInContext(C, &i8_arr, 1, ty->is_packed);
+    }
+
     size_t member_count = next_iter_count(ty->members);
     LLVMTypeRef *members_type = calloc(member_count, sizeof(LLVMTypeRef));
     {
@@ -217,6 +232,83 @@ static LLVMTypeRef type_convert(Type *ty) {
   unreachable();
 }
 
+// Write an integer value into a byte buffer at the given offset,
+// using the size-dependent width for correct layout.
+static void write_buf(char *buf, uint64_t val, int sz) {
+  if (sz == 1)
+    *buf = val;
+  else if (sz == 2)
+    *(uint16_t *)buf = val;
+  else if (sz == 4)
+    *(uint32_t *)buf = val;
+  else if (sz == 8)
+    *(uint64_t *)buf = val;
+  else
+    unreachable();
+}
+
+// Read an integer from a byte buffer with the given size.
+static uint64_t read_buf(char *buf, int sz) {
+  if (sz == 1)
+    return *(uint8_t *)buf;
+  else if (sz == 2)
+    return *(uint16_t *)buf;
+  else if (sz == 4)
+    return *(uint32_t *)buf;
+  else if (sz == 8)
+    return *(uint64_t *)buf;
+  else
+    unreachable();
+}
+
+// Fill a byte buffer with the initial values for a bitfield-containing
+// struct. DCC's flat-bit-counter layout may produce overlapping storage
+// units, so we build a raw byte-level representation instead of typed
+// LLVM struct members.
+static void fill_bitfield_buf(Type *ty, Initializer *init, uint8_t *buf) {
+  for (Member *m = ty->members; m; m = m->next) {
+    Initializer *child = init->children[m->idx];
+    if (!child)
+      continue;
+
+    if (m->is_bitfield) {
+      if (!child->expr)
+        continue;
+      int64_t val = eval(child->expr);
+      int sz = m->ty->size;
+      uint64_t mask = (1ULL << m->bit_width) - 1;
+      uint64_t bits = ((uint64_t)val & mask) << m->bit_offset;
+
+      uint64_t prev = read_buf((char *)(buf + m->offset), sz);
+      write_buf((char *)(buf + m->offset), prev | bits, sz);
+    } else if (is_agg_type(m->ty) && !child->expr) {
+      fill_bitfield_buf(m->ty, child, buf + m->offset);
+    } else if (child->expr) {
+      int64_t val = eval(child->expr);
+      write_buf((char *)(buf + m->offset), (uint64_t)val, m->ty->size);
+    }
+  }
+}
+
+// Build a global initializer for a bitfield-containing struct.
+// The LLVM type is { [ty->size x i8] }, so we create a byte array
+// constant and wrap it in a single-element LLVM struct.
+static LLVMValueRef init_bitfield_struct_global(Type *ty, Initializer *init) {
+  int sz = ty->size;
+  uint8_t *buf = calloc(sz, 1);
+  fill_bitfield_buf(ty, init, buf);
+
+  LLVMValueRef *bytes = calloc(sz, sizeof(LLVMValueRef));
+  for (int i = 0; i < sz; i++)
+    bytes[i] = LLVMConstInt(LLVMInt8TypeInContext(C), buf[i], false);
+
+  LLVMValueRef array_val = LLVMConstArray(LLVMInt8TypeInContext(C), bytes, sz);
+  LLVMValueRef r = LLVMConstStructInContext(C, &array_val, 1, false);
+  free(bytes);
+  free(buf);
+  return r;
+}
+
 static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
   LLVMTypeRef llvm_ty = type_convert(ty);
   LLVMValueRef init_val;
@@ -247,21 +339,19 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
       init_val = LLVMConstNull(type_convert(ty));
     }
   } else if (ty->kind == TY_STRUCT) {
-    size_t member_count = next_iter_count(ty->members);
-    LLVMValueRef *cv_array = calloc(member_count, sizeof(LLVMValueRef));
-    {
+    if (is_struct_bitfield(ty)) {
+      init_val = init_bitfield_struct_global(ty, init);
+    } else {
+      size_t member_count = next_iter_count(ty->members);
+      LLVMValueRef *cv_array = calloc(member_count, sizeof(LLVMValueRef));
       size_t cv_array_idx = 0;
-      for (Member *m = ty->members; m; m = m->next) {
-        if (m->is_bitfield) {
-          todo_impl("bitfield global init");
-        }
+      for (Member *m = ty->members; m; m = m->next)
         cv_array[cv_array_idx++] =
             init_global_data(m->ty, init->children[m->idx]);
-      }
       assert(cv_array_idx == member_count);
+      init_val = LLVMConstNamedStruct(type_convert(ty), cv_array, member_count);
+      free(cv_array);
     }
-    init_val = LLVMConstNamedStruct(type_convert(ty), cv_array, member_count);
-    free(cv_array);
   } else if (ty->kind == TY_DOUBLE || ty->kind == TY_FLOAT) {
     init_val = LLVMConstReal(llvm_ty, eval_double(init->expr));
   } else if (!init->expr) {
