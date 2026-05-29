@@ -36,6 +36,9 @@ static void run_subprocess(char **argv) {
   if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
     error("run_subprocess: %s exited with error code: %d", argv[0],
           WEXITSTATUS(status));
+  } else if (WIFSIGNALED(status)) {
+    error("run_subprocess: %s terminated by signal %d", argv[0],
+          WTERMSIG(status));
   }
 }
 
