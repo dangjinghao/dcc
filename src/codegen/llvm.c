@@ -152,9 +152,10 @@ static LLVMTypeRef type_convert(Type *ty) {
     return LLVMX86FP80TypeInContext(C);
   case TY_PTR:
     return LLVMPointerTypeInContext(C, 0);
-  case TY_ARRAY:
-    assert(ty->array_len >= 0);
-    return LLVMArrayType2(type_convert(ty->base), ty->array_len);
+  case TY_ARRAY: {
+    int repr_array_len = MAX(0, ty->array_len);
+    return LLVMArrayType2(type_convert(ty->base), repr_array_len);
+  }
   case TY_STRUCT: {
     if (is_struct_bitfield(ty)) {
       // Bitfield structs may have overlapping storage units that LLVM
