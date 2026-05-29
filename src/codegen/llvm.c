@@ -771,6 +771,19 @@ static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
   return LLVMBuildCast(B, (LLVMOpcode)op, v, type_convert(to), "cast");
 }
 
+// Generate a pointer-arithmetic index value extended to a 64-bit integer.
+//
+// LLVM's getelementptr sign-extends a narrow index operand to the pointer
+// width.  For C this is wrong when the index type is an unsigned type
+// narrower than the pointer (e.g. `unsigned char`): such a value must be
+// zero-extended.  We therefore widen the index here according to its own
+// signedness so the subsequent GEP sees a full-width value.
+static LLVMValueRef gen_ptr_index(Node *idx) {
+  LLVMValueRef v = gen_expr(idx);
+  return LLVMBuildIntCast2(B, v, LLVMInt64TypeInContext(C),
+                           !idx->ty->is_unsigned, "ptr_idx");
+}
+
 // Read a bitfield value from its storage unit. `ptr` points to the
 // start of the storage unit byte (from GEP into the [N x i8] array).
 static LLVMValueRef bf_load(Member *mem, LLVMValueRef ptr) {
@@ -1293,8 +1306,7 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_PTR_SUB: {
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef ptr = gen_expr(node->lhs);
-      LLVMValueRef idx = LLVMBuildSExt(
-          B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_sub_idx");
+      LLVMValueRef idx = gen_ptr_index(node->rhs);
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
                (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
@@ -1303,7 +1315,7 @@ static LLVMValueRef gen_expr(Node *node) {
       return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &neg, 1,
                            "vla_sub");
     }
-    LLVMValueRef neg = LLVMBuildNeg(B, gen_expr(node->rhs), "ptr_sub_neg");
+    LLVMValueRef neg = LLVMBuildNeg(B, gen_ptr_index(node->rhs), "ptr_sub_neg");
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
         node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
@@ -1313,8 +1325,7 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_PTR_ADD: {
     if (node->lhs->ty->base->kind == TY_VLA) {
       LLVMValueRef ptr = gen_expr(node->lhs);
-      LLVMValueRef idx = LLVMBuildSExt(
-          B, gen_expr(node->rhs), LLVMInt64TypeInContext(C), "vla_add_idx");
+      LLVMValueRef idx = gen_ptr_index(node->rhs);
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
                (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
@@ -1325,8 +1336,9 @@ static LLVMValueRef gen_expr(Node *node) {
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
         node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
-    return LLVMBuildGEP2(B, type_convert(pointee_ty), gen_expr(node->lhs),
-                         &(LLVMValueRef){gen_expr(node->rhs)}, 1, "ptr_add");
+    LLVMValueRef base = gen_expr(node->lhs);
+    LLVMValueRef idx = gen_ptr_index(node->rhs);
+    return LLVMBuildGEP2(B, type_convert(pointee_ty), base, &idx, 1, "ptr_add");
   }
   case ND_MUL: {
     if (is_flonum(node->lhs->ty)) {
@@ -1466,7 +1478,7 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_PTR_ADD: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
-    LLVMValueRef rhs = gen_expr(node->rhs);
+    LLVMValueRef rhs = gen_ptr_index(node->rhs);
     if (node->lhs->ty->is_atomic) {
       rhs = LLVMBuildMul(B, rhs,
                          LLVMConstInt(LLVMInt64TypeInContext(C),
@@ -1478,12 +1490,10 @@ static LLVMValueRef gen_expr(Node *node) {
       return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
-      LLVMValueRef idx =
-          LLVMBuildSExt(B, rhs, LLVMInt64TypeInContext(C), "sa_vla_add_idx");
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
                (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
-      LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_add_bytes");
+      LLVMValueRef bytes = LLVMBuildMul(B, rhs, step, "sa_vla_add_bytes");
       LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val,
                                          &bytes, 1, "sa_vla_ptr_add");
       store(node->lhs->ty, ptr, tmp_v);
@@ -1492,15 +1502,15 @@ static LLVMValueRef gen_expr(Node *node) {
     // [gnu ext]: void* ptr calculate
     Type *pointee_ty =
         node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
-    LLVMValueRef tmp_v = LLVMBuildGEP2(B, type_convert(pointee_ty), val,
-                                       &(LLVMValueRef){rhs}, 1, "sa_ptr_add");
+    LLVMValueRef tmp_v =
+        LLVMBuildGEP2(B, type_convert(pointee_ty), val, &rhs, 1, "sa_ptr_add");
     store(node->lhs->ty, ptr, tmp_v);
     return load(node->ty, ptr);
   }
   case ND_SA_PTR_SUB: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef val = load(node->lhs->ty, ptr);
-    LLVMValueRef rhs = gen_expr(node->rhs);
+    LLVMValueRef rhs = gen_ptr_index(node->rhs);
     if (node->lhs->ty->is_atomic) {
       rhs = LLVMBuildMul(B, rhs,
                          LLVMConstInt(LLVMInt64TypeInContext(C),
@@ -1513,12 +1523,10 @@ static LLVMValueRef gen_expr(Node *node) {
       return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
     }
     if (node->lhs->ty->base->kind == TY_VLA) {
-      LLVMValueRef idx =
-          LLVMBuildSExt(B, rhs, LLVMInt64TypeInContext(C), "sa_vla_sub_idx");
       LLVMValueRef step =
           load(node->lhs->ty->base->vla_size->ty,
                (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
-      LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "sa_vla_sub_bytes");
+      LLVMValueRef bytes = LLVMBuildMul(B, rhs, step, "sa_vla_sub_bytes");
       LLVMValueRef neg = LLVMBuildNeg(B, bytes, "sa_vla_sub_neg");
       LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &neg,
                                          1, "sa_vla_ptr_sub");
@@ -2242,7 +2250,8 @@ static void codegen_global_init(Obj *prog) {
           LLVMReplaceAllUsesWith(old_v, new_v);
 
           LLVMDeleteGlobal(old_v);
-
+          // Re-set the name after deleting old_v so the symbol
+          // has the correct name (not e.g. "v.1").
           LLVMSetValueName2(new_v, var->name, strlen(var->name));
           // update reference in our system
           var->codegen_data = (intptr_t)new_v;
