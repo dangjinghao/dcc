@@ -200,7 +200,7 @@ void parse_args(int argc, char **argv) {
       continue;
     }
 
-    if (!strncmp(argv[i], "-Wl,", 2)) {
+    if (!strncmp(argv[i], "-Wl,", 4)) {
       char *s = strdup(argv[i] + 4);
       char *arg = strtok(s, ",");
 
@@ -248,18 +248,8 @@ void parse_args(int argc, char **argv) {
       continue;
     }
 
-    if (!strncmp(argv[i], "-MF", 3)) {
-      opt_MF = argv[i] + 3;
-      continue;
-    }
-
     if (!strcmp(argv[i], "-MT")) {
       opt_MT = argv[++i];
-      continue;
-    }
-
-    if (!strncmp(argv[i], "-MT", 3)) {
-      opt_MT = argv[i] + 3;
       continue;
     }
 
