@@ -265,6 +265,10 @@ static uint64_t read_buf(char *buf, int sz) {
 // struct. DCC's flat-bit-counter layout may produce overlapping storage
 // units, so we build a raw byte-level representation instead of typed
 // LLVM struct members.
+//
+// Members whose initializers require relocations (addresses of functions
+// or global variables) are skipped — they will be handled separately as
+// native LLVM constants by init_bitfield_struct_global.
 static void fill_bitfield_buf(Type *ty, Initializer *init, uint8_t *buf) {
   for (Member *m = ty->members; m; m = m->next) {
     Initializer *child = init->children[m->idx];
@@ -284,27 +288,120 @@ static void fill_bitfield_buf(Type *ty, Initializer *init, uint8_t *buf) {
     } else if (is_agg_type(m->ty) && !child->expr) {
       fill_bitfield_buf(m->ty, child, buf + m->offset);
     } else if (child->expr) {
-      int64_t val = eval(child->expr);
+      Node *var_node = NULL;
+      int64_t val = eval2(child->expr, &var_node);
+      if (var_node) {
+        // Relocation member — skip, handled separately
+        continue;
+      }
       write_buf((char *)(buf + m->offset), (uint64_t)val, m->ty->size);
     }
   }
 }
 
+// Generate a relocation initializer for a scalar (non-bitfield) member.
+// Returns NULL if the member does not require a relocation.
+static LLVMValueRef gen_scalar_reloc_init(Type *ty, Initializer *init) {
+  if (!init->expr)
+    return NULL;
+
+  if (ty->kind == TY_DOUBLE || ty->kind == TY_FLOAT)
+    return NULL;
+
+  Node *var_node = NULL;
+  int64_t eval_val = eval2(init->expr, &var_node);
+  if (!var_node)
+    return NULL;
+
+  if (var_node->kind == ND_LABEL_VAL) {
+    LLVMValueRef target_fn = (LLVMValueRef)var_node->parent_fn->codegen_data;
+    assert(target_fn);
+    LLVMBasicBlockRef bb = hashmap_get(&block_labels, var_node->unique_label);
+    if (!bb) {
+      bb = LLVMAppendBasicBlockInContext(C, target_fn, var_node->unique_label);
+      hashmap_put(&block_labels, var_node->unique_label, bb);
+    }
+    return LLVMBlockAddress(target_fn, bb);
+  }
+
+  assert(var_node->var);
+  LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
+  assert(target_val);
+  assert(ty->base);
+  LLVMTypeRef pointee_ty = type_convert(ty->base);
+  LLVMValueRef indices = LLVMConstInt(
+      LLVMInt64TypeInContext(C), (uint64_t)eval_val / ty->base->size, false);
+  return LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
+}
+
 // Build a global initializer for a bitfield-containing struct.
-// The LLVM type is { [ty->size x i8] }, so we create a byte array
-// constant and wrap it in a single-element LLVM struct.
+//
+// Non-bitfield members whose initializers require relocations (addresses
+// of functions/globals) are emitted as native LLVM constants (ptr, etc.)
+// at their byte offset, while bitfields and non-relocation members form
+// [k x i8] byte-array gaps. The result is a packed unnamed struct that
+// matches the parser-computed byte layout exactly.
 static LLVMValueRef init_bitfield_struct_global(Type *ty, Initializer *init) {
   int sz = ty->size;
   uint8_t *buf = calloc(sz, 1);
   fill_bitfield_buf(ty, init, buf);
 
-  LLVMValueRef *bytes = calloc(sz, sizeof(LLVMValueRef));
-  for (int i = 0; i < sz; i++)
-    bytes[i] = LLVMConstInt(LLVMInt8TypeInContext(C), buf[i], false);
+  // Collect relocation members (non-bitfield, scalar, relocation-needed)
+  int n_reloc = 0;
+  typedef struct {
+    int offset;
+    int size;
+    LLVMValueRef val;
+  } RelocEntry;
+  RelocEntry *relocs = calloc(ty->members ? next_iter_count(ty->members) : 1,
+                              sizeof(RelocEntry));
 
-  LLVMValueRef array_val = LLVMConstArray(LLVMInt8TypeInContext(C), bytes, sz);
-  LLVMValueRef r = LLVMConstStructInContext(C, &array_val, 1, false);
-  free(bytes);
+  for (Member *m = ty->members; m; m = m->next) {
+    Initializer *child = init->children[m->idx];
+    if (!child || m->is_bitfield || !child->expr)
+      continue;
+    if (is_agg_type(m->ty))
+      continue;
+    LLVMValueRef val = gen_scalar_reloc_init(m->ty, child);
+    if (val)
+      relocs[n_reloc++] = (RelocEntry){m->offset, m->ty->size, val};
+  }
+
+  // Build LLVM struct elements: [k x i8] gaps + relocation values
+  int max_elems = n_reloc * 2 + 1;
+  LLVMValueRef *elems = calloc(max_elems, sizeof(LLVMValueRef));
+  int n_elems = 0;
+  int pos = 0;
+
+  for (int i = 0; i < n_reloc; i++) {
+    if (relocs[i].offset > pos) {
+      int gap = relocs[i].offset - pos;
+      LLVMValueRef *gap_bytes = calloc(gap, sizeof(LLVMValueRef));
+      for (int j = 0; j < gap; j++)
+        gap_bytes[j] =
+            LLVMConstInt(LLVMInt8TypeInContext(C), buf[pos + j], false);
+      elems[n_elems++] =
+          LLVMConstArray(LLVMInt8TypeInContext(C), gap_bytes, gap);
+      free(gap_bytes);
+    }
+    elems[n_elems++] = relocs[i].val;
+    pos = relocs[i].offset + relocs[i].size;
+  }
+
+  if (pos < sz) {
+    int gap = sz - pos;
+    LLVMValueRef *gap_bytes = calloc(gap, sizeof(LLVMValueRef));
+    for (int j = 0; j < gap; j++)
+      gap_bytes[j] =
+          LLVMConstInt(LLVMInt8TypeInContext(C), buf[pos + j], false);
+    elems[n_elems++] = LLVMConstArray(LLVMInt8TypeInContext(C), gap_bytes, gap);
+    free(gap_bytes);
+  }
+
+  bool packed = ty->is_packed || n_reloc > 0;
+  LLVMValueRef r = LLVMConstStructInContext(C, elems, n_elems, packed);
+  free(elems);
+  free(relocs);
   free(buf);
   return r;
 }
@@ -2144,9 +2241,9 @@ static void codegen_global_init(Obj *prog) {
           // update reference in llvm system
           LLVMReplaceAllUsesWith(old_v, new_v);
 
-          // set same name and delete old variable
-          LLVMSetValueName2(new_v, var->name, strlen(var->name));
           LLVMDeleteGlobal(old_v);
+
+          LLVMSetValueName2(new_v, var->name, strlen(var->name));
           // update reference in our system
           var->codegen_data = (intptr_t)new_v;
         } else {
