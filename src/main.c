@@ -71,11 +71,13 @@ static void pack_args(int argc, char *argv[], PtrArray *arr) {
 }
 
 static void expand_macro(char *input, char *output) {
-  char *compiler_include = format("-I%s/../include", path_get_exedir());
+  char *compiler_include = format("%s/../include", path_get_exedir());
   char *argv[] = {"cpp",
                   "-E",
                   "-w",
-                  "-U__GNUC__",
+                  "-nostdinc",
+                  "-undef",
+                  "-U__has_extension",
                   "-D_LP64=1",
                   "-D__C99_MACRO_WITH_VA_ARGS=1",
                   "-D__ELF__=1",
@@ -116,10 +118,14 @@ static void expand_macro(char *input, char *output) {
                   "-Dlinux=1",
                   "-Dunix=1",
                   "-D__dcc__=1",
+                  "-isystem",
                   compiler_include,
-                  "-I/usr/local/include",
-                  "-I/usr/include/x86_64-linux-gnu",
-                  "-I/usr/include",
+                  "-isystem",
+                  "/usr/local/include",
+                  "-isystem",
+                  "/usr/include/x86_64-linux-gnu",
+                  "-isystem",
+                  "/usr/include",
                   NULL};
 
   PtrArray args_full = {};
