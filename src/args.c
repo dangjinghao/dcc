@@ -35,9 +35,11 @@ char *opt_cc1_filename;
 static InputFileType force_input_file_type = FILETYPE_NONE;
 
 static InputFileType get_file_type(char *filename) {
-  if (force_input_file_type != FILETYPE_NONE) {
+  if (force_input_file_type != FILETYPE_NONE)
     return force_input_file_type;
-  }
+
+  if (!strcmp(filename, "-"))
+    return FILETYPE_C;
 
   if (str_endswith(filename, ".a"))
     return FILETYPE_AR;
