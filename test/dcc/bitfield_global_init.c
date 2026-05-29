@@ -66,6 +66,56 @@ int main() {
   ASSERT(0, p[2]);
   ASSERT(0, p[3]);
 
+  // ---- Runtime read/write tests for bf_load / bf_store ----
+
+  // BF1 read-back
+  ASSERT(1,  (int)ss1.a);
+  ASSERT(2,  (int)ss1.b);
+  ASSERT(3,  (int)(long)ss1.c);
+
+  // BF1 assignment + truncation
+  struct BF1 x = {};
+  x.a = 7;                         // 3-bit signed: 0b111 → -1
+  ASSERT(-1, (int)x.a);
+  x.b = 127;                       // 7-bit signed: 0b1111111 → -1
+  ASSERT(-1, (int)x.b);
+  x.c = 16383;                     // 15-bit signed max positive
+  ASSERT(16383, (int)(long)x.c);
+
+  // BF2 signed truncation
+  struct BF2 y = {};
+  y.a = 3;                         // fits in 3-bit signed
+  ASSERT(3, (int)y.a);
+  y.b = 31;                        // 6-bit signed max positive
+  ASSERT(31, (int)y.b);
+  y.d = 5;                         // 3-bit signed: 0b101 → -3
+  ASSERT(-3, (int)(long)y.d);
+
+  // BF2 compound assignment
+  y.b &= 16;                       // 31 & 16 = 16
+  ASSERT(16, (int)y.b);
+  y.d <<= 1;                       // -3 << 1 in 3-bit: 0b010 → 2
+  ASSERT(2, (int)(long)y.d);
+
+  // BF3 packed long bitfields
+  struct BF3 z = {};
+  z.a = 5; z.b = 7; z.c = 9;
+  ASSERT(5,  (int)(long)z.a);
+  ASSERT(7,  (int)(long)z.b);
+  ASSERT(-7, (int)(long)z.c);      // 9 in 4-bit signed → -7
+
+  // BF3 compound ops
+  z.a++;                            // 5+1 = 6
+  ASSERT(6, (int)(long)z.a);
+  z.b *= 2;                         // 7*2=14, 4-bit signed → -2
+  ASSERT(-2, (int)(long)z.b);
+  z.c -= 3;                         // -7-3=-10, 4-bit signed → 6
+  ASSERT(6, (int)(long)z.c);
+
+  // BF2 regular member (non-bitfield) still accessible
+  y.c = 'Z';
+  ASSERT('Z', y.c);
+
   printf("OK\n");
   return 0;
 }

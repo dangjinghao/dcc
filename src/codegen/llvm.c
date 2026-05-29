@@ -674,6 +674,54 @@ static LLVMValueRef cast(LLVMValueRef v, Type *from, Type *to, Token *tok) {
   return LLVMBuildCast(B, (LLVMOpcode)op, v, type_convert(to), "cast");
 }
 
+// Read a bitfield value from its storage unit. `ptr` points to the
+// start of the storage unit byte (from GEP into the [N x i8] array).
+static LLVMValueRef bf_load(Member *mem, LLVMValueRef ptr) {
+  int sz = mem->ty->size;
+  LLVMTypeRef ity = LLVMIntTypeInContext(C, sz * 8);
+
+  LLVMValueRef unit = LLVMBuildLoad2(B, ity, ptr, "bf_unit");
+  uint64_t bf_mask = (1ULL << mem->bit_width) - 1;
+
+  // (unit >> bit_offset) & mask
+  LLVMValueRef v = LLVMBuildLShr(
+      B, unit, LLVMConstInt(ity, mem->bit_offset, false), "bf_shr");
+  v = LLVMBuildAnd(B, v, LLVMConstInt(ity, bf_mask, false), "bf_mask");
+
+  // Sign-extend if the declared type is signed
+  if (!mem->ty->is_unsigned && mem->bit_width > 0) {
+    int shift_amt = sz * 8 - mem->bit_width;
+    v = LLVMBuildShl(B, v, LLVMConstInt(ity, shift_amt, false), "bf_sext_shl");
+    v = LLVMBuildAShr(B, v, LLVMConstInt(ity, shift_amt, false),
+                      "bf_sext_ashr");
+  }
+  return v;
+}
+
+// Store a value into a bitfield. `ptr` points to the start of the
+// storage unit byte. Performs read-modify-write.
+static void bf_store(Member *mem, LLVMValueRef ptr, LLVMValueRef val) {
+  int sz = mem->ty->size;
+  LLVMTypeRef ity = LLVMIntTypeInContext(C, sz * 8);
+  uint64_t bf_mask = (1ULL << mem->bit_width) - 1;
+
+  LLVMValueRef unit = LLVMBuildLoad2(B, ity, ptr, "bf_old");
+
+  // Clear old bits: unit & ~(mask << bit_offset)
+  LLVMValueRef cleared = LLVMBuildAnd(
+      B, unit, LLVMConstInt(ity, ~(bf_mask << mem->bit_offset), false),
+      "bf_clear");
+
+  // Mask new value and shift into position
+  LLVMValueRef masked =
+      LLVMBuildAnd(B, val, LLVMConstInt(ity, bf_mask, false), "bf_val_mask");
+  LLVMValueRef shifted = LLVMBuildShl(
+      B, masked, LLVMConstInt(ity, mem->bit_offset, false), "bf_shl");
+
+  LLVMValueRef merged = LLVMBuildOr(B, cleared, shifted, "bf_merge");
+  LLVMBuildStore(B, merged, ptr);
+}
+
 static LLVMValueRef gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
@@ -689,6 +737,12 @@ static LLVMValueRef gen_addr(Node *node) {
     if (node->lhs->ty->kind == TY_UNION) {
       // union type doesn't need gep
       return ptr;
+    }
+    if (is_struct_bitfield(node->lhs->ty)) {
+      // return the bitfield starts byte address
+      LLVMValueRef idx =
+          LLVMConstInt(LLVMInt32TypeInContext(C), node->member->offset, false);
+      return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &idx, 1, "");
     }
     return LLVMBuildStructGEP2(B, type_convert(node->lhs->ty), ptr,
                                node->member->idx, "mem_GEP");
@@ -937,6 +991,10 @@ static LLVMValueRef gen_expr(Node *node) {
     // the pointer value; don't load.
     if (node->member->ty->kind == TY_FUNC || node->member->ty->kind == TY_ARRAY)
       return gen_addr(node);
+    if (node->member->is_bitfield) {
+      LLVMValueRef ptr = gen_addr(node);
+      return bf_load(node->member, ptr);
+    }
     return load(node->ty, gen_addr(node));
   }
   case ND_STMT_EXPR: {
@@ -957,7 +1015,8 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef v = gen_expr(node->rhs);
     if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
-      todo_impl("assign bitfield");
+      bf_store(node->lhs->member, ptr, v);
+      return bf_load(node->lhs->member, ptr);
     }
     store(node->ty, ptr, v);
     // load again
@@ -1273,6 +1332,15 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
 
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = is_flonum(node->lhs->ty)
+                                 ? LLVMBuildFAdd(B, old, rhs, "")
+                                 : LLVMBuildAdd(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       LLVMValueRef result_v = NULL;
       if (is_flonum(node->lhs->ty)) {
@@ -1373,6 +1441,15 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
 
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = is_flonum(node->lhs->ty)
+                                 ? LLVMBuildFSub(B, old, rhs, "")
+                                 : LLVMBuildSub(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       LLVMValueRef result_v = NULL;
       if (is_flonum(node->lhs->ty)) {
@@ -1402,6 +1479,15 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
 
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = is_flonum(node->lhs->ty)
+                                 ? LLVMBuildFMul(B, old, rhs, "")
+                                 : LLVMBuildMul(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       if (is_flonum(node->lhs->ty)) {
         return build_sa_atomic_rmw(LLVMFMul, node->lhs->ty, ptr, rhs);
@@ -1421,6 +1507,20 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_DIV: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
+
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val;
+      if (is_flonum(node->lhs->ty))
+        new_val = LLVMBuildFDiv(B, old, rhs, "");
+      else if (node->lhs->ty->is_unsigned)
+        new_val = LLVMBuildUDiv(B, old, rhs, "");
+      else
+        new_val = LLVMBuildSDiv(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       if (is_flonum(node->lhs->ty)) {
         return build_sa_atomic_rmw(LLVMFDiv, node->lhs->ty, ptr, rhs);
@@ -1444,6 +1544,16 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_MOD: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
+
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = node->lhs->ty->is_unsigned
+                                 ? LLVMBuildURem(B, old, rhs, "")
+                                 : LLVMBuildSRem(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       if (node->lhs->ty->is_unsigned) {
         return build_sa_atomic_rmw(LLVMURem, node->lhs->ty, ptr, rhs);
@@ -1465,6 +1575,13 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
 
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = LLVMBuildAnd(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       LLVMValueRef old_v =
           LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAnd, ptr, rhs,
@@ -1481,6 +1598,13 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
 
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = LLVMBuildOr(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       LLVMValueRef old_v =
           LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpOr, ptr, rhs,
@@ -1496,6 +1620,13 @@ static LLVMValueRef gen_expr(Node *node) {
   case ND_SA_BITXOR: {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
+
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = LLVMBuildXor(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
 
     if (node->lhs->ty->is_atomic) {
       LLVMValueRef old_v =
@@ -1514,6 +1645,13 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef rhs = gen_expr(node->rhs);
     rhs = cast(rhs, node->rhs->ty, node->lhs->ty, node->tok);
 
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = LLVMBuildShl(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
+
     if (node->lhs->ty->is_atomic) {
       return build_sa_atomic_rmw(LLVMShl, node->lhs->ty, ptr, rhs);
     }
@@ -1526,6 +1664,15 @@ static LLVMValueRef gen_expr(Node *node) {
     LLVMValueRef ptr = gen_addr(node->lhs);
     LLVMValueRef rhs = gen_expr(node->rhs);
     rhs = cast(rhs, node->lhs->ty, node->rhs->ty, node->tok);
+
+    if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+      LLVMValueRef old = bf_load(node->lhs->member, ptr);
+      LLVMValueRef new_val = node->lhs->ty->is_unsigned
+                                 ? LLVMBuildLShr(B, old, rhs, "")
+                                 : LLVMBuildAShr(B, old, rhs, "");
+      bf_store(node->lhs->member, ptr, new_val);
+      return bf_load(node->lhs->member, ptr);
+    }
 
     if (node->lhs->ty->is_atomic) {
       if (node->lhs->ty->is_unsigned) {
