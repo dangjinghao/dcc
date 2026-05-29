@@ -1,0 +1,22 @@
+#!/bin/bash
+# Shared setup for third-party test scripts.
+# Source this after setting $repo, e.g.:
+#   repo='https://github.com/rui314/chibicc.git'
+#   . "$SCRIPT_DIR/common"
+
+set -eu
+
+COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$COMMON_DIR/../.."
+
+dcc="$PROJECT_ROOT/build/dcc"
+make="make -j$(nproc)"
+
+repo_name=$(basename -s .git $repo)
+
+if [ ! -d "$COMMON_DIR/$repo_name" ]; then
+    echo "Cloning $repo..."
+    git clone "$repo" "$COMMON_DIR/$repo_name"
+fi
+
+cd "$COMMON_DIR/$repo_name"
