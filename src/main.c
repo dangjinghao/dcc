@@ -75,7 +75,7 @@ static void expand_macro(char *input, char *output) {
   char *argv[] = {"cpp",
                   "-E",
                   "-w",
-                  "-undef",
+                  "-U__GNUC__",
                   "-D_LP64=1",
                   "-D__C99_MACRO_WITH_VA_ARGS=1",
                   "-D__ELF__=1",
