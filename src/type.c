@@ -501,6 +501,8 @@ static void add_type2(Node *node) {
       // same as above
       node->then = new_cast(node->then, node->_else->ty);
       node->ty = node->_else->ty;
+    } else if (node->then->ty->base || node->_else->ty->base) {
+      node->ty = node->then->ty;
     } else {
       node->ty = usual_arith_conv(&node->then, &node->_else);
     }
