@@ -137,6 +137,26 @@ static VarScope *find_var(Token *tok) {
     if (sc2)
       return sc2;
   }
+
+  // seek extern declarations in sub scope, e.g.
+  //
+  // int main() {
+  //  extern int V;
+  // }
+  // int V;
+  //
+  // `extern int V` in main has been added to the globals but we can't
+  // find it in scope
+  // TODO: maybe the better way is make globals be the first scope and the
+  // locals be current scope.
+  for (Obj *o = globals; o; o = o->next) {
+    if (equal(tok, o->name)) {
+      VarScope *fake_sc = calloc(1, sizeof(VarScope));
+      fake_sc->var = o;
+      return fake_sc;
+    }
+  }
+
   return NULL;
 }
 
