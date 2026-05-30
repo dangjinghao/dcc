@@ -108,7 +108,7 @@ static void expand_macro(char *input, char *output) {
                   "-D__STDC_NO_COMPLEX__=1",
                   "-D__STDC_UTF_16__=1",
                   "-D__STDC_UTF_32__=1",
-                  "-DSTDC_VERSION=201112L",
+                  "-D__STDC_VERSION__=201112L",
                   "-D__STDC__=1",
                   "-D__USER_LABEL_PREFIX__=",
                   "-D__alignof__(x)=_Alignof(x)",
