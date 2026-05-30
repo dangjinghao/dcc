@@ -24,8 +24,7 @@ PTRARRAY_PREFIX_EXPAND(_push_batch)(PtrArray *arr,
 }
 
 static inline void
-PTRARRAY_PREFIX_EXPAND(_push_batch2)(PtrArray *arr,
-                                     PtrArray *append_array) {
+PTRARRAY_PREFIX_EXPAND(_push_batch2)(PtrArray *arr, PtrArray *append_array) {
   ptrarray_push_batch2(arr, append_array);
 }
 

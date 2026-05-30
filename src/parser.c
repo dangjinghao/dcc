@@ -1137,8 +1137,7 @@ static void array_initializer2(Token **rest, Token *tok, Initializer *init,
       tok = skip(tok, ",");
 
     // Rewind comma so the caller's skip(",") can consume it naturally.
-    if (equal(tok, ",") &&
-        (equal(tok->next, "[") || equal(tok->next, "."))) {
+    if (equal(tok, ",") && (equal(tok->next, "[") || equal(tok->next, "."))) {
       *rest = tok;
       return;
     }
@@ -1196,8 +1195,7 @@ static void struct_initializer2(Token **rest, Token *tok, Initializer *init,
     // When called from designation after a nested designated initializer
     // (e.g. .s.i = 2, .s.u.v = 1), the comma may already be at `tok`.
     // Rewind so the caller's skip(",") can consume it naturally.
-    if (equal(tok, ",") &&
-        (equal(tok->next, "[") || equal(tok->next, "."))) {
+    if (equal(tok, ",") && (equal(tok->next, "[") || equal(tok->next, "."))) {
       *rest = tok;
       return;
     }
