@@ -39,6 +39,7 @@ static char *NodeKind_string[] = {
     array_string_item(ND_SA_SHL),     array_string_item(ND_SA_SHR),
     array_string_item(ND_ALLOCA),     array_string_item(ND_VA_START),
     array_string_item(ND_VA_END),     array_string_item(ND_VA_COPY),
+    array_string_item(ND_POST_DEC),   array_string_item(ND_POST_INC),
 };
 
 static char *TypeKind_string[] = {

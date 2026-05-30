@@ -571,6 +571,10 @@ static void add_type2(Node *node) {
   case ND_VA_COPY:
     node->ty = ty_void;
     return;
+  case ND_POST_INC:
+  case ND_POST_DEC:
+    node->ty = node->lhs->ty;
+    return;
   default:
     break;
   }

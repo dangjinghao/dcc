@@ -2662,12 +2662,11 @@ static Node *struct_ref(Node *node, Token *tok) {
   return node;
 }
 
-// Convert A++ to `(typeof A)((A += 1) - 1)`
-static Node *new_inc_dec(Node *node, Token *tok, int addend) {
-  add_type(node, true);
-  return new_cast(new_add(new_add(node, new_num(addend, tok), tok, true),
-                          new_num(-addend, tok), tok, false),
-                  node->ty);
+static Node *new_post_inc_dec(Node *node, Token *tok, bool is_inc) {
+  add_type(node, false);
+  Node *r = new_node(is_inc ? ND_POST_INC : ND_POST_DEC, tok);
+  r->lhs = node;
+  return r;
 }
 
 // postfix = "(" type-name ")" "{" initializer-list "}"
@@ -2734,13 +2733,13 @@ static Node *postfix(Token **rest, Token *tok) {
     }
 
     if (equal(tok, "++")) {
-      node = new_inc_dec(node, tok, 1);
+      node = new_post_inc_dec(node, tok, true);
       tok = tok->next;
       continue;
     }
 
     if (equal(tok, "--")) {
-      node = new_inc_dec(node, tok, -1);
+      node = new_post_inc_dec(node, tok, false);
       tok = tok->next;
       continue;
     }

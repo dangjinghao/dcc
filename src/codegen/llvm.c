@@ -1042,6 +1042,81 @@ static LLVMValueRef build_sa_atomic_rmw(LLVMOpcode kind, Type *ty,
   return new_v;
 }
 
+static LLVMValueRef llvm_const_one(Type *ty) {
+  if (is_flonum(ty)) {
+    return LLVMConstReal(type_convert(ty), 1);
+  }
+  return LLVMConstInt(type_convert(ty), 1, false);
+}
+
+static LLVMValueRef gen_expr_post_inc_dec(Node *node, bool is_inc) {
+  LLVMValueRef ptr = gen_addr(node->lhs);
+
+  if (node->lhs->ty->kind == TY_PTR) {
+    LLVMValueRef result = NULL;
+    LLVMValueRef ptr2 = load(node->lhs->ty, ptr);
+    if (is_inc) {
+      LLVMValueRef one = LLVMConstInt(LLVMInt64TypeInContext(C), 1, false);
+      result = LLVMBuildGEP2(B, type_convert(node->lhs->ty->base), ptr2, &one,
+                             1, "");
+    } else {
+      LLVMValueRef neg_one = LLVMConstInt(LLVMInt64TypeInContext(C), -1, true);
+      result = LLVMBuildGEP2(B, type_convert(node->lhs->ty->base), ptr2,
+                             &neg_one, 1, "");
+    }
+    store(node->lhs->ty, ptr, result);
+    return ptr2;
+  }
+
+  LLVMValueRef one = llvm_const_one(node->lhs->ty);
+  if (node->lhs->kind == ND_MEMBER && node->lhs->member->is_bitfield) {
+    LLVMValueRef old = bf_load(node->lhs->member, ptr);
+
+    LLVMValueRef result = NULL;
+
+    if (is_flonum(node->lhs->ty) && is_inc) {
+      result = LLVMBuildFAdd(B, old, one, "");
+    } else if (is_flonum(node->lhs->ty) && !is_inc) {
+      result = LLVMBuildFSub(B, old, one, "");
+    } else if (is_inc) {
+      result = LLVMBuildAdd(B, old, one, "");
+    } else {
+      result = LLVMBuildSub(B, old, one, "");
+    }
+
+    bf_store(node->lhs->member, ptr, result);
+    return old;
+  }
+
+  if (node->lhs->ty->is_atomic) {
+    LLVMValueRef old = NULL;
+    if (is_flonum(node->lhs->ty)) {
+      old = LLVMBuildAtomicRMW(
+          B, is_inc ? LLVMAtomicRMWBinOpFAdd : LLVMAtomicRMWBinOpFSub, ptr, one,
+          LLVMAtomicOrderingSequentiallyConsistent, false);
+    } else {
+      old = LLVMBuildAtomicRMW(
+          B, is_inc ? LLVMAtomicRMWBinOpAdd : LLVMAtomicRMWBinOpSub, ptr, one,
+          LLVMAtomicOrderingSequentiallyConsistent, false);
+    }
+    return old;
+  }
+
+  LLVMValueRef result = NULL;
+  LLVMValueRef old = load(node->lhs->ty, ptr);
+  if (is_flonum(node->lhs->ty) && is_inc) {
+    result = LLVMBuildFAdd(B, old, one, "");
+  } else if (is_flonum(node->lhs->ty) && !is_inc) {
+    result = LLVMBuildFSub(B, old, one, "");
+  } else if (is_inc) {
+    result = LLVMBuildAdd(B, old, one, "");
+  } else {
+    result = LLVMBuildSub(B, old, one, "");
+  }
+  store(node->lhs->ty, ptr, result);
+  return old;
+}
+
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
@@ -1475,6 +1550,12 @@ static LLVMValueRef gen_expr(Node *node) {
     }
     store(node->lhs->ty, ptr, result_v);
     return load(node->ty, ptr);
+  }
+  case ND_POST_INC: {
+    return gen_expr_post_inc_dec(node, true);
+  }
+  case ND_POST_DEC: {
+    return gen_expr_post_inc_dec(node, false);
   }
   case ND_SA_PTR_ADD: {
     LLVMValueRef ptr = gen_addr(node->lhs);

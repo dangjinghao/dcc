@@ -269,6 +269,8 @@ typedef enum {
   ND_VA_START,   // va_start
   ND_VA_END,     // va_end
   ND_VA_COPY,    // va_copy
+  ND_POST_INC,   // i++
+  ND_POST_DEC,   // i--
 } NodeKind;
 
 // AST node type
