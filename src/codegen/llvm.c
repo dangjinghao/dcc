@@ -1230,6 +1230,24 @@ static LLVMValueRef gen_expr_ptr_add(Node *node) {
   return LLVMBuildGEP2(B, type_convert(pointee_ty), base, &idx, 1, "ptr_add");
 }
 
+static LLVMValueRef gen_expr_ptr_sub(Node *node) {
+  if (node->lhs->ty->base->kind == TY_VLA) {
+    LLVMValueRef ptr = gen_expr(node->lhs);
+    LLVMValueRef idx = gen_ptr_index(node->rhs);
+    LLVMValueRef step =
+        load(node->lhs->ty->base->vla_size->ty,
+             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
+    LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_sub_bytes");
+    LLVMValueRef neg = LLVMBuildNeg(B, bytes, "vla_sub_neg");
+    return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &neg, 1, "vla_sub");
+  }
+  LLVMValueRef neg = LLVMBuildNeg(B, gen_ptr_index(node->rhs), "ptr_sub_neg");
+  Type *pointee_ty =
+      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+  return LLVMBuildGEP2(B, type_convert(pointee_ty), gen_expr(node->lhs), &neg,
+                       1, "ptr_sub");
+}
+
 static LLVMValueRef gen_expr_add(Node *node) {
   if (node->lhs->ty->base) {
     return gen_expr_ptr_add(node);
@@ -1241,7 +1259,9 @@ static LLVMValueRef gen_expr_add(Node *node) {
 }
 
 static LLVMValueRef gen_expr_sub(Node *node) {
-  if (is_flonum(node->lhs->ty)) {
+  if (node->lhs->ty->base) {
+    return gen_expr_ptr_sub(node);
+  } else if (is_flonum(node->lhs->ty)) {
     return LLVMBuildFSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "fsub");
   } else {
     return LLVMBuildSub(B, gen_expr(node->lhs), gen_expr(node->rhs), "sub");
@@ -1801,24 +1821,6 @@ static LLVMValueRef gen_expr_shr(Node *node) {
   return LLVMBuildAShr(B, gen_expr(node->lhs), rhs, "ashr");
 }
 
-static LLVMValueRef gen_expr_ptr_sub(Node *node) {
-  if (node->lhs->ty->base->kind == TY_VLA) {
-    LLVMValueRef ptr = gen_expr(node->lhs);
-    LLVMValueRef idx = gen_ptr_index(node->rhs);
-    LLVMValueRef step =
-        load(node->lhs->ty->base->vla_size->ty,
-             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
-    LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_sub_bytes");
-    LLVMValueRef neg = LLVMBuildNeg(B, bytes, "vla_sub_neg");
-    return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &neg, 1, "vla_sub");
-  }
-  LLVMValueRef neg = LLVMBuildNeg(B, gen_ptr_index(node->rhs), "ptr_sub_neg");
-  Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
-  return LLVMBuildGEP2(B, type_convert(pointee_ty), gen_expr(node->lhs), &neg,
-                       1, "ptr_sub");
-}
-
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
@@ -1902,9 +1904,6 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_SUB: {
     return gen_expr_sub(node);
-  }
-  case ND_PTR_SUB: {
-    return gen_expr_ptr_sub(node);
   }
   case ND_MUL: {
     return gen_expr_mul(node);

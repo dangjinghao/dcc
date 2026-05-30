@@ -384,15 +384,10 @@ static void add_type2(Node *node) {
     // node->ty = ty_int;
     unreachable();
     return;
-  case ND_PTR_SUB:
-    // operation has been canonicalized and pointer will always in the lhs
-    // ptr - ptr has been extracted in frontend
-    node->ty = node->lhs->ty;
-    return;
-  // arithmetic binary operation
   case ND_ADD:
   case ND_SUB: {
     // operation has been canonicalized and pointer will always in the lhs
+    // ptr - ptr has been extracted in frontend
     if (node->lhs->ty->base) {
       node->rhs = new_cast(node->rhs, type_integer_promotion(node->rhs->ty));
       node->ty = node->lhs->ty;

@@ -1797,11 +1797,13 @@ int64_t eval2(Node *node, Node **label_node) {
     }
     return eval2(node->lhs, label_node) + eval(node->rhs);
   }
-  case ND_SUB:
+  case ND_SUB: {
+    if (node->lhs->ty->base) {
+      return eval2(node->lhs, label_node) -
+             eval(node->rhs) * node->lhs->ty->base->size;
+    }
     return eval2(node->lhs, label_node) - eval(node->rhs);
-  case ND_PTR_SUB:
-    return eval2(node->lhs, label_node) -
-           eval(node->rhs) * node->lhs->ty->base->size;
+  }
   case ND_MUL:
     return eval(node->lhs) * eval(node->rhs);
   case ND_DIV:
@@ -1915,9 +1917,15 @@ static int64_t eval_lval_addr_offset(Node *node, Node **label_node) {
       return eval_lval_addr_offset(node->lhs, label_node) +
              eval(node->rhs) * node->lhs->ty->base->size;
     }
-  case ND_PTR_SUB:
-    return eval_lval_addr_offset(node->lhs, label_node) -
-           eval(node->rhs) * node->lhs->ty->base->size;
+    break;
+  case ND_SUB: {
+    if (node->lhs->ty->base) {
+      // ptr
+      return eval_lval_addr_offset(node->lhs, label_node) -
+             eval(node->rhs) * node->lhs->ty->base->size;
+    }
+    break;
+  }
   default:
     break;
   }
@@ -2271,7 +2279,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
 
   // VLA - num
   if (lhs->ty->base->kind == TY_VLA) {
-    return new_binary(self_assign ? ND_SA_PTR_SUB : ND_PTR_SUB, lhs, rhs, tok);
+    return new_binary(self_assign ? ND_SA_PTR_SUB : ND_SUB, lhs, rhs, tok);
   }
 
   // ptr - num
@@ -2279,7 +2287,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
     if (self_assign) {
       return new_binary(ND_SA_PTR_SUB, lhs, rhs, tok);
     }
-    return new_binary(ND_PTR_SUB, lhs, rhs, tok);
+    return new_binary(ND_SUB, lhs, rhs, tok);
   }
 
   // ptr - ptr, which returns how many elements are between the two.

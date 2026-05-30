@@ -251,7 +251,6 @@ typedef enum {
   ND_ASM,        // "asm"
   ND_CAS,        // Atomic compare-and-swap
   ND_EXCH,       // Atomic exchange
-  ND_PTR_SUB,    // pointer operation(-)
   ND_SA_ADD,     // +=
   ND_SA_PTR_ADD, // ptr +=
   ND_SA_SUB,     // -=
