@@ -72,7 +72,7 @@ void warn_tok(Token *tok, char *fmt, ...) {
 }
 
 bool equal(Token *tok, char *op) {
-  return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
+  return strlen(op) == tok->len && memcmp(tok->loc, op, tok->len) == 0;
 }
 
 // Create a new token.
