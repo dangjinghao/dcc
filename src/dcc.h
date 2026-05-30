@@ -203,71 +203,70 @@ Type *type_decay(Type *ty);
 //
 
 typedef enum {
-  ND_NULL_EXPR,  // Do nothing
-  ND_NEG,        // unary -
-  ND_ADD,        // +
-  ND_SUB,        // -
-  ND_MUL,        // *
-  ND_DIV,        // /
-  ND_MOD,        // %
-  ND_BITAND,     // &
-  ND_BITOR,      // |
-  ND_BITXOR,     // ^
-  ND_SHL,        // <<
-  ND_SHR,        // >>
-  ND_EQ,         // ==
-  ND_NE,         // !=
-  ND_LT,         // <
-  ND_LE,         // <=
-  ND_ASSIGN,     // =
-  ND_COND,       // ?:
-  ND_COMMA,      // ,
-  ND_MEMBER,     // . (struct member access)
-  ND_ADDR,       // unary &
-  ND_DEREF,      // unary *
-  ND_NOT,        // !
-  ND_BITNOT,     // ~
-  ND_LOGAND,     // &&
-  ND_LOGOR,      // ||
-  ND_RETURN,     // "return"
-  ND_IF,         // "if"
-  ND_FOR,        // "for" or "while"
-  ND_DO,         // "do"
-  ND_SWITCH,     // "switch"
-  ND_CASE,       // "case"
-  ND_BLOCK,      // { ... }
-  ND_GOTO,       // "goto"
-  ND_GOTO_EXPR,  // [GNU] "goto" labels-as-values
-  ND_LABEL,      // Labeled statement
-  ND_LABEL_VAL,  // [GNU] Labels-as-values
-  ND_FUNCALL,    // Function call
-  ND_EXPR_STMT,  // Expression statement
-  ND_STMT_EXPR,  // [GNU] Statement expression
-  ND_VAR,        // Variable
-  ND_VLA_PTR,    //  VLA designator
-  ND_NUM,        // Integer or fp
-  ND_CAST,       // Type cast
-  ND_MEMZERO,    // Zero-clear a stack variable
-  ND_ASM,        // "asm"
-  ND_CAS,        // Atomic compare-and-swap
-  ND_EXCH,       // Atomic exchange
-  ND_SA_ADD,     // +=
-  ND_SA_SUB,     // -=
-  ND_SA_PTR_SUB, // ptr -=
-  ND_SA_MUL,     // *=
-  ND_SA_DIV,     // /=
-  ND_SA_MOD,     // %=
-  ND_SA_BITAND,  // &=
-  ND_SA_BITOR,   // |=
-  ND_SA_BITXOR,  // ^=
-  ND_SA_SHL,     // <<=
-  ND_SA_SHR,     // >>=
-  ND_ALLOCA,     // alloca
-  ND_VA_START,   // va_start
-  ND_VA_END,     // va_end
-  ND_VA_COPY,    // va_copy
-  ND_POST_INC,   // i++
-  ND_POST_DEC,   // i--
+  ND_NULL_EXPR, // Do nothing
+  ND_NEG,       // unary -
+  ND_ADD,       // +
+  ND_SUB,       // -
+  ND_MUL,       // *
+  ND_DIV,       // /
+  ND_MOD,       // %
+  ND_BITAND,    // &
+  ND_BITOR,     // |
+  ND_BITXOR,    // ^
+  ND_SHL,       // <<
+  ND_SHR,       // >>
+  ND_EQ,        // ==
+  ND_NE,        // !=
+  ND_LT,        // <
+  ND_LE,        // <=
+  ND_ASSIGN,    // =
+  ND_COND,      // ?:
+  ND_COMMA,     // ,
+  ND_MEMBER,    // . (struct member access)
+  ND_ADDR,      // unary &
+  ND_DEREF,     // unary *
+  ND_NOT,       // !
+  ND_BITNOT,    // ~
+  ND_LOGAND,    // &&
+  ND_LOGOR,     // ||
+  ND_RETURN,    // "return"
+  ND_IF,        // "if"
+  ND_FOR,       // "for" or "while"
+  ND_DO,        // "do"
+  ND_SWITCH,    // "switch"
+  ND_CASE,      // "case"
+  ND_BLOCK,     // { ... }
+  ND_GOTO,      // "goto"
+  ND_GOTO_EXPR, // [GNU] "goto" labels-as-values
+  ND_LABEL,     // Labeled statement
+  ND_LABEL_VAL, // [GNU] Labels-as-values
+  ND_FUNCALL,   // Function call
+  ND_EXPR_STMT, // Expression statement
+  ND_STMT_EXPR, // [GNU] Statement expression
+  ND_VAR,       // Variable
+  ND_VLA_PTR,   //  VLA designator
+  ND_NUM,       // Integer or fp
+  ND_CAST,      // Type cast
+  ND_MEMZERO,   // Zero-clear a stack variable
+  ND_ASM,       // "asm"
+  ND_CAS,       // Atomic compare-and-swap
+  ND_EXCH,      // Atomic exchange
+  ND_SA_ADD,    // +=
+  ND_SA_SUB,    // -=
+  ND_SA_MUL,    // *=
+  ND_SA_DIV,    // /=
+  ND_SA_MOD,    // %=
+  ND_SA_BITAND, // &=
+  ND_SA_BITOR,  // |=
+  ND_SA_BITXOR, // ^=
+  ND_SA_SHL,    // <<=
+  ND_SA_SHR,    // >>=
+  ND_ALLOCA,    // alloca
+  ND_VA_START,  // va_start
+  ND_VA_END,    // va_end
+  ND_VA_COPY,   // va_copy
+  ND_POST_INC,  // i++
+  ND_POST_DEC,  // i--
 } NodeKind;
 
 // AST node type

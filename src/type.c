@@ -434,12 +434,6 @@ static void add_type2(Node *node) {
     node->ty = node->lhs->ty;
     return;
   }
-  case ND_SA_PTR_SUB: {
-    if (node->lhs->ty->kind == TY_ARRAY)
-      error_tok(node->lhs->tok, "not an lvalue");
-    node->ty = node->lhs->ty;
-    return;
-  }
   case ND_SWITCH: {
     // now we just use long
     // because now the case value is stored in long type

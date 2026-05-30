@@ -1342,6 +1342,41 @@ static LLVMValueRef gen_expr_sa_ptr_add(Node *node) {
   return load(node->ty, ptr);
 }
 
+static LLVMValueRef gen_expr_sa_ptr_sub(Node *node) {
+  LLVMValueRef ptr = gen_addr(node->lhs);
+  LLVMValueRef val = load(node->lhs->ty, ptr);
+  LLVMValueRef rhs = gen_ptr_index(node->rhs);
+  if (node->lhs->ty->is_atomic) {
+    rhs = LLVMBuildMul(B, rhs,
+                       LLVMConstInt(LLVMInt64TypeInContext(C),
+                                    node->lhs->ty->base->size, false),
+                       "");
+    rhs = LLVMBuildNeg(B, rhs, "");
+    LLVMValueRef old_v =
+        LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAdd, ptr, rhs,
+                           LLVMAtomicOrderingSequentiallyConsistent, false);
+    return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
+  }
+  if (node->lhs->ty->base->kind == TY_VLA) {
+    LLVMValueRef step =
+        load(node->lhs->ty->base->vla_size->ty,
+             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
+    LLVMValueRef bytes = LLVMBuildMul(B, rhs, step, "sa_vla_sub_bytes");
+    LLVMValueRef neg = LLVMBuildNeg(B, bytes, "sa_vla_sub_neg");
+    LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &neg,
+                                       1, "sa_vla_ptr_sub");
+    store(node->lhs->ty, ptr, tmp_v);
+    return load(node->ty, ptr);
+  }
+  LLVMValueRef neg = LLVMBuildNeg(B, rhs, "sa_ptr_sub_neg");
+  Type *pointee_ty =
+      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+  LLVMValueRef tmp_v = LLVMBuildGEP2(B, type_convert(pointee_ty), val,
+                                     &(LLVMValueRef){neg}, 1, "sa_ptr_sub");
+  store(node->lhs->ty, ptr, tmp_v);
+  return load(node->ty, ptr);
+}
+
 static LLVMValueRef gen_expr_sa_add(Node *node) {
   if (node->lhs->ty->base) {
     return gen_expr_sa_ptr_add(node);
@@ -1385,6 +1420,9 @@ static LLVMValueRef gen_expr_sa_add(Node *node) {
 }
 
 static LLVMValueRef gen_expr_sa_sub(Node *node) {
+  if (node->lhs->ty->base) {
+    return gen_expr_sa_ptr_sub(node);
+  }
   LLVMValueRef ptr = gen_addr(node->lhs);
   LLVMValueRef rhs = gen_expr(node->rhs);
 
@@ -1640,41 +1678,6 @@ static LLVMValueRef gen_expr_sa_shr(Node *node) {
   } else {
     tmp_v = LLVMBuildAShr(B, load(node->lhs->ty, ptr), rhs, "sa_ashr");
   }
-  store(node->lhs->ty, ptr, tmp_v);
-  return load(node->ty, ptr);
-}
-
-static LLVMValueRef gen_expr_sa_ptr_sub(Node *node) {
-  LLVMValueRef ptr = gen_addr(node->lhs);
-  LLVMValueRef val = load(node->lhs->ty, ptr);
-  LLVMValueRef rhs = gen_ptr_index(node->rhs);
-  if (node->lhs->ty->is_atomic) {
-    rhs = LLVMBuildMul(B, rhs,
-                       LLVMConstInt(LLVMInt64TypeInContext(C),
-                                    node->lhs->ty->base->size, false),
-                       "");
-    rhs = LLVMBuildNeg(B, rhs, "");
-    LLVMValueRef old_v =
-        LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAdd, ptr, rhs,
-                           LLVMAtomicOrderingSequentiallyConsistent, false);
-    return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
-  }
-  if (node->lhs->ty->base->kind == TY_VLA) {
-    LLVMValueRef step =
-        load(node->lhs->ty->base->vla_size->ty,
-             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
-    LLVMValueRef bytes = LLVMBuildMul(B, rhs, step, "sa_vla_sub_bytes");
-    LLVMValueRef neg = LLVMBuildNeg(B, bytes, "sa_vla_sub_neg");
-    LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &neg,
-                                       1, "sa_vla_ptr_sub");
-    store(node->lhs->ty, ptr, tmp_v);
-    return load(node->ty, ptr);
-  }
-  LLVMValueRef neg = LLVMBuildNeg(B, rhs, "sa_ptr_sub_neg");
-  Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
-  LLVMValueRef tmp_v = LLVMBuildGEP2(B, type_convert(pointee_ty), val,
-                                     &(LLVMValueRef){neg}, 1, "sa_ptr_sub");
   store(node->lhs->ty, ptr, tmp_v);
   return load(node->ty, ptr);
 }
@@ -1946,9 +1949,6 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_POST_DEC: {
     return gen_expr_post_inc_dec(node, false);
-  }
-  case ND_SA_PTR_SUB: {
-    return gen_expr_sa_ptr_sub(node);
   }
   case ND_SA_SUB: {
     return gen_expr_sa_sub(node);

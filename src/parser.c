@@ -2272,15 +2272,10 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
     return new_binary(k, lhs, rhs, tok);
   }
 
-  // VLA - num
-  if (lhs->ty->base->kind == TY_VLA) {
-    return new_binary(self_assign ? ND_SA_PTR_SUB : ND_SUB, lhs, rhs, tok);
-  }
-
   // ptr - num
   if (lhs->ty->base && is_integer(rhs->ty)) {
     if (self_assign) {
-      return new_binary(ND_SA_PTR_SUB, lhs, rhs, tok);
+      return new_binary(ND_SA_SUB, lhs, rhs, tok);
     }
     return new_binary(ND_SUB, lhs, rhs, tok);
   }
