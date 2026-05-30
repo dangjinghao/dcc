@@ -31,6 +31,23 @@ static inline int align_to(int n, int align) {
       number++;                                                                \
     number;                                                                    \
   })
+
+//
+/// ptrarray.c
+//
+
+typedef struct {
+  void **data;
+  int capacity;
+  int len;
+} PtrArray;
+
+void ptrarray_insert(PtrArray *arr, size_t idx, void *s);
+void ptrarray_push(PtrArray *arr, void *s);
+void ptrarray_push_batch(PtrArray *arr, void **append_array);
+void ptrarray_push_batch2(PtrArray *arr, PtrArray *append_array);
+void ptrarray_free(PtrArray *arr);
+
 //
 /// tokenizer.c
 //
@@ -408,21 +425,6 @@ double eval_double(Node *node);
 //
 
 void codegen(Obj *prog, FILE *out, bool gen_asm);
-
-//
-/// ptrarray.c
-//
-
-typedef struct {
-  void **data;
-  int capacity;
-  int len;
-} PtrArray;
-
-void ptrarray_push(PtrArray *arr, void *s);
-void ptrarray_push_batch(PtrArray *arr, void **append_array);
-void ptrarray_push_batch2(PtrArray *arr, PtrArray *append_array);
-void ptrarray_free(PtrArray *arr);
 
 //
 /// strings.c

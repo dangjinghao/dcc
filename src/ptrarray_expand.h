@@ -17,6 +17,12 @@ static inline void PTRARRAY_PREFIX_EXPAND(_push)(PtrArray *arr,
   ptrarray_push(arr, (void *)s);
 }
 
+static inline void PTRARRAY_PREFIX_EXPAND(_insert)(PtrArray *arr,
+                                                   unsigned long idx,
+                                                   PTRARRAY_PTR_TYPE s) {
+  ptrarray_insert(arr, idx, (void *)s);
+}
+
 static inline void
 PTRARRAY_PREFIX_EXPAND(_push_batch)(PtrArray *arr,
                                     PTRARRAY_PTR_TYPE *append_array) {

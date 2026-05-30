@@ -1,20 +1,35 @@
 #include "dcc.h"
+#include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
-void ptrarray_push(PtrArray *arr, void *s) {
+void ptrarray_insert(PtrArray *arr, size_t idx, void *s) {
   if (!arr->data) {
-    arr->data = calloc(8, sizeof(void *));
+    arr->data = malloc(8 * sizeof(void *));
     arr->capacity = 8;
   }
 
   if (arr->capacity == arr->len) {
-    arr->data = realloc(arr->data, sizeof(void *) * arr->capacity * 2);
+    void **new_data = realloc(arr->data, sizeof(void *) * arr->capacity * 2);
+    if (!new_data)
+      abort();
+    arr->data = new_data;
     arr->capacity *= 2;
-    for (int i = arr->len; i < arr->capacity; i++)
-      arr->data[i] = NULL;
+  }
+  assert(idx <= arr->len);
+  if (idx == arr->len) {
+    arr->data[arr->len++] = s;
+    return;
   }
 
-  arr->data[arr->len++] = s;
+  memmove(&arr->data[idx + 1], &arr->data[idx],
+          (arr->len - idx) * sizeof(void *));
+  arr->data[idx] = s;
+  arr->len++;
+}
+
+void ptrarray_push(PtrArray *arr, void *s) {
+  ptrarray_insert(arr, arr->len, s);
 }
 
 // append_array should be end with NULL
