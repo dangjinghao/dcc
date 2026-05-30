@@ -1791,8 +1791,15 @@ int64_t eval2(Node *node, Node **label_node) {
   switch (node->kind) {
   case ND_ADD:
     return eval2(node->lhs, label_node) + eval(node->rhs);
+  case ND_PTR_ADD:
+    // node->rhs is the element index; convert to byte offset.
+    return eval2(node->lhs, label_node) +
+           eval(node->rhs) * node->lhs->ty->base->size;
   case ND_SUB:
     return eval2(node->lhs, label_node) - eval(node->rhs);
+  case ND_PTR_SUB:
+    return eval2(node->lhs, label_node) -
+           eval(node->rhs) * node->lhs->ty->base->size;
   case ND_MUL:
     return eval(node->lhs) * eval(node->rhs);
   case ND_DIV:
@@ -1900,6 +1907,12 @@ static int64_t eval_lval_addr_offset(Node *node, Node **label_node) {
     return eval2(node->lhs, label_node);
   case ND_MEMBER:
     return eval_lval_addr_offset(node->lhs, label_node) + node->member->offset;
+  case ND_PTR_ADD:
+    return eval_lval_addr_offset(node->lhs, label_node) +
+           eval(node->rhs) * node->lhs->ty->base->size;
+  case ND_PTR_SUB:
+    return eval_lval_addr_offset(node->lhs, label_node) -
+           eval(node->rhs) * node->lhs->ty->base->size;
   default:
     break;
   }
