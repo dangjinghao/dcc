@@ -1212,8 +1212,28 @@ static LLVMValueRef gen_expr_funcall(Node *node) {
   return r;
 }
 
+static LLVMValueRef gen_expr_ptr_add(Node *node) {
+  if (node->lhs->ty->base->kind == TY_VLA) {
+    LLVMValueRef ptr = gen_expr(node->lhs);
+    LLVMValueRef idx = gen_ptr_index(node->rhs);
+    LLVMValueRef step =
+        load(node->lhs->ty->base->vla_size->ty,
+             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
+    LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_add_bytes");
+    return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &bytes, 1,
+                         "vla_add");
+  }
+  Type *pointee_ty =
+      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+  LLVMValueRef base = gen_expr(node->lhs);
+  LLVMValueRef idx = gen_ptr_index(node->rhs);
+  return LLVMBuildGEP2(B, type_convert(pointee_ty), base, &idx, 1, "ptr_add");
+}
+
 static LLVMValueRef gen_expr_add(Node *node) {
-  if (is_flonum(node->lhs->ty)) {
+  if (node->lhs->ty->base) {
+    return gen_expr_ptr_add(node);
+  } else if (is_flonum(node->lhs->ty)) {
     return LLVMBuildFAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "fadd");
   } else {
     return LLVMBuildAdd(B, gen_expr(node->lhs), gen_expr(node->rhs), "add");
@@ -1799,24 +1819,6 @@ static LLVMValueRef gen_expr_ptr_sub(Node *node) {
                        1, "ptr_sub");
 }
 
-static LLVMValueRef gen_expr_ptr_add(Node *node) {
-  if (node->lhs->ty->base->kind == TY_VLA) {
-    LLVMValueRef ptr = gen_expr(node->lhs);
-    LLVMValueRef idx = gen_ptr_index(node->rhs);
-    LLVMValueRef step =
-        load(node->lhs->ty->base->vla_size->ty,
-             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
-    LLVMValueRef bytes = LLVMBuildMul(B, idx, step, "vla_add_bytes");
-    return LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), ptr, &bytes, 1,
-                         "vla_add");
-  }
-  Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
-  LLVMValueRef base = gen_expr(node->lhs);
-  LLVMValueRef idx = gen_ptr_index(node->rhs);
-  return LLVMBuildGEP2(B, type_convert(pointee_ty), base, &idx, 1, "ptr_add");
-}
-
 static LLVMValueRef gen_expr(Node *node) {
   switch (node->kind) {
   case ND_NULL_EXPR: {
@@ -1903,9 +1905,6 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_PTR_SUB: {
     return gen_expr_ptr_sub(node);
-  }
-  case ND_PTR_ADD: {
-    return gen_expr_ptr_add(node);
   }
   case ND_MUL: {
     return gen_expr_mul(node);
