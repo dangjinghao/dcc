@@ -1310,7 +1310,42 @@ static LLVMValueRef gen_expr_cmp(Node *node) {
                        "logic_result_zext");
 }
 
+static LLVMValueRef gen_expr_sa_ptr_add(Node *node) {
+  LLVMValueRef ptr = gen_addr(node->lhs);
+  LLVMValueRef val = load(node->lhs->ty, ptr);
+  LLVMValueRef rhs = gen_ptr_index(node->rhs);
+  if (node->lhs->ty->is_atomic) {
+    rhs = LLVMBuildMul(B, rhs,
+                       LLVMConstInt(LLVMInt64TypeInContext(C),
+                                    node->lhs->ty->base->size, false),
+                       "");
+    LLVMValueRef old_v =
+        LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAdd, ptr, rhs,
+                           LLVMAtomicOrderingSequentiallyConsistent, false);
+    return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
+  }
+  if (node->lhs->ty->base->kind == TY_VLA) {
+    LLVMValueRef step =
+        load(node->lhs->ty->base->vla_size->ty,
+             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
+    LLVMValueRef bytes = LLVMBuildMul(B, rhs, step, "sa_vla_add_bytes");
+    LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &bytes,
+                                       1, "sa_vla_ptr_add");
+    store(node->lhs->ty, ptr, tmp_v);
+    return load(node->ty, ptr);
+  }
+  Type *pointee_ty =
+      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+  LLVMValueRef tmp_v =
+      LLVMBuildGEP2(B, type_convert(pointee_ty), val, &rhs, 1, "sa_ptr_add");
+  store(node->lhs->ty, ptr, tmp_v);
+  return load(node->ty, ptr);
+}
+
 static LLVMValueRef gen_expr_sa_add(Node *node) {
+  if (node->lhs->ty->base) {
+    return gen_expr_sa_ptr_add(node);
+  }
   LLVMValueRef ptr = gen_addr(node->lhs);
   LLVMValueRef rhs = gen_expr(node->rhs);
 
@@ -1605,38 +1640,6 @@ static LLVMValueRef gen_expr_sa_shr(Node *node) {
   } else {
     tmp_v = LLVMBuildAShr(B, load(node->lhs->ty, ptr), rhs, "sa_ashr");
   }
-  store(node->lhs->ty, ptr, tmp_v);
-  return load(node->ty, ptr);
-}
-
-static LLVMValueRef gen_expr_sa_ptr_add(Node *node) {
-  LLVMValueRef ptr = gen_addr(node->lhs);
-  LLVMValueRef val = load(node->lhs->ty, ptr);
-  LLVMValueRef rhs = gen_ptr_index(node->rhs);
-  if (node->lhs->ty->is_atomic) {
-    rhs = LLVMBuildMul(B, rhs,
-                       LLVMConstInt(LLVMInt64TypeInContext(C),
-                                    node->lhs->ty->base->size, false),
-                       "");
-    LLVMValueRef old_v =
-        LLVMBuildAtomicRMW(B, LLVMAtomicRMWBinOpAdd, ptr, rhs,
-                           LLVMAtomicOrderingSequentiallyConsistent, false);
-    return LLVMBuildAdd(B, old_v, rhs, "sa_add_ptr_atom_ret_val_add");
-  }
-  if (node->lhs->ty->base->kind == TY_VLA) {
-    LLVMValueRef step =
-        load(node->lhs->ty->base->vla_size->ty,
-             (LLVMValueRef)node->lhs->ty->base->vla_size->codegen_data);
-    LLVMValueRef bytes = LLVMBuildMul(B, rhs, step, "sa_vla_add_bytes");
-    LLVMValueRef tmp_v = LLVMBuildGEP2(B, LLVMInt8TypeInContext(C), val, &bytes,
-                                       1, "sa_vla_ptr_add");
-    store(node->lhs->ty, ptr, tmp_v);
-    return load(node->ty, ptr);
-  }
-  Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
-  LLVMValueRef tmp_v =
-      LLVMBuildGEP2(B, type_convert(pointee_ty), val, &rhs, 1, "sa_ptr_add");
   store(node->lhs->ty, ptr, tmp_v);
   return load(node->ty, ptr);
 }
@@ -1943,9 +1946,6 @@ static LLVMValueRef gen_expr(Node *node) {
   }
   case ND_POST_DEC: {
     return gen_expr_post_inc_dec(node, false);
-  }
-  case ND_SA_PTR_ADD: {
-    return gen_expr_sa_ptr_add(node);
   }
   case ND_SA_PTR_SUB: {
     return gen_expr_sa_ptr_sub(node);

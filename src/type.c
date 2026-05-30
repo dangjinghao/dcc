@@ -393,8 +393,7 @@ static void add_type2(Node *node) {
       node->ty = node->lhs->ty;
       return;
     }
-    node->ty = usual_arith_conv(&node->lhs, &node->rhs);
-    return;
+    // fallthrough for normal type
   }
   case ND_MUL:
   case ND_DIV: {
@@ -435,8 +434,7 @@ static void add_type2(Node *node) {
     node->ty = node->lhs->ty;
     return;
   }
-  case ND_SA_PTR_SUB:
-  case ND_SA_PTR_ADD: {
+  case ND_SA_PTR_SUB: {
     if (node->lhs->ty->kind == TY_ARRAY)
       error_tok(node->lhs->tok, "not an lvalue");
     node->ty = node->lhs->ty;
@@ -448,9 +446,17 @@ static void add_type2(Node *node) {
     node->cond = new_cast(node->cond, ty_long);
     return;
   }
-  case ND_ASSIGN:
   case ND_SA_ADD:
-  case ND_SA_SUB:
+  case ND_SA_SUB: {
+    if (node->lhs->ty->base) {
+      if (node->lhs->ty->kind == TY_ARRAY)
+        error_tok(node->lhs->tok, "not an lvalue");
+      node->ty = node->lhs->ty;
+      return;
+    }
+    // fallthrough for normal type
+  }
+  case ND_ASSIGN:
   case ND_SA_MUL:
   case ND_SA_DIV:
   case ND_SA_MOD:
@@ -463,9 +469,12 @@ static void add_type2(Node *node) {
       error_tok(node->tok, "assign variable with incomplete type: void");
     if (node->lhs->ty->kind == TY_ARRAY)
       error_tok(node->lhs->tok, "not an lvalue");
-    /* For struct assignment, we should eventually check type compatibility
-       and insert memcpy. For now we leave the cast insertion only for
-       non-struct types. */
+    // VLA declaration needs this so we should not check node->lhs->ty->kind ==
+    // TY_VLA
+    // TODO: but why TY_VLA need this?
+    // For struct assignment, we should eventually check type
+    // compatibility and insert memcpy. For now we leave the cast insertion only
+    // for non-struct types.
     if (node->lhs->ty->kind != TY_STRUCT)
       node->rhs = new_cast(node->rhs, node->lhs->ty);
     node->ty = node->lhs->ty;

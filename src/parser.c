@@ -2250,14 +2250,9 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok, bool self_assign) {
     rhs = tmp;
   }
 
-  // VLA + num
-  if (lhs->ty->base->kind == TY_VLA) {
-    return new_binary(self_assign ? ND_SA_PTR_ADD : ND_ADD, lhs, rhs, tok);
-  }
-
   if (self_assign) {
     // ptr += num
-    return new_binary(ND_SA_PTR_ADD, lhs, rhs, tok);
+    return new_binary(ND_SA_ADD, lhs, rhs, tok);
   } else {
     // ptr + num
     return new_binary(ND_ADD, lhs, rhs, tok);

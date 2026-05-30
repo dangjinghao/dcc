@@ -252,7 +252,6 @@ typedef enum {
   ND_CAS,        // Atomic compare-and-swap
   ND_EXCH,       // Atomic exchange
   ND_SA_ADD,     // +=
-  ND_SA_PTR_ADD, // ptr +=
   ND_SA_SUB,     // -=
   ND_SA_PTR_SUB, // ptr -=
   ND_SA_MUL,     // *=
