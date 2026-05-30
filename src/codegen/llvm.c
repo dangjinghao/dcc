@@ -329,7 +329,8 @@ static LLVMValueRef gen_scalar_reloc_init(Type *ty, Initializer *init) {
   LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
   assert(target_val);
   assert(ty->base);
-  LLVMTypeRef pointee_ty = type_convert(ty->base);
+  LLVMTypeRef pointee_ty = ty->base->kind != TY_VOID ? type_convert(ty->base)
+                                                     : LLVMInt8TypeInContext(C);
   LLVMValueRef indices = LLVMConstInt(
       LLVMInt64TypeInContext(C), (uint64_t)eval_val / ty->base->size, false);
   return LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
@@ -477,7 +478,9 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
         LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
         assert(target_val);
         assert(ty->base);
-        LLVMTypeRef pointee_ty = type_convert(ty->base);
+        LLVMTypeRef pointee_ty = ty->base->kind != TY_VOID
+                                     ? type_convert(ty->base)
+                                     : LLVMInt8TypeInContext(C);
         LLVMValueRef indices =
             LLVMConstInt(LLVMInt64TypeInContext(C),
                          (uint64_t)eval_val / ty->base->size, false);
@@ -2468,7 +2471,7 @@ void codegen(Obj *prog, FILE *out, bool gen_asm) {
   codegen_global_declare(prog);
 
   codegen_global_init(prog);
-
+  LLVMVerifyModule(M, LLVMAbortProcessAction, NULL);
   if (gen_asm) {
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
