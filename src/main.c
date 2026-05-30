@@ -1,6 +1,7 @@
 #include "dcc.h"
 #include <errno.h>
 #include <libgen.h>
+#include <signal.h>
 #include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -37,8 +38,8 @@ static void run_subprocess(char **argv) {
     error("run_subprocess: %s exited with error code: %d", argv[0],
           WEXITSTATUS(status));
   } else if (WIFSIGNALED(status)) {
-    error("run_subprocess: %s terminated by signal %d", argv[0],
-          WTERMSIG(status));
+    error("run_subprocess: %s terminated by signal %s(%d)", argv[0],
+          strsignal(WTERMSIG(status)), WTERMSIG(status));
   }
 }
 
