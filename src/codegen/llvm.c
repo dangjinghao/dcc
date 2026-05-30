@@ -472,12 +472,11 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
           hashmap_put(&block_labels, var_node->unique_label, bb);
         }
         init_val = LLVMBlockAddress(target_fn, bb);
-      } else {
-        // Relocation pointer, real data: label + eval_val
+      } else if (ty->kind == TY_PTR) {
+        // pointer initialization with relocation
         assert(var_node->var);
         LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
         assert(target_val);
-        assert(ty->base);
         LLVMTypeRef pointee_ty = ty->base->kind != TY_VOID
                                      ? type_convert(ty->base)
                                      : LLVMInt8TypeInContext(C);
@@ -485,6 +484,24 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
             LLVMConstInt(LLVMInt64TypeInContext(C),
                          (uint64_t)eval_val / ty->base->size, false);
         init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
+      } else {
+        // cast pointer to integer initialization with relocation
+        assert(var_node->var);
+        LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
+        assert(target_val);
+        if (eval_val != 0) {
+          LLVMTypeRef pointee_ty = var_node->var->ty->base
+                                       ? type_convert(var_node->var->ty->base)
+                                       : LLVMInt8TypeInContext(C);
+          LLVMValueRef indices = LLVMConstInt(
+              LLVMInt64TypeInContext(C),
+              (uint64_t)eval_val /
+                  (var_node->var->ty->base ? var_node->var->ty->base->size : 1),
+              false);
+          target_val =
+              LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
+        }
+        init_val = LLVMConstPtrToInt(target_val, type_convert(ty));
       }
     } else if (ty->kind == TY_PTR) {
       init_val =
