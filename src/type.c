@@ -581,6 +581,14 @@ static void add_type2(Node *node) {
   case ND_POST_DEC:
     node->ty = node->lhs->ty;
     return;
+  case ND__SEQ: {
+    node->ty = ty_void;
+    for (size_t idx = 0; idx < node->_seq->len; idx++) {
+      Node *n = node->_seq->data[idx];
+      add_type(n, false);
+    }
+    return;
+  }
   default:
     break;
   }

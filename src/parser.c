@@ -189,6 +189,26 @@ static Node *new_unary(NodeKind kind, Node *expr, Token *tok) {
   return node;
 }
 
+static Node *new_seq(Token *tok) {
+  Node *node = new_node(ND__SEQ, tok);
+  node->_seq = calloc(1, sizeof(PtrArray));
+  return node;
+}
+
+#define PTRARRAY_PTR_TYPE Node *
+#define PTRARRAY_PREFIX node_seq
+#include "ptrarray_expand.h"
+#undef PTRARRAY_PREFIX
+#undef PTRARRAY_PTR_TYPE
+
+static void seq_add_node(Node *seq_node, Node *new_node) {
+  node_seq_push(seq_node->_seq, new_node);
+}
+
+static void seq_insert(Node *seq_node, size_t idx, Node *new_node) {
+  node_seq_insert(seq_node->_seq, idx, new_node);
+}
+
 // used to represent some basic int type constant value
 static Node *new_num(int val, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
@@ -1358,41 +1378,39 @@ static Node *init_desg_expr(InitDesg *desg, Token *tok) {
   return new_unary(ND_DEREF, new_add(lhs, rhs, tok, false), tok);
 }
 
-static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg,
-                              Token *tok) {
+static void create_lvar_init(Node *seq, Initializer *init, Type *ty,
+                             InitDesg *desg, Token *tok) {
   if (ty->kind == TY_ARRAY) {
-    Node *node = new_node(ND_NULL_EXPR, tok);
     for (int i = 0; i < ty->array_len; i++) {
       InitDesg desg2 = {desg, i};
-      Node *rhs = create_lvar_init(init->children[i], ty->base, &desg2, tok);
-      node = new_binary(ND_COMMA, node, rhs, tok);
+      create_lvar_init(seq, init->children[i], ty->base, &desg2, tok);
     }
-    return node;
+    return;
   }
 
   if (ty->kind == TY_STRUCT && !init->expr) {
-    Node *node = new_node(ND_NULL_EXPR, tok);
-
     for (Member *mem = ty->members; mem; mem = mem->next) {
       InitDesg desg2 = {desg, 0, mem};
-      Node *rhs =
-          create_lvar_init(init->children[mem->idx], mem->ty, &desg2, tok);
-      node = new_binary(ND_COMMA, node, rhs, tok);
+      create_lvar_init(seq, init->children[mem->idx], mem->ty, &desg2, tok);
     }
-    return node;
+    return;
   }
 
   if (ty->kind == TY_UNION) {
     Member *mem = init->mem ? init->mem : ty->members;
     InitDesg desg2 = {desg, 0, mem};
-    return create_lvar_init(init->children[mem->idx], mem->ty, &desg2, tok);
+    create_lvar_init(seq, init->children[mem->idx], mem->ty, &desg2, tok);
+    return;
   }
 
-  if (!init->expr)
-    return new_node(ND_NULL_EXPR, tok);
+  if (!init->expr) {
+    return;
+  }
 
   Node *lhs = init_desg_expr(desg, tok);
-  return new_binary(ND_ASSIGN, lhs, init->expr, tok);
+  Node *assign_expr = new_binary(ND_ASSIGN, lhs, init->expr, tok);
+  seq_add_node(seq, assign_expr);
+  return;
 }
 
 // A variable definition with an initializer is a shorthand notation
@@ -1408,7 +1426,7 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg,
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
   Initializer *init = initializer(rest, tok, var->ty, &var->ty);
   InitDesg desg = {NULL, 0, NULL, var};
-  Node *lhs;
+  Node *lhs = NULL;
   switch (var->ty->kind) {
   case TY_ARRAY:
   case TY_VLA:
@@ -1422,15 +1440,13 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var) {
     lhs->var = var;
     break;
   }
-  default: {
-    // basic types, skip memzero process
-    lhs = new_node(ND_NULL_EXPR, tok);
-    break;
   }
+  Node *seq = new_seq(tok);
+  if (lhs) {
+    seq_add_node(seq, lhs);
   }
-
-  Node *rhs = create_lvar_init(init, var->ty, &desg, tok);
-  return new_binary(ND_COMMA, lhs, rhs, tok);
+  create_lvar_init(seq, init, var->ty, &desg, tok);
+  return seq;
 }
 // Initializers for global variables are evaluated at compile-time and
 // embedded to .data section. This function serializes Initializer

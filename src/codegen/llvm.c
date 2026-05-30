@@ -1989,6 +1989,13 @@ static LLVMValueRef gen_expr(Node *node) {
     llvm_va_copy(gen_expr(node->lhs), gen_expr(node->rhs));
     return NULL;
   }
+  case ND__SEQ: {
+    for (size_t idx = 0; idx < node->_seq->len; idx++) {
+      Node *n = node->_seq->data[idx];
+      gen_expr(n);
+    }
+    return NULL;
+  }
   }
   error_tok(node->tok, "invalid expression");
 }

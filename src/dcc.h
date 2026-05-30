@@ -284,6 +284,8 @@ typedef enum {
   ND_VA_COPY,   // va_copy
   ND_POST_INC,  // i++
   ND_POST_DEC,  // i--
+  // internal sequenced expression, returns nothing
+  ND__SEQ,
 } NodeKind;
 
 // AST node type
@@ -352,6 +354,8 @@ struct Node {
   // Numeric literal
   uint64_t val;
   long double fval;
+
+  PtrArray *_seq;
 };
 
 struct Obj {
