@@ -114,7 +114,7 @@ static Node *funcall(Token **rest, Token *tok, Node *node);
 static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
 static Token *parse_typedef(Token *tok, Type *basety);
-static bool is_function(Token *tok);
+static bool is_function(Token *tok, Type *declspec);
 static Token *function(Token *tok, Type *basety, VarAttr *attr);
 static Token *global_variable(Token *tok, Type *basety, VarAttr *attr);
 
@@ -1708,7 +1708,7 @@ static Node *compound_stmt(Token **rest, Token *tok) {
         continue;
       }
 
-      if (is_function(tok)) {
+      if (is_function(tok, basety)) {
         tok = function(tok, basety, &attr);
         continue;
       }
@@ -3199,12 +3199,11 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
 
 // Lookahead tokens and returns true if a given token is a start
 // of a function definition or declaration.
-static bool is_function(Token *tok) {
+static bool is_function(Token *tok, Type *base_ty) {
   if (equal(tok, ";"))
     return false;
 
-  Type dummy = {};
-  Type *ty = declarator(&tok, tok, &dummy);
+  Type *ty = declarator(&tok, tok, base_ty);
   return ty->kind == TY_FUNC;
 }
 
@@ -3229,7 +3228,7 @@ Obj *parse(Token *tok) {
     }
 
     // Function
-    if (is_function(tok)) {
+    if (is_function(tok, basety)) {
       tok = function(tok, basety, &attr);
       continue;
     }
