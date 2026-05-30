@@ -9,7 +9,8 @@ set -eu
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$COMMON_DIR/../.."
 
-dcc="$PROJECT_ROOT/build/dcc"
+# use build/dcc if dcc not defined
+dcc="${dcc:-$PROJECT_ROOT/build/dcc}"
 make="make -j$(nproc)"
 
 repo_name=$(basename -s .git $repo)
