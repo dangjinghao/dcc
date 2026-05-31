@@ -28,6 +28,7 @@ PtrArray opt_cpp_extra_args;
 
 // cc1 mode
 bool opt_cc1;
+bool opt_skip_verify;
 char *opt_cc1_input;
 char *opt_cc1_output;
 char *opt_cc1_filename;
@@ -56,42 +57,42 @@ static InputFileType get_file_type(char *filename) {
 }
 
 static void usage(int status) {
-  fprintf(
-      stderr,
-      "Usage: dcc [options] <file>...\n"
-      "Options:\n"
-      "  -o <path>              place output into <path>\n"
-      "  -I<dir> / -I <dir>     add include directory\n"
-      "  -D<macro> / -D <macro> define macro\n"
-      "  -U<macro> / -U <macro> undefine macro\n"
-      "  -include <file>        include header before main input\n"
-      "  -x <lang>              force input language (c|assembler|none)\n"
-      "  -l<lib>                link with library\n"
-      "  -Wl,<args>             pass comma-separated args to linker\n"
-      "  -Xlinker <arg>         pass arg to linker\n"
-      "  -s                     pass -s to linker\n"
-      "  -M, -MD, -MM, -MMD     dependency generation options\n"
-      "  -MF <file>             write deps to file\n"
-      "  -MT <target>           set dependency target\n"
-      "  -MG, -MP               dependency options\n"
-      "  -fpic, -fPIC           generate position-independent code\n"
-      "  -idirafter <dir>       add include directory after others\n"
-      "  -###                   dump subprocess command line\n"
-      "  -emit-llvm             generate LLVM IR\n"
-      "  -S                     stop after assembly (output .s)\n"
-      "  -E                     preprocess only (output .i)\n"
-      "  -c                     compile only (output .o)\n"
-      "  -static, -shared       pass to linker\n"
-      "  -L<dir> / -L <dir>     add library search path\n"
-      "  -fcommon / -fno-common\n"
-      "  --help                show this help\n"
-      "cc1 mode:\n"
-      "  -cc1 -cc1-input <path> -cc1-output <path> [-emit-llvm] -cc1-filename "
-      "<path>\n"
-      "Infomation:\n"
-      "\n"
-      "dcc include path: %s/../include\n",
-      path_get_exedir());
+  fprintf(stderr,
+          "Usage: dcc [options] <file>...\n"
+          "Options:\n"
+          "  -o <path>              place output into <path>\n"
+          "  -I<dir> / -I <dir>     add include directory\n"
+          "  -D<macro> / -D <macro> define macro\n"
+          "  -U<macro> / -U <macro> undefine macro\n"
+          "  -include <file>        include header before main input\n"
+          "  -x <lang>              force input language (c|assembler|none)\n"
+          "  -l<lib>                link with library\n"
+          "  -Wl,<args>             pass comma-separated args to linker\n"
+          "  -Xlinker <arg>         pass arg to linker\n"
+          "  -s                     pass -s to linker\n"
+          "  -M, -MD, -MM, -MMD     dependency generation options\n"
+          "  -MF <file>             write deps to file\n"
+          "  -MT <target>           set dependency target\n"
+          "  -MG, -MP               dependency options\n"
+          "  -fpic, -fPIC           generate position-independent code\n"
+          "  -idirafter <dir>       add include directory after others\n"
+          "  -###                   dump subprocess command line\n"
+          "  -emit-llvm             generate LLVM IR\n"
+          "  -S                     stop after assembly (output .s)\n"
+          "  -E                     preprocess only (output .i)\n"
+          "  -c                     compile only (output .o)\n"
+          "  -static, -shared       pass to linker\n"
+          "  -L<dir> / -L <dir>     add library search path\n"
+          "  -fcommon / -fno-common\n"
+          "  --help                show this help\n"
+          "cc1 mode:\n"
+          "  -cc1 -cc1-input <path> -cc1-output <path> [-emit-llvm] "
+          "[-skip-verify] -cc1-filename "
+          "<path>\n"
+          "Infomation:\n"
+          "\n"
+          "dcc include path: %s/../include\n",
+          path_get_exedir());
   exit(status);
 }
 
@@ -278,6 +279,11 @@ void parse_args(int argc, char **argv) {
 
     if (!strcmp(argv[i], "-###")) {
       opt_hash_hash_hash = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-skip-verify")) {
+      opt_skip_verify = true;
       continue;
     }
 

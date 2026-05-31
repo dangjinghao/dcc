@@ -2507,7 +2507,8 @@ void codegen(Obj *prog, FILE *out, bool gen_asm) {
   codegen_global_declare(prog);
 
   codegen_global_init(prog);
-  LLVMVerifyModule(M, LLVMAbortProcessAction, NULL);
+  if (!opt_skip_verify)
+    LLVMVerifyModule(M, LLVMAbortProcessAction, NULL);
   if (gen_asm) {
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();

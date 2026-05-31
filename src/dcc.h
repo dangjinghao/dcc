@@ -515,6 +515,7 @@ typedef struct {
 
 void parse_args(int argc, char **argv);
 extern bool opt_cc1;
+extern bool opt_skip_verify;
 extern bool opt_S;
 extern bool opt_c;
 extern bool opt_E;
