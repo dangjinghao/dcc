@@ -285,7 +285,8 @@ typedef enum {
   ND_VA_COPY,   // va_copy
   ND_POST_INC,  // i++
   ND_POST_DEC,  // i--
-  // internal sequenced expression, returns nothing
+  // internal sequenced expression, returns the last expr,
+  // used to replace comma lowering
   ND__SEQ,
 } NodeKind;
 

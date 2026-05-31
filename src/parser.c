@@ -843,13 +843,11 @@ static Type *typeof_specifier(Token **rest, Token *tok) {
 }
 
 // Generate code for computing a VLA size.
-static Node *compute_vla_size(Type *ty, Token *tok) {
-  Node *node = new_node(ND_NULL_EXPR, tok);
+static void compute_vla_size(Node *seq, Type *ty, Token *tok) {
   if (ty->base)
-    node = new_binary(ND_COMMA, node, compute_vla_size(ty->base, tok), tok);
-
+    compute_vla_size(seq, ty->base, tok);
   if (ty->kind != TY_VLA)
-    return node;
+    return;
 
   Node *base_sz;
   if (ty->base->kind == TY_VLA)
@@ -860,7 +858,7 @@ static Node *compute_vla_size(Type *ty, Token *tok) {
   ty->vla_size = new_lvar("", ty_ulong);
   Node *expr = new_binary(ND_ASSIGN, new_var_node(ty->vla_size, tok),
                           new_binary(ND_MUL, ty->vla_len, base_sz, tok), tok);
-  return new_binary(ND_COMMA, node, expr, tok);
+  seq_add_node(seq, expr);
 }
 
 static Node *new_alloca(Node *sz) {
@@ -899,7 +897,9 @@ static Node *declaration(Token **rest, Token *tok, Type *basety,
     // Generate code for computing a VLA size. We need to do this
     // even if ty is not VLA because ty may be a pointer to VLA
     // (e.g. int (*foo)[n][m] where n and m are variables.)
-    cur = cur->next = new_unary(ND_EXPR_STMT, compute_vla_size(ty, tok), tok);
+    Node *seq = new_seq(tok);
+    compute_vla_size(seq, ty, tok);
+    cur = cur->next = new_unary(ND_EXPR_STMT, seq, tok);
 
     if (ty->kind == TY_VLA) {
       if (equal(tok, "="))
@@ -2907,9 +2907,11 @@ static Node *primary(Token **rest, Token *tok) {
       if (ty->vla_size)
         return new_var_node(ty->vla_size, tok);
 
-      Node *lhs = compute_vla_size(ty, tok);
+      Node *seq = new_seq(tok);
+      compute_vla_size(seq, ty, tok);
       Node *rhs = new_var_node(ty->vla_size, tok);
-      return new_binary(ND_COMMA, lhs, rhs, tok);
+      seq_add_node(seq, rhs);
+      return seq;
     }
     return new_ulong(ty->size, start);
   }

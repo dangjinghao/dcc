@@ -586,6 +586,7 @@ static void add_type2(Node *node) {
     for (size_t idx = 0; idx < node->_seq->len; idx++) {
       Node *n = node->_seq->data[idx];
       add_type(n, false);
+      node->ty = n->ty;
     }
     return;
   }

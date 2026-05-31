@@ -2029,11 +2029,12 @@ static LLVMValueRef gen_expr(Node *node) {
     return NULL;
   }
   case ND__SEQ: {
+    LLVMValueRef r = NULL;
     for (size_t idx = 0; idx < node->_seq->len; idx++) {
       Node *n = node->_seq->data[idx];
-      gen_expr(n);
+      r = gen_expr(n);
     }
-    return NULL;
+    return r;
   }
   }
   error_tok(node->tok, "invalid expression");
