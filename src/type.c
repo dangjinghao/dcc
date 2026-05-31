@@ -88,6 +88,10 @@ bool is_flonum(Type *ty) {
 }
 
 bool is_numeric(Type *ty) { return is_integer(ty) || is_flonum(ty); }
+static bool is_arithmetic(Type *ty) { return is_numeric(ty); }
+static bool is_scalar(Type *ty) {
+  return is_arithmetic(ty) || ty->kind == TY_PTR;
+}
 
 bool is_agg_type(Type *ty) {
   return ty->kind == TY_STRUCT || ty->kind == TY_UNION;
@@ -495,24 +499,71 @@ static void add_type2(Node *node) {
   case ND_VLA_PTR:
     node->ty = node->var->ty;
     return;
-  case ND_COND:
+  case ND_COND: {
+    // C11 6.5.15p2: the first operand shall have scalar type
+    if (!is_scalar(node->cond->ty))
+      error_tok(node->cond->tok, "used %s type where scalar is required",
+                node->cond->ty->kind == TY_STRUCT  ? "struct"
+                : node->cond->ty->kind == TY_UNION ? "union"
+                : node->cond->ty->kind == TY_ARRAY ? "array"
+                                                   : "aggregate");
+
+    // C11 6.5.15p5: both void -> void.  Accept one-sided void as a
+    // practical extension (void expression can appear on either branch
+    // with a non-void counterpart; result is void).
     if (node->then->ty->kind == TY_VOID || node->_else->ty->kind == TY_VOID) {
-      // support return void from ternary operator
       node->ty = ty_void;
-    } else if (is_null_pointer_constant(node->_else)) {
-      // support <cond>? NULL: <ty> return <ty>
+    }
+    // C11 6.5.15p5: both struct or union of the same type
+    else if (is_agg_type(node->then->ty) && node->then->ty == node->_else->ty) {
+      node->ty = node->then->ty;
+    }
+    // C11 6.5.15p6: one operand is a pointer, the other is a null pointer
+    // constant. Only applies when the other operand is actually a pointer.
+    else if (is_null_pointer_constant(node->_else) &&
+             node->then->ty->kind == TY_PTR) {
       node->_else = new_cast(node->_else, node->then->ty);
       node->ty = node->then->ty;
-    } else if (is_null_pointer_constant(node->then)) {
-      // same as above
+    } else if (is_null_pointer_constant(node->then) &&
+               node->_else->ty->kind == TY_PTR) {
       node->then = new_cast(node->then, node->_else->ty);
       node->ty = node->_else->ty;
-    } else if (node->then->ty->base || node->_else->ty->base) {
-      node->ty = node->then->ty;
-    } else {
+    }
+    // C11 6.5.15p6: both operands are pointers
+    else if (node->then->ty->kind == TY_PTR &&
+             node->_else->ty->kind == TY_PTR) {
+      Type *t_base = node->then->ty->base;
+      Type *e_base = node->_else->ty->base;
+      bool t_void = t_base->kind == TY_VOID;
+      bool e_void = e_base->kind == TY_VOID;
+
+      if (t_void || e_void) {
+        // One is void* -> result is void*. FIXME: merge qualifiers.
+        node->ty = pointer_to(ty_void);
+      } else if (is_compatible(t_base, e_base)) {
+        // Compatible pointer types. FIXME: merge qualifiers and
+        // build composite type per 6.5.15p6.
+        node->ty = node->then->ty;
+      } else {
+        error_tok(node->tok,
+                  "incompatible pointer types in conditional expression");
+      }
+    }
+    // C11 6.5.15p6: neither arithmetic, struct, void, pointer, nor NULL
+    else if (node->then->ty->kind == TY_PTR ||
+             node->_else->ty->kind == TY_PTR) {
+      error_tok(node->tok,
+                "pointer/integer type mismatch in conditional expression");
+    }
+    // C11 6.5.15p5: both have arithmetic type -> usual arithmetic conversions
+    else if (is_arithmetic(node->then->ty) && is_arithmetic(node->_else->ty)) {
       node->ty = usual_arith_conv(&node->then, &node->_else);
+    } else {
+      // Constraint violation: incompatible or unsupported type combination.
+      error_tok(node->tok, "incompatible types in conditional expression");
     }
     return;
+  }
   case ND_COMMA:
     node->ty = node->rhs->ty;
     return;

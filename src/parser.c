@@ -205,22 +205,11 @@ static void seq_add_node(Node *seq_node, Node *new_node) {
   node_seq_push(seq_node->_seq, new_node);
 }
 
-static void seq_insert(Node *seq_node, size_t idx, Node *new_node) {
-  node_seq_insert(seq_node->_seq, idx, new_node);
-}
-
 // used to represent some basic int type constant value
 static Node *new_num(int val, Token *tok) {
   Node *node = new_node(ND_NUM, tok);
   node->val = (uint64_t)val;
   node->ty = ty_int;
-  return node;
-}
-
-static Node *new_long(int64_t val, Token *tok) {
-  Node *node = new_node(ND_NUM, tok);
-  node->val = val;
-  node->ty = ty_long;
   return node;
 }
 
@@ -2094,6 +2083,8 @@ static Node *conditional(Token **rest, Token *tok) {
     rhs->then = new_var_node(var, tok);
     rhs->_else = conditional(rest, tok->next->next);
     add_type(rhs->_else, false);
+    // keep using ND_COMMA, because it's not sequnece and sometimes would be
+    // used in compile-time eval
     return new_binary(ND_COMMA, lhs, rhs, tok);
   }
 
