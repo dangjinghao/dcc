@@ -470,10 +470,10 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
       init_val = LLVMConstNamedStruct(type_convert(ty), cv_array, member_count);
       free(cv_array);
     }
-  } else if (ty->kind == TY_DOUBLE || ty->kind == TY_FLOAT) {
-    init_val = LLVMConstReal(llvm_ty, eval_double(init->expr));
   } else if (!init->expr) {
     init_val = LLVMConstNull(llvm_ty);
+  } else if (ty->kind == TY_DOUBLE || ty->kind == TY_FLOAT) {
+    init_val = LLVMConstReal(llvm_ty, eval_double(init->expr));
   } else {
     // integer family and ptr
     Node *var_node = NULL;
