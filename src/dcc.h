@@ -214,6 +214,7 @@ Type *struct_full_type(size_t nmem, Type **members);
 Type *struct_full_type2(size_t nmem, Type **members, int *members_attr_align);
 void add_type(Node *node, bool supress_decay);
 Type *type_decay(Type *ty);
+Node *integer_promotion(Node *n);
 
 //
 /// parser.c

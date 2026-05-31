@@ -313,7 +313,7 @@ static Type *type_usual_arithmetic_conversion(Type *t1, Type *t2) {
   }
 }
 
-static Node *integer_promotion(Node *n) {
+Node *integer_promotion(Node *n) {
   Type *promoted = type_integer_promotion(n->ty);
   if (promoted != n->ty)
     return new_cast(n, promoted);

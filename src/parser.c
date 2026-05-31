@@ -2797,9 +2797,12 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
         arg = new_cast(arg, param_ty);
       param_ty = param_ty->next;
     } else if (arg->ty->kind == TY_FLOAT) {
-      // If parameter type is omitted (e.g. in "..."), float
+      // If parameter type is omitted (e.g. in "...", it's va function), float
       // arguments are promoted to double.
       arg = new_cast(arg, ty_double);
+    } else if (is_integer(arg->ty)) {
+      // promote small type to int in va function
+      arg = integer_promotion(arg);
     }
 
     cur = cur->next = arg;
