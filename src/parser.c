@@ -3127,11 +3127,15 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
     }
     if (fn->is_definition && equal(tok, "{"))
       error_tok(tok, "redefinition of %s", name_str);
-    if (fn->is_static != attr->is_static)
-      error_tok(tok, "static declaration conflicts with a same name non-static "
-                     "declaration");
+    // C11 6.2.2p5: function declaration without storage-class specifier
+    // is treated "as if declared with extern", so it inherits the prior
+    // declaration's linkage (6.2.2p4). Only error when a non-static
+    // function is redeclared with static.
+    if (!fn->is_static && attr->is_static)
+      error_tok(tok, "static declaration of non-static function");
     //  reuse previous function
     fn->is_definition = fn->is_definition || equal(tok, "{");
+    fn->is_inline = fn->is_inline || attr->is_inline;
   } else {
     fn = new_gvar(name_str, ty);
     fn->is_function = true;
