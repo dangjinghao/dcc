@@ -2067,7 +2067,12 @@ static LLVMValueRef gen_stmt(Node *node) {
       LLVMBuildRet(B, v);
       return NULL;
     }
-    LLVMBuildRet(B, gen_expr(node->lhs));
+    LLVMValueRef ret = gen_expr(node->lhs);
+    if (node->lhs->ty->kind == TY_VOID) {
+      LLVMBuildRetVoid(B);
+    } else {
+      LLVMBuildRet(B, ret);
+    }
     return NULL;
   }
   case ND_EXPR_STMT: {
