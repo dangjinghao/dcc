@@ -268,7 +268,7 @@ static uint64_t read_buf(char *buf, int sz) {
 // LLVM struct members.
 //
 // Members whose initializers require relocations (addresses of functions
-// or global variables) are skipped — they will be handled separately as
+// or global variables) are skipped - they will be handled separately as
 // native LLVM constants by init_bitfield_struct_global.
 static void fill_bitfield_buf(Type *ty, Initializer *init, uint8_t *buf) {
   for (Member *m = ty->members; m; m = m->next) {
@@ -292,7 +292,7 @@ static void fill_bitfield_buf(Type *ty, Initializer *init, uint8_t *buf) {
       Node *var_node = NULL;
       int64_t val = eval2(child->expr, &var_node);
       if (var_node) {
-        // Relocation member — skip, handled separately
+        // Relocation member - skip, handled separately
         continue;
       }
       write_buf((char *)(buf + m->offset), (uint64_t)val, m->ty->size);
@@ -343,31 +343,45 @@ static LLVMValueRef gen_scalar_reloc_init(Type *ty, Initializer *init) {
 // at their byte offset, while bitfields and non-relocation members form
 // [k x i8] byte-array gaps. The result is a packed unnamed struct that
 // matches the parser-computed byte layout exactly.
+typedef struct {
+  int offset;
+  int size;
+  LLVMValueRef val;
+} RelocEntry;
+
+// Recursively collect relocation entries from a type tree, including
+// nested aggregate members (structs/unions embedded within the outer
+// bitfield struct). base_offset tracks the cumulative offset from the
+// outermost struct.
+static void collect_relocs_rec(Type *ty, Initializer *init, int base_offset,
+                               PtrArray *relocs) {
+  if (!ty->members)
+    return;
+  for (Member *m = ty->members; m; m = m->next) {
+    Initializer *child = init->children[m->idx];
+    if (!child || m->is_bitfield)
+      continue;
+    if (is_agg_type(m->ty) && !child->expr) {
+      collect_relocs_rec(m->ty, child, base_offset + m->offset, relocs);
+      continue;
+    }
+    LLVMValueRef val = gen_scalar_reloc_init(m->ty, child);
+    if (val) {
+      RelocEntry *e = calloc(1, sizeof(RelocEntry));
+      *e = (RelocEntry){base_offset + m->offset, m->ty->size, val};
+      ptrarray_push(relocs, e);
+    }
+  }
+}
+
 static LLVMValueRef init_bitfield_struct_global(Type *ty, Initializer *init) {
   int sz = ty->size;
   uint8_t *buf = calloc(sz, 1);
   fill_bitfield_buf(ty, init, buf);
 
-  // Collect relocation members (non-bitfield, scalar, relocation-needed)
-  int n_reloc = 0;
-  typedef struct {
-    int offset;
-    int size;
-    LLVMValueRef val;
-  } RelocEntry;
-  RelocEntry *relocs = calloc(ty->members ? next_iter_count(ty->members) : 1,
-                              sizeof(RelocEntry));
-
-  for (Member *m = ty->members; m; m = m->next) {
-    Initializer *child = init->children[m->idx];
-    if (!child || m->is_bitfield || !child->expr)
-      continue;
-    if (is_agg_type(m->ty))
-      continue;
-    LLVMValueRef val = gen_scalar_reloc_init(m->ty, child);
-    if (val)
-      relocs[n_reloc++] = (RelocEntry){m->offset, m->ty->size, val};
-  }
+  PtrArray reloc_list = {};
+  collect_relocs_rec(ty, init, 0, &reloc_list);
+  int n_reloc = reloc_list.len;
 
   // Build LLVM struct elements: [k x i8] gaps + relocation values
   int max_elems = n_reloc * 2 + 1;
@@ -376,26 +390,29 @@ static LLVMValueRef init_bitfield_struct_global(Type *ty, Initializer *init) {
   int pos = 0;
 
   for (int i = 0; i < n_reloc; i++) {
-    if (relocs[i].offset > pos) {
-      int gap = relocs[i].offset - pos;
+    RelocEntry *re = (RelocEntry *)reloc_list.data[i];
+    if (re->offset > pos) {
+      int gap = re->offset - pos;
       LLVMValueRef *gap_bytes = calloc(gap, sizeof(LLVMValueRef));
-      for (int j = 0; j < gap; j++)
+      for (int j = 0; j < gap; j++) {
         gap_bytes[j] =
             LLVMConstInt(LLVMInt8TypeInContext(C), buf[pos + j], false);
+      }
       elems[n_elems++] =
           LLVMConstArray(LLVMInt8TypeInContext(C), gap_bytes, gap);
       free(gap_bytes);
     }
-    elems[n_elems++] = relocs[i].val;
-    pos = relocs[i].offset + relocs[i].size;
+    elems[n_elems++] = re->val;
+    pos = re->offset + re->size;
   }
 
   if (pos < sz) {
     int gap = sz - pos;
     LLVMValueRef *gap_bytes = calloc(gap, sizeof(LLVMValueRef));
-    for (int j = 0; j < gap; j++)
+    for (int j = 0; j < gap; j++) {
       gap_bytes[j] =
           LLVMConstInt(LLVMInt8TypeInContext(C), buf[pos + j], false);
+    }
     elems[n_elems++] = LLVMConstArray(LLVMInt8TypeInContext(C), gap_bytes, gap);
     free(gap_bytes);
   }
@@ -403,7 +420,9 @@ static LLVMValueRef init_bitfield_struct_global(Type *ty, Initializer *init) {
   bool packed = ty->is_packed || n_reloc > 0;
   LLVMValueRef r = LLVMConstStructInContext(C, elems, n_elems, packed);
   free(elems);
-  free(relocs);
+  for (int i = 0; i < n_reloc; i++)
+    free(reloc_list.data[i]);
+  ptrarray_free(&reloc_list);
   free(buf);
   return r;
 }
