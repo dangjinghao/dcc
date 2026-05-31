@@ -1263,7 +1263,7 @@ static LLVMValueRef gen_expr_ptr_add(Node *node) {
                          "vla_add");
   }
   Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+      node->lhs->ty->base->kind == TY_VOID ? ty_char : node->lhs->ty->base;
   LLVMValueRef base = gen_expr(node->lhs);
   LLVMValueRef idx = gen_ptr_index(node->rhs);
   return LLVMBuildGEP2(B, type_convert(pointee_ty), base, &idx, 1, "ptr_add");
@@ -1282,7 +1282,7 @@ static LLVMValueRef gen_expr_ptr_sub(Node *node) {
   }
   LLVMValueRef neg = LLVMBuildNeg(B, gen_ptr_index(node->rhs), "ptr_sub_neg");
   Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+      node->lhs->ty->kind == TY_VOID ? ty_char : node->lhs->ty->base;
   return LLVMBuildGEP2(B, type_convert(pointee_ty), gen_expr(node->lhs), &neg,
                        1, "ptr_sub");
 }
@@ -1374,7 +1374,7 @@ static LLVMValueRef gen_expr_sa_ptr_add(Node *node) {
     return load(node->ty, ptr);
   }
   Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+      node->lhs->ty->kind == TY_VOID ? ty_char : node->lhs->ty->base;
   LLVMValueRef tmp_v =
       LLVMBuildGEP2(B, type_convert(pointee_ty), val, &rhs, 1, "sa_ptr_add");
   store(node->lhs->ty, ptr, tmp_v);
@@ -1409,7 +1409,7 @@ static LLVMValueRef gen_expr_sa_ptr_sub(Node *node) {
   }
   LLVMValueRef neg = LLVMBuildNeg(B, rhs, "sa_ptr_sub_neg");
   Type *pointee_ty =
-      node->lhs->ty->base == ty_void ? ty_char : node->lhs->ty->base;
+      node->lhs->ty->kind == TY_VOID ? ty_char : node->lhs->ty->base;
   LLVMValueRef tmp_v = LLVMBuildGEP2(B, type_convert(pointee_ty), val,
                                      &(LLVMValueRef){neg}, 1, "sa_ptr_sub");
   store(node->lhs->ty, ptr, tmp_v);
