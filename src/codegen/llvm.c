@@ -2377,6 +2377,8 @@ static void build_function_default_return(Obj *var) {
     // If there isn't any terminator(return) in the last BB, create a new one
     if (var->ty->return_ty->kind == TY_VOID) {
       LLVMBuildRetVoid(B);
+    } else if (is_large_agg_type(var->ty->return_ty)) {
+      LLVMBuildRetVoid(B);
     } else {
       LLVMBuildRet(B, LLVMConstNull(type_convert(var->ty->return_ty)));
     }
