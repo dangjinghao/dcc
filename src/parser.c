@@ -75,7 +75,8 @@ static Type *enum_specifier(Token **rest, Token *tok);
 static Type *typeof_specifier(Token **rest, Token *tok);
 static Type *type_suffix(Token **rest, Token *tok, Type *ty);
 static Type *declarator(Token **rest, Token *tok, Type *ty);
-static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr);
+static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr,
+                         bool is_global);
 static void array_initializer2(Token **rest, Token *tok, Initializer *init,
                                int i);
 static void struct_initializer2(Token **rest, Token *tok, Initializer *init,
@@ -114,8 +115,8 @@ static Node *funcall(Token **rest, Token *tok, Node *node);
 static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
 static Token *parse_typedef(Token *tok, Type *basety);
-static Token *parse_decl_list(Token *tok, Type *basety, VarAttr *attr);
-static Token *parse_var_decl(Token *tok, Type *basety, VarAttr *attr, Type *ty);
+static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
+                              Type *ty);
 static bool parse_func_decl(Token **rest, Token *tok, Type *basety,
                             VarAttr *attr, Type *ty);
 
@@ -858,39 +859,52 @@ static Node *new_alloca(Node *sz) {
 }
 
 // declaration = declspec (declarator ("=" expr)? ("," declarator ("="
-// expr)?)*)? ";"
-static Node *declaration(Token **rest, Token *tok, Type *basety,
-                         VarAttr *attr) {
+// declaration = declspec declarator ("," declarator)* ";"
+// When is_global is true, object declarators produce global variables.
+// When false (inside a function body), they produce locals/VLAs/static-locals.
+static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr,
+                         bool is_global) {
   Node head = {};
   Node *cur = &head;
-  int i = 0;
+  bool first = true;
 
   while (!equal(tok, ";")) {
-    if (i++ > 0)
+    if (!first)
       tok = skip(tok, ",");
+    first = false;
 
     Type *ty = declarator(&tok, tok, basety);
-    if (ty->kind == TY_VOID)
-      error_tok(tok, "variable declared void");
     if (!ty->name)
-      error_tok(ty->name_pos, "variable name omitted");
+      error_tok(ty->name_pos, "name omitted");
 
     if (ty->kind == TY_FUNC) {
-      if (!parse_func_decl(&tok, tok, basety, attr, ty))
-        error_tok(tok, "function definition is not allowed in this context");
+      if (!parse_func_decl(&tok, tok, basety, attr, ty)) {
+        // Function definition — body already consumed, no trailing ';'.
+        if (!is_global)
+          error_tok(tok, "function definition is not allowed in this context");
+        Node *node = new_node(ND_BLOCK, tok);
+        node->body = head.next;
+        *rest = tok;
+        return node;
+      }
       continue;
     }
+    // variables
+    if (ty->kind == TY_VOID)
+      error_tok(tok, "variable declared void");
 
     if (attr && attr->is_inline)
       error_tok(tok, "'inline' can only appear on functions");
 
-    if (attr && attr->is_extern) {
-      tok = parse_var_decl(tok, basety, attr, ty);
+    if (is_global || (attr && attr->is_extern)) {
+      tok = parse_gvar_decl(tok, basety, attr, ty);
       continue;
     }
 
     if (attr && attr->is_static) {
       // static local variable
+      // it will modify the name to anonymous name, that's differet from
+      // parse_gvar_decl so we should not put this logic into parse_gvar_decl
       Obj *var = new_anon_gvar(ty);
       push_scope(get_ident(ty->name))->var = var;
       if (equal(tok, "="))
@@ -898,8 +912,8 @@ static Node *declaration(Token **rest, Token *tok, Type *basety,
       continue;
     }
 
-    // Generate code for computing a VLA size. We need to do this
-    // even if ty is not VLA because ty may be a pointer to VLA
+    // Generate code for computing a VLA size. Needed even when ty
+    // is not VLA because it may be a pointer to VLA
     // (e.g. int (*foo)[n][m] where n and m are variables.)
     Node *seq = new_seq(tok);
     compute_vla_size(seq, ty, tok);
@@ -909,15 +923,12 @@ static Node *declaration(Token **rest, Token *tok, Type *basety,
       if (equal(tok, "="))
         error_tok(tok, "variable-sized object may not be initialized");
 
-      // Variable length arrays (VLAs) are translated to alloca() calls.
-      // For example, `int x[n+2]` is translated to `tmp = n + 2,
-      // x = alloca(tmp)`.
       Obj *var = new_lvar(get_ident(ty->name), ty);
-      Token *tok = ty->name;
-      Node *expr = new_binary(ND_ASSIGN, new_vla_ptr(var, tok),
-                              new_alloca(new_var_node(ty->vla_size, tok)), tok);
-
-      cur = cur->next = new_unary(ND_EXPR_STMT, expr, tok);
+      Token *name_tok = ty->name;
+      Node *expr = new_binary(ND_ASSIGN, new_vla_ptr(var, name_tok),
+                              new_alloca(new_var_node(ty->vla_size, name_tok)),
+                              name_tok);
+      cur = cur->next = new_unary(ND_EXPR_STMT, expr, name_tok);
       continue;
     }
 
@@ -938,7 +949,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety,
 
   Node *node = new_node(ND_BLOCK, tok);
   node->body = head.next;
-  *rest = tok->next;
+  *rest = skip(tok, ";");
   return node;
 }
 
@@ -1614,7 +1625,7 @@ static Node *stmt(Token **rest, Token *tok) {
 
     if (is_typename(tok)) {
       Type *basety = declspec(&tok, tok, NULL);
-      node->init = declaration(&tok, tok, basety, NULL);
+      node->init = declaration(&tok, tok, basety, NULL, false);
     } else {
       node->init = expr_stmt(&tok, tok);
     }
@@ -1746,7 +1757,7 @@ static Node *compound_stmt(Token **rest, Token *tok) {
         continue;
       }
 
-      cur = cur->next = declaration(&tok, tok, basety, &attr);
+      cur = cur->next = declaration(&tok, tok, basety, &attr, false);
     } else {
       cur = cur->next = stmt(&tok, tok);
     }
@@ -3112,8 +3123,8 @@ static void resolve_goto_labels(void) {
 
 // Handle a single variable declarator. Called once per declarator in a
 // comma-separated top-level declaration list.
-static Token *parse_var_decl(Token *tok, Type *basety, VarAttr *attr,
-                             Type *ty) {
+static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
+                              Type *ty) {
   if (attr->is_inline)
     error_tok(tok, "'inline' can only appear on functions");
   char *name_str = get_ident(ty->name);
@@ -3220,30 +3231,6 @@ static bool parse_func_decl(Token **rest, Token *tok, Type *basety,
   return false;
 }
 
-// Top-level declaration list: processes comma-separated declarators,
-// dispatching each based on whether it has function or object type.
-static Token *parse_decl_list(Token *tok, Type *basety, VarAttr *attr) {
-  bool first = true;
-
-  while (!equal(tok, ";")) {
-    if (!first)
-      tok = skip(tok, ",");
-    first = false;
-
-    Type *ty = declarator(&tok, tok, basety);
-    if (!ty->name)
-      error_tok(ty->name_pos, "name omitted");
-
-    if (ty->kind == TY_FUNC) {
-      if (!parse_func_decl(&tok, tok, basety, attr, ty))
-        return tok; // function definition consumed body, no trailing ';'
-    } else {
-      tok = parse_var_decl(tok, basety, attr, ty);
-    }
-  }
-  return skip(tok, ";");
-}
-
 static void declare_builtin_symbols(void) {
   {
   }
@@ -3262,7 +3249,7 @@ Obj *parse(Token *tok) {
       continue;
     }
 
-    tok = parse_decl_list(tok, basety, &attr);
+    declaration(&tok, tok, basety, &attr, true);
   }
 
   return globals;
