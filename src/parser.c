@@ -2708,6 +2708,7 @@ static Node *postfix(Token **rest, Token *tok) {
     Obj *var = new_lvar("", ty);
     Node *lhs = lvar_initializer(rest, tok, var);
     Node *rhs = new_var_node(var, tok);
+    // Keep using comma, it's not seq format
     return new_binary(ND_COMMA, lhs, rhs, start);
   }
 

@@ -329,11 +329,11 @@ static LLVMValueRef gen_scalar_reloc_init(Type *ty, Initializer *init) {
   LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
   assert(target_val);
   assert(ty->base);
-  LLVMTypeRef pointee_ty = ty->base->kind != TY_VOID ? type_convert(ty->base)
-                                                     : LLVMInt8TypeInContext(C);
-  LLVMValueRef indices = LLVMConstInt(
-      LLVMInt64TypeInContext(C), (uint64_t)eval_val / ty->base->size, false);
-  return LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
+  LLVMValueRef byte_offset =
+      LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, true);
+  LLVMValueRef i8_ptr =
+      LLVMConstGEP2(LLVMInt8TypeInContext(C), target_val, &byte_offset, 1);
+  return LLVMConstBitCast(i8_ptr, LLVMPointerTypeInContext(C, 0));
 }
 
 // Build a global initializer for a bitfield-containing struct.
@@ -496,13 +496,11 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
         assert(var_node->var);
         LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
         assert(target_val);
-        LLVMTypeRef pointee_ty = ty->base->kind != TY_VOID
-                                     ? type_convert(ty->base)
-                                     : LLVMInt8TypeInContext(C);
-        LLVMValueRef indices =
-            LLVMConstInt(LLVMInt64TypeInContext(C),
-                         (uint64_t)eval_val / ty->base->size, false);
-        init_val = LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
+        LLVMValueRef byte_offset =
+            LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, true);
+        LLVMValueRef i8_ptr = LLVMConstGEP2(LLVMInt8TypeInContext(C),
+                                            target_val, &byte_offset, 1);
+        init_val = LLVMConstBitCast(i8_ptr, llvm_ty);
       } else {
         // cast pointer to integer initialization with relocation
         assert(var_node->var);
