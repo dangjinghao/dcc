@@ -912,6 +912,7 @@ static LLVMValueRef gen_addr(Node *node) {
         store(node->ty, tmp, val);
         return tmp;
       }
+      // if it's large_agg_type, gen_expr will return ptr directly
       return gen_expr(node);
     }
     break;
@@ -954,7 +955,7 @@ static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v) {
   case TY_STRUCT:
   case TY_UNION: {
     if (is_large_agg_type(ty)) {
-      // in the large agg situation, v is the agg ptr
+      // v is the agg ptr if it is large agg
       llvm_memcpy(ptr, v, ty->size, false);
       return;
     }
@@ -2308,6 +2309,12 @@ static LLVMValueRef declare_agg_function(Obj *var) {
 
   // attach 'byval' label
   LLVMAttributeIndex params_idx = 1;
+
+  if (is_large_agg_type(ty->return_ty)) {
+    // large agg type will occur the first param to pass the ptr
+    params_idx++;
+  }
+
   for (Type *p = ty->params; p; p = p->next) {
     if (is_large_agg_type(p)) {
       unsigned kind_id = LLVMGetEnumAttributeKindForName("byval", 5);
