@@ -19,4 +19,4 @@ $make test \
   test_asynchat test_asyncore test_socketserver \
   test_telnetlib test_imaplib test_nntplib test_xmlrpc_net \
   test_http_cookiejar test_http_cookies test_httpservers \
-  test_docxmlrpc test_robotparser"
+  test_docxmlrpc test_robotparser test_timeout"
