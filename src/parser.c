@@ -2528,7 +2528,27 @@ static Token *attribute_list(Token *tok, Type *ty) {
 
     tok = skip(tok, ")");
   }
+  return tok;
+}
 
+// Consume __attribute__((...)) blocks at points where attributes are not
+// semantically meaningful (e.g. after a function declarator). Unknown
+// attributes are silently skipped instead of triggering an error.
+static Token *skip_attributes(Token *tok) {
+  while (consume(&tok, tok, "__attribute__")) {
+    tok = skip(tok, "(");
+    tok = skip(tok, "(");
+    int depth = 1;
+    while (depth > 0 && !equal(tok, ";") && tok->kind != TK_EOF) {
+      if (equal(tok, "("))
+        depth++;
+      else if (equal(tok, ")"))
+        depth--;
+      tok = tok->next;
+    }
+    if (depth == 0)
+      tok = skip(tok, ")");
+  }
   return tok;
 }
 
@@ -2654,7 +2674,6 @@ static Member *get_struct_member(Type *ty, Token *tok) {
   }
   return NULL;
 }
-
 // Create a node representing a struct member access, such as foo.bar
 // where foo is a struct and bar is a member name.
 //
@@ -3165,6 +3184,17 @@ static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
     var->is_tentative = false;
 
   var->is_live = true;
+  tok = skip_attributes(tok);
+  return tok;
+}
+
+// <asm keyword> "(" <string> ")"
+static Token *parse_asm_label(Token *tok, Obj *fn) {
+  tok = tok->next;
+  tok = skip(tok, "(");
+  fn->asm_label = tok->str;
+  tok = tok->next;
+  tok = skip(tok, ")");
   return tok;
 }
 
@@ -3199,7 +3229,16 @@ static bool parse_func_decl(Token **rest, Token *tok, Type *basety,
     fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
     fn->is_inline = attr->is_inline;
   }
-
+  while (true) {
+    if (equal_kw_asm(tok)) {
+      tok = parse_asm_label(tok, fn);
+      continue;
+    } else if (equal(tok, "__attribute__")) {
+      tok = skip_attributes(tok);
+      continue;
+    }
+    break;
+  }
   if (!equal(tok, "{")) {
     *rest = tok;
     return true;

@@ -128,6 +128,8 @@ static void expand_macro(char *input, char *output) {
                   "-D__volatile__=volatile",
                   "-D__x86_64=1",
                   "-D__x86_64__=1",
+                  "-D__GNUC__=4",
+                  "-D__GNUC_MINOR__=2",
                   "-Dlinux=1",
                   "-Dunix=1",
                   "-D__dcc__=1",

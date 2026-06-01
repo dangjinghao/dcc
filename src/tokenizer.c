@@ -867,3 +867,10 @@ Token *tokenize_file(char *path) {
   join_adjacent_string_literals(tok);
   return tok;
 }
+
+bool equal_kw_asm(Token *tok) {
+  if (equal(tok, "__asm__") || equal(tok, "__asm") || equal(tok, "asm")) {
+    return true;
+  }
+  return false;
+}

@@ -129,6 +129,10 @@ static bool is_struct_bitfield(Type *ty) {
   return false;
 }
 
+static char *get_function_real_name(Obj *fn) {
+  return fn->asm_label ?: fn->name;
+}
+
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
   case TY_VOID:
@@ -2305,7 +2309,8 @@ static LLVMValueRef declare_agg_function(Obj *var) {
   assert(var->is_function);
   Type *ty = var->ty;
 
-  LLVMValueRef func = LLVMAddFunction(M, var->name, type_convert(ty));
+  LLVMValueRef func =
+      LLVMAddFunction(M, get_function_real_name(var), type_convert(ty));
 
   // attach 'byval' label
   LLVMAttributeIndex params_idx = 1;
@@ -2439,7 +2444,7 @@ static void codegen_global_declare(Obj *var) {
       vr = declare_agg_function(var);
     } else {
       LLVMTypeRef ty = type_convert(var->ty);
-      vr = LLVMAddFunction(M, var->name, ty);
+      vr = LLVMAddFunction(M, get_function_real_name(var), ty);
     }
     if (var->is_definition) {
       // create entry block early to avoid some blocks that created in global

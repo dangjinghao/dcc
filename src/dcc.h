@@ -92,6 +92,7 @@ void warn_tok(Token *tok, char *fmt, ...);
 
 Token *tokenize_string_literal(Token *tok, Type *basety);
 Token *tokenize_file(char *path);
+bool equal_kw_asm(Token *tok);
 
 #ifdef unreachable
 #undef unreachable
@@ -391,6 +392,10 @@ struct Obj {
   bool is_inline;
   Obj *params; // positive order
   Node *body;
+  // asm-label, e.g.
+  // extern int fscanf (FILE *__restrict __stream, const char *__restrict
+  // __format, ...) __asm__ ("" "__isoc99_fscanf");
+  char *asm_label;
   // locals is special. the local variables are reversed order but the param
   // variables are positive ordered. Both of them are stored in this variable
   // [local var new] -- [local var old] [param old] -- [param new]
