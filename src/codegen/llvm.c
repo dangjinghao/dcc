@@ -507,16 +507,10 @@ static LLVMValueRef init_global_data(Type *ty, Initializer *init) {
         LLVMValueRef target_val = (LLVMValueRef)var_node->var->codegen_data;
         assert(target_val);
         if (eval_val != 0) {
-          LLVMTypeRef pointee_ty = var_node->var->ty->base
-                                       ? type_convert(var_node->var->ty->base)
-                                       : LLVMInt8TypeInContext(C);
-          LLVMValueRef indices = LLVMConstInt(
-              LLVMInt64TypeInContext(C),
-              (uint64_t)eval_val /
-                  (var_node->var->ty->base ? var_node->var->ty->base->size : 1),
-              false);
-          target_val =
-              LLVMConstInBoundsGEP2(pointee_ty, target_val, &indices, 1);
+          LLVMValueRef byte_offset =
+              LLVMConstInt(LLVMInt64TypeInContext(C), (uint64_t)eval_val, true);
+          target_val = LLVMConstGEP2(LLVMInt8TypeInContext(C), target_val,
+                                     &byte_offset, 1);
         }
         init_val = LLVMConstPtrToInt(target_val, type_convert(ty));
       }
@@ -2507,14 +2501,18 @@ static void codegen_global_init(Obj *prog) {
 
 void codegen(Obj *prog, FILE *out, bool gen_asm) {
   C = LLVMContextCreate();
-  M = LLVMModuleCreateWithNameInContext(opt_cc1_filename ?: "<unknown>", C);
+  char *module_id = opt_cc1_filename ?: "<unknown>";
+  M = LLVMModuleCreateWithNameInContext(module_id, C);
   B = LLVMCreateBuilderInContext(C);
 
   codegen_global_declare(prog);
 
   codegen_global_init(prog);
-  if (!opt_skip_verify)
-    LLVMVerifyModule(M, LLVMAbortProcessAction, NULL);
+  if (!opt_skip_verify) {
+    if (LLVMVerifyModule(M, LLVMPrintMessageAction, NULL)) {
+      error("Failed to verify module %s", module_id);
+    }
+  }
   if (gen_asm) {
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
