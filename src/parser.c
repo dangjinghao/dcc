@@ -3106,41 +3106,57 @@ static void resolve_goto_labels(void) {
 }
 
 static Token *function(Token *tok, Type *basety, VarAttr *attr) {
-  Type *ty = declarator(&tok, tok, basety);
-  if (!ty->name)
-    error_tok(ty->name_pos, "function name omitted");
-
+  bool first = true;
   Obj *fn = NULL;
-  char *name_str = get_ident(ty->name);
-  VarScope *sym = find_var(ty->name);
-  if (sym) {
-    // Redeclaration
-    fn = sym->var;
-    if (!fn || !fn->is_function) {
-      error_tok(tok, "redeclared %s as a different kind of symbol", name_str);
+  while (!equal(tok, ";")) {
+    if (!first)
+      tok = skip(tok, ",");
+    first = false;
+
+    Type *ty = declarator(&tok, tok, basety);
+    if (!ty->name)
+      error_tok(ty->name_pos, "function name omitted");
+
+    char *name_str = get_ident(ty->name);
+    VarScope *sym = find_var(ty->name);
+    if (sym) {
+      // Redeclaration
+      fn = sym->var;
+      if (!fn || !fn->is_function) {
+        error_tok(tok, "redeclared %s as a different kind of symbol", name_str);
+      }
+      if (fn->is_definition && equal(tok, "{"))
+        error_tok(tok, "redefinition of %s", name_str);
+      // C11 6.2.2p5: function declaration without storage-class specifier
+      // is treated "as if declared with extern", so it inherits the prior
+      // declaration's linkage (6.2.2p4). Only error when a non-static
+      // function is redeclared with static.
+      if (!fn->is_static && attr->is_static)
+        error_tok(tok, "static declaration of non-static function");
+      //  reuse previous function
+      fn->is_definition = fn->is_definition || equal(tok, "{");
+      fn->is_inline = fn->is_inline || attr->is_inline;
+      if (equal(tok, "{")) {
+        // if it is a new definition, update the fn.ty for later usage
+        fn->ty = ty;
+      }
+    } else {
+      fn = new_gvar(name_str, ty);
+      fn->is_function = true;
+      fn->is_definition = equal(tok, "{");
+      fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
+      fn->is_inline = attr->is_inline;
     }
-    if (fn->is_definition && equal(tok, "{"))
-      error_tok(tok, "redefinition of %s", name_str);
-    // C11 6.2.2p5: function declaration without storage-class specifier
-    // is treated "as if declared with extern", so it inherits the prior
-    // declaration's linkage (6.2.2p4). Only error when a non-static
-    // function is redeclared with static.
-    if (!fn->is_static && attr->is_static)
-      error_tok(tok, "static declaration of non-static function");
-    //  reuse previous function
-    fn->is_definition = fn->is_definition || equal(tok, "{");
-    fn->is_inline = fn->is_inline || attr->is_inline;
-  } else {
-    fn = new_gvar(name_str, ty);
-    fn->is_function = true;
-    fn->is_definition = equal(tok, "{");
-    fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
-    fn->is_inline = attr->is_inline;
+    if (equal(tok, "{")) {
+      break;
+    }
   }
 
   if (consume(&tok, tok, ";"))
     return tok;
+
   assert(fn->is_definition);
+  Type *ty = fn->ty;
   // function is live if it is definition
   fn->is_live = fn->is_definition;
   current_fn = fn;
