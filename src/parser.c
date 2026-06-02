@@ -2556,7 +2556,7 @@ static Token *attribute_list(Token *tok, Type *ty) {
         tok = skip(tok, ",");
       first = false;
 
-      if (consume(&tok, tok, "packed")) {
+      if (consume(&tok, tok, "packed") || consume(&tok, tok, "__packed__")) {
         ty->is_packed = true;
         continue;
       }

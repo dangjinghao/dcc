@@ -22,6 +22,7 @@ static HashMap func_labels_as_values;
 
 static LLVMValueRef cmp_nz(LLVMValueRef v);
 static LLVMValueRef cmp_ez(LLVMValueRef v);
+static LLVMTypeRef type_convert(Type *ty);
 static LLVMValueRef load(Type *ty, LLVMValueRef ptr);
 static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v);
 
@@ -1222,14 +1223,36 @@ static LLVMValueRef gen_expr_funcall(Node *node) {
     args[arg_idx++] = gen_expr(arg);
   }
 
-  bool ret_void = false;
-  if (F_ty->return_ty->kind == TY_VOID || is_large_agg_type(F_ty->return_ty)) {
-    ret_void = true;
-  }
+  bool ret_void =
+      F_ty->return_ty->kind == TY_VOID || is_large_agg_type(F_ty->return_ty);
 
   LLVMValueRef r = LLVMBuildCall2(B, type_convert(F_ty), F, args, arg_count,
                                   ret_void ? "" : "funcall");
   free(args);
+  {
+    unsigned byval_kind =
+        LLVMGetEnumAttributeKindForName("byval", strlen("byval"));
+    size_t attr_param_idx = 1;
+    if (is_large_agg_type(F_ty->return_ty))
+      attr_param_idx++;
+    for (Type *p = F_ty->params; p; p = p->next) {
+      if (is_large_agg_type(p)) {
+        LLVMTypeRef actual_type = type_convert(p);
+        LLVMAttributeRef byval_attr =
+            LLVMCreateTypeAttribute(C, byval_kind, actual_type);
+        LLVMAddCallSiteAttribute(r, attr_param_idx, byval_attr);
+      }
+      attr_param_idx++;
+    }
+    if (is_large_agg_type(F_ty->return_ty)) {
+      unsigned sret_kind =
+          LLVMGetEnumAttributeKindForName("sret", strlen("sret"));
+      LLVMTypeRef ret_type = type_convert(F_ty->return_ty);
+      LLVMAttributeRef sret_attr =
+          LLVMCreateTypeAttribute(C, sret_kind, ret_type);
+      LLVMAddCallSiteAttribute(r, 1, sret_attr);
+    }
+  }
 
   if (is_agg_type(node->ty)) {
     LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
@@ -2312,8 +2335,12 @@ static LLVMValueRef declare_agg_function(Obj *var) {
   LLVMAttributeIndex params_idx = 1;
 
   if (is_large_agg_type(ty->return_ty)) {
-    // large agg type will occur the first param to pass the ptr
-    params_idx++;
+    unsigned sret_kind =
+        LLVMGetEnumAttributeKindForName("sret", strlen("sret"));
+    LLVMTypeRef ret_type = type_convert(ty->return_ty);
+    LLVMAttributeRef sret_attr =
+        LLVMCreateTypeAttribute(C, sret_kind, ret_type);
+    LLVMAddAttributeAtIndex(func, params_idx++, sret_attr);
   }
 
   for (Type *p = ty->params; p; p = p->next) {
