@@ -1285,17 +1285,13 @@ static LLVMValueRef gen_expr_cond(Node *node) {
   LLVMBuildCondBr(B, cond, bb_then, bb_else);
   LLVMPositionBuilderAtEnd(B, bb_then);
   LLVMValueRef then_v = gen_expr(node->then);
-  if (!then_v) {
-    error_tok(node->tok, "there isn't any value returned from true path");
-  }
+
   // update then block which maybe updated by sub-expression
   bb_then = LLVMGetInsertBlock(B);
   llvm_build_terminator_br(bb_merge);
   LLVMPositionBuilderAtEnd(B, bb_else);
   LLVMValueRef else_v = gen_expr(node->_else);
-  if (!else_v) {
-    error_tok(node->tok, "there isn't any value returned from false path");
-  }
+
   // update else block which maybe updated by sub-expression
   bb_else = LLVMGetInsertBlock(B);
   llvm_build_terminator_br(bb_merge);
@@ -1318,10 +1314,13 @@ static LLVMValueRef gen_expr_cond(Node *node) {
   } else {
     phi_ty = type_convert(node->ty);
   }
-  LLVMValueRef phi = LLVMBuildPhi(B, phi_ty, "cond_merge_phi");
-  LLVMAddIncoming(phi, (LLVMValueRef[]){then_v, else_v},
-                  (LLVMBasicBlockRef[]){bb_then, bb_else}, 2);
-  return phi;
+  if (node->ty->kind != TY_VOID) {
+    LLVMValueRef phi = LLVMBuildPhi(B, phi_ty, "cond_merge_phi");
+    LLVMAddIncoming(phi, (LLVMValueRef[]){then_v, else_v},
+                    (LLVMBasicBlockRef[]){bb_then, bb_else}, 2);
+    return phi;
+  }
+  return NULL;
 }
 
 static LLVMValueRef gen_expr_funcall(Node *node) {
