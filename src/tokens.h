@@ -1,0 +1,58 @@
+
+#define _TK_KW_START TK_CHAR
+
+XMACRO(TK_CHAR, "char")
+XMACRO(TK_INT, "int")
+XMACRO(TK_FLOAT, "float")
+XMACRO(TK_DOUBLE, "double")
+XMACRO(TK_BOOL, "_Bool")
+// XMACRO(TK_COMPLEX, "_Complex")
+XMACRO(TK_SHORT, "short")
+XMACRO(TK_LONG, "long")
+XMACRO(TK_SIGNED, "signed")
+XMACRO(TK_UNSIGNED, "unsigned")
+XMACRO(TK_VOID, "void")
+
+XMACRO(TK_STRUCT, "struct")
+XMACRO(TK_UNION, "union")
+XMACRO(TK_ENUM, "enum")
+XMACRO(TK_TYPEDEF, "typedef")
+
+XMACRO(TK_EXTERN, "extern")
+XMACRO(TK_STATIC, "static")
+XMACRO(TK_REGISTER, "register")
+XMACRO(TK_AUTO, "auto")
+
+XMACRO(TK_CONST, "const")
+XMACRO(TK_VOLATILE, "volatile")
+XMACRO(TK_RESTRICT, "restrict")
+XMACRO(TK_INLINE, "inline")
+
+XMACRO(TK_SIZEOF, "sizeof")
+XMACRO(TK_TYPEOF, "typeof")
+
+XMACRO(TK__ATOMIC, "_Atomic")
+XMACRO(TK__ALIGNOF, "_Alignof")
+XMACRO(TK_ALIGNAS, "_Alignas")
+XMACRO(TK_GENERIC, "_Generic")
+XMACRO(TK__NORETURN, "_Noreturn")
+// XMACRO(TK_STATIC_ASSERT, "_Static_assert")
+XMACRO(TK_THREAD_LOCAL, "_Thread_local")
+
+XMACRO(TK_IF, "if")
+XMACRO(TK_ELSE, "else")
+XMACRO(TK_SWITCH, "switch")
+XMACRO(TK_CASE, "case")
+XMACRO(TK_DEFAULT, "default")
+XMACRO(TK_FOR, "for")
+XMACRO(TK_WHILE, "while")
+XMACRO(TK_DO, "do")
+XMACRO(TK_BREAK, "break")
+XMACRO(TK_CONTINUE, "continue")
+XMACRO(TK_GOTO, "goto")
+XMACRO(TK_RETURN, "return")
+
+XMACRO(TK_ASM, "asm")
+XMACRO(TK___ATTRIBUTE__, "__attribute__")
+XMACRO(TK___EXTERNSION__, "__extension__")
+// XMACRO(TK___LABEL__, "__label__")

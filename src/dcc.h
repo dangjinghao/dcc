@@ -58,11 +58,16 @@ typedef struct {
 } DFile;
 
 typedef enum {
+  TK_EOF,   // End-of-file markers
   TK_IDENT, // Identifiers
   TK_PUNCT, // Punctuators
   TK_STR,   // String literals
   TK_NUM,   // Numeric literals
-  TK_EOF,   // End-of-file markers
+
+#define XMACRO(kw, str) kw,
+#include "tokens.h"
+#undef XMACRO
+
 } TokenKind;
 
 struct Token {
@@ -82,7 +87,9 @@ struct Token {
 
 bool equal(Token *tok, char *op);
 bool consume(Token **rest, Token *tok, char *str);
+bool consume2(Token **rest, Token *tok, TokenKind tk);
 Token *skip(Token *tok, char *op);
+Token *skip2(Token *tok, TokenKind tk);
 
 noreturn void error(char *fmt, ...);
 noreturn void error_tok(Token *tok, char *fmt, ...);
@@ -91,7 +98,6 @@ void warn_tok(Token *tok, char *fmt, ...);
 
 Token *tokenize_string_literal(Token *tok, Type *basety);
 Token *tokenize_file(char *path);
-bool equal_kw_asm(Token *tok);
 
 #ifdef unreachable
 #undef unreachable

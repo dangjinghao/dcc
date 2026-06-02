@@ -579,6 +579,56 @@ void error(char *fmt, ...) {
   exit(1);
 }
 
+static struct {
+  TokenKind t;
+  char *s;
+} token_map[] = {
+#define XMACRO(a, b) {a, b},
+#include "tokens.h"
+#undef XMACRO
+    {TK__ALIGNOF, "__alignof__"},
+    {TK__ALIGNOF, "__alignof"},
+    {TK_CONST, "__const"},
+    {TK_CONST, "__const__"},
+    {TK_SIGNED, "__signed__"},
+    {TK_SIGNED, "__signed"},
+    {TK_TYPEOF, "__typeof__"},
+    {TK_TYPEOF, "__typeof"},
+    {TK_INLINE, "__inline__"},
+    {TK_INLINE, "__inline"},
+    {TK_VOLATILE, "__volatile__"},
+    {TK_VOLATILE, "__volatile"},
+    {TK__NORETURN, "__noreturn__"},
+    {TK_ASM, "__asm"},
+    {TK_ASM, "__asm__"},
+    {TK_RESTRICT, "__restrict"},
+    {TK_RESTRICT, "__restrict__"},
+    {TK_THREAD_LOCAL, "__thread"},
+    {TK___ATTRIBUTE__, "__attribute"},
+    {TK_EOF, "<EOF>"},
+    {TK_IDENT, "<IDENT>"},
+    {TK_PUNCT, "<PUNCT>"},
+    {TK_STR, "<STR>"},
+    {TK_NUM, "<NUM>"},
+};
+
+static char *token_to_str(TokenKind t) {
+  for (int i = 0; i < sizeof(token_map) / sizeof(token_map[0]); i++) {
+    if (t == token_map[i].t)
+      return token_map[i].s;
+  }
+  return NULL;
+}
+
+static TokenKind str_to_kw(char *s, size_t len) {
+  for (int i = 0; i < sizeof(token_map) / sizeof(token_map[0]); i++) {
+    if (strlen(token_map[i].s) == len && !strncmp(token_map[i].s, s, len)) {
+      return token_map[i].t;
+    }
+  }
+  return TK_EOF;
+}
+
 // Ensure that the current token is `op`
 Token *skip(Token *tok, char *op) {
   if (!equal(tok, op))
@@ -586,8 +636,24 @@ Token *skip(Token *tok, char *op) {
   return tok->next;
 }
 
+Token *skip2(Token *tok, TokenKind tk) {
+  if (tok->kind != tk) {
+    error_tok(tok, "expected '%s'", token_to_str(tk));
+  }
+  return tok->next;
+}
+
 bool consume(Token **rest, Token *tok, char *str) {
   if (equal(tok, str)) {
+    *rest = tok->next;
+    return true;
+  }
+  *rest = tok;
+  return false;
+}
+
+bool consume2(Token **rest, Token *tok, TokenKind tk) {
+  if (tk == tok->kind) {
     *rest = tok->next;
     return true;
   }
@@ -603,6 +669,14 @@ Token *tokenize_string_literal(Token *tok, Type *basety) {
     t = read_utf32_string_literal(tok->loc, tok->loc, basety);
   t->next = tok->next;
   return t;
+}
+
+static void convert_ident_to_keyword(Token *tok) {
+  assert(tok->kind == TK_IDENT);
+  TokenKind k = str_to_kw(tok->loc, tok->len);
+  if (k != TK_EOF) {
+    tok->kind = k;
+  }
 }
 
 static Token *tokenize(DFile *file) {
@@ -728,6 +802,7 @@ static Token *tokenize(DFile *file) {
     int ident_len = read_ident(p);
     if (ident_len) {
       cur = cur->next = new_token(TK_IDENT, p, p + ident_len);
+      convert_ident_to_keyword(cur);
       p += cur->len;
       continue;
     }
@@ -866,11 +941,4 @@ Token *tokenize_file(char *path) {
   Token *tok = tokenize(file);
   join_adjacent_string_literals(tok);
   return tok;
-}
-
-bool equal_kw_asm(Token *tok) {
-  if (equal(tok, "__asm__") || equal(tok, "__asm") || equal(tok, "asm")) {
-    return true;
-  }
-  return false;
 }
