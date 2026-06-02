@@ -1766,8 +1766,6 @@ static LLVMValueRef gen_expr_stmt_expr(Node *node) {
   LLVMValueRef r = NULL;
   for (Node *n = node->body; n; n = n->next)
     r = gen_stmt(n);
-  if (!r)
-    error_tok(node->tok, "This statement expression returns a invalid type");
   return r;
 }
 
