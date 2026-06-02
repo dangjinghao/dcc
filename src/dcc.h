@@ -58,12 +58,11 @@ typedef struct {
 } DFile;
 
 typedef enum {
-  TK_IDENT,   // Identifiers
-  TK_PUNCT,   // Punctuators
-  TK_KEYWORD, // Keywords
-  TK_STR,     // String literals
-  TK_NUM,     // Numeric literals
-  TK_EOF,     // End-of-file markers
+  TK_IDENT, // Identifiers
+  TK_PUNCT, // Punctuators
+  TK_STR,   // String literals
+  TK_NUM,   // Numeric literals
+  TK_EOF,   // End-of-file markers
 } TokenKind;
 
 struct Token {

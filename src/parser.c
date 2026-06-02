@@ -3188,10 +3188,13 @@ static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
   return tok;
 }
 
-// <asm keyword> "(" <string> ")"
+// "asm" "(" <string> ")"
 static Token *parse_asm_label(Token *tok, Obj *fn) {
-  tok = tok->next;
+  tok = skip(tok, "asm");
   tok = skip(tok, "(");
+  if (tok->kind != TK_STR) {
+    error_tok(tok, "expect string as the asm-label");
+  }
   fn->asm_label = tok->str;
   tok = tok->next;
   tok = skip(tok, ")");
@@ -3230,7 +3233,7 @@ static bool parse_func_decl(Token **rest, Token *tok, Type *basety,
     fn->is_inline = attr->is_inline;
   }
   while (true) {
-    if (equal_kw_asm(tok)) {
+    if (equal(tok, "asm")) {
       tok = parse_asm_label(tok, fn);
       continue;
     } else if (equal(tok, "__attribute__")) {
