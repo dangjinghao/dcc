@@ -45,8 +45,6 @@
 #define __x86_64 1
 #define __x86_64__ 1
 #define __extension__
-#define __GNUC__ 4
-#define __GNUC_MINOR__ 2
 #define __PRETTY_FUNCTION__ __FUNCTION__
 #define linux 1
 #define unix 1
