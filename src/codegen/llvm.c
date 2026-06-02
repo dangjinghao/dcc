@@ -129,9 +129,7 @@ static bool is_struct_bitfield(Type *ty) {
   return false;
 }
 
-static char *get_function_real_name(Obj *fn) {
-  return fn->asm_label ?: fn->name;
-}
+static char *get_var_real_name(Obj *var) { return var->asm_label ?: var->name; }
 
 static LLVMTypeRef type_convert(Type *ty) {
   switch (ty->kind) {
@@ -2308,7 +2306,7 @@ static LLVMValueRef declare_agg_function(Obj *var) {
   Type *ty = var->ty;
 
   LLVMValueRef func =
-      LLVMAddFunction(M, get_function_real_name(var), type_convert(ty));
+      LLVMAddFunction(M, get_var_real_name(var), type_convert(ty));
 
   // attach 'byval' label
   LLVMAttributeIndex params_idx = 1;
@@ -2442,7 +2440,7 @@ static void codegen_global_declare(Obj *var) {
       vr = declare_agg_function(var);
     } else {
       LLVMTypeRef ty = type_convert(var->ty);
-      vr = LLVMAddFunction(M, get_function_real_name(var), ty);
+      vr = LLVMAddFunction(M, get_var_real_name(var), ty);
     }
     if (var->is_definition) {
       // create entry block early to avoid some blocks that created in global
@@ -2456,7 +2454,7 @@ static void codegen_global_declare(Obj *var) {
     }
   } else {
     LLVMTypeRef ty = type_convert(var->ty);
-    vr = LLVMAddGlobal(M, ty, var->name);
+    vr = LLVMAddGlobal(M, ty, get_var_real_name(var));
   }
   llvm_set_value_attr(var, vr);
   var->codegen_data = (intptr_t)vr;
@@ -2490,7 +2488,7 @@ static void codegen_global_init(Obj *prog) {
           LLVMDeleteGlobal(old_v);
           // Re-set the name after deleting old_v so the symbol
           // has the correct name (not e.g. "v.1").
-          LLVMSetValueName2(new_v, var->name, strlen(var->name));
+          LLVMSetValueName(new_v, get_var_real_name(var));
           // update reference in our system
           var->codegen_data = (intptr_t)new_v;
         } else {
