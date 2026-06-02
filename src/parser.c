@@ -119,6 +119,8 @@ static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
                               Type *ty);
 static bool parse_func_decl(Token **rest, Token *tok, Type *basety,
                             VarAttr *attr, Type *ty);
+static Token *attribute_list(Token *tok, Type *ty);
+static Token *parse_asm_label(Token *tok, Obj *fn);
 
 static int align_down(int n, int align) {
   return align_to(n - align + 1, align);
@@ -427,6 +429,12 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
   bool is_atomic = false;
 
   while (is_typename(tok)) {
+
+    if (tok->kind == TK___ATTRIBUTE__) {
+      tok = attribute_list(tok, copy_type(ty));
+      continue;
+    }
+
     // Handle storage class specifiers.
     if (tok->kind == TK_TYPEDEF || tok->kind == TK_STATIC ||
         tok->kind == TK_EXTERN || tok->kind == TK_INLINE ||
@@ -609,7 +617,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
 }
 
 // func-params = ("void" | param ("," param)* ("," "...")?)? ")"
-// param       = declspec declarator
+// param       = declspec declarator attribute
 static Type *func_params(Token **rest, Token *tok, Type *ty) {
   if (tok->kind == TK_VOID && equal(tok->next, ")")) {
     *rest = tok->next->next;
@@ -633,7 +641,10 @@ static Type *func_params(Token **rest, Token *tok, Type *ty) {
 
     Type *ty2 = declspec(&tok, tok, NULL);
     ty2 = declarator(&tok, tok, ty2);
-
+    if (tok->kind == TK___ATTRIBUTE__) {
+      tok = attribute_list(tok, ty2);
+      continue;
+    }
     Token *name = ty2->name;
     ty2 = type_decay(ty2);
     ty2->name = name;
@@ -856,6 +867,21 @@ static Node *new_alloca(Node *sz) {
   return node;
 }
 
+// (asm-labels | attribute)*
+static Token *after_declaration(Token *tok, Obj *var) {
+  while (true) {
+    if (consume2(&tok, tok, TK_ASM)) {
+      tok = parse_asm_label(tok, var);
+      continue;
+    } else if (tok->kind == TK___ATTRIBUTE__) {
+      tok = attribute_list(tok, var->ty);
+      continue;
+    }
+    break;
+  }
+  return tok;
+}
+
 // declaration = declspec (declarator ("=" expr)? ("," declarator ("="
 // declaration = declspec declarator ("," declarator)* ";"
 // When is_global is true, object declarators produce global variables.
@@ -904,6 +930,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr,
       // it will modify the name to anonymous name, that's differet from
       // parse_gvar_decl so we should not put this logic into parse_gvar_decl
       Obj *var = new_anon_gvar(ty);
+      tok = after_declaration(tok, var);
       push_scope(get_ident(ty->name))->var = var;
       if (equal(tok, "="))
         gvar_initializer(&tok, tok->next, var);
@@ -922,6 +949,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr,
         error_tok(tok, "variable-sized object may not be initialized");
 
       Obj *var = new_lvar(get_ident(ty->name), ty);
+      tok = after_declaration(tok, var);
       Token *name_tok = ty->name;
       Node *expr = new_binary(ND_ASSIGN, new_vla_ptr(var, name_tok),
                               new_alloca(new_var_node(ty->vla_size, name_tok)),
@@ -931,6 +959,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr,
     }
 
     Obj *var = new_lvar(get_ident(ty->name), ty);
+    tok = after_declaration(tok, var);
     if (attr && attr->align)
       var->align = attr->align;
 
@@ -1500,6 +1529,7 @@ static bool is_typename(Token *tok) {
   case TK_INLINE:
   case TK_THREAD_LOCAL:
   case TK__ATOMIC:
+  case TK___ATTRIBUTE__:
     return true;
   }
   return find_typedef(tok);
@@ -2485,6 +2515,9 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
 
       Member *mem = calloc(1, sizeof(Member));
       mem->ty = declarator(&tok, tok, basety);
+      if (tok->kind == TK___ATTRIBUTE__) {
+        tok = attribute_list(tok, ty);
+      }
       mem->name = mem->ty->name;
       mem->idx = idx++;
       mem->align = attr.align ? attr.align : mem->ty->align;
@@ -2512,7 +2545,7 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
 
 // attribute = ("__attribute__" "(" "(" "packed" ")" ")")*
 static Token *attribute_list(Token *tok, Type *ty) {
-  while (consume(&tok, tok, "__attribute__")) {
+  while (consume2(&tok, tok, TK___ATTRIBUTE__)) {
     tok = skip(tok, "(");
     tok = skip(tok, "(");
 
@@ -2528,9 +2561,85 @@ static Token *attribute_list(Token *tok, Type *ty) {
         continue;
       }
 
-      if (consume(&tok, tok, "aligned")) {
+      if (consume(&tok, tok, "aligned") || consume(&tok, tok, "__aligned__")) {
+        if (consume(&tok, tok, "(")) {
+          ty->align = const_expr(&tok, tok);
+          tok = skip(tok, ")");
+        }
+        continue;
+      }
+
+      if (consume(&tok, tok, "__pure__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__nothrow__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__malloc__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__warn_unused_result__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__noreturn__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__const__")) {
+        continue;
+      }
+      if (consume(&tok, tok, "__leaf__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__weak__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "noinline")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "deprecated") ||
+          consume(&tok, tok, "__deprecated__")) {
+        continue;
+      }
+
+      if (consume(&tok, tok, "__format__") || consume(&tok, tok, "format")) {
         tok = skip(tok, "(");
-        ty->align = const_expr(&tok, tok);
+        tok = tok->next; // __printf__ or something
+        tok = skip(tok, ",");
+        const_expr(&tok, tok);
+        tok = skip(tok, ",");
+        const_expr(&tok, tok);
+        tok = skip(tok, ")");
+        continue;
+      }
+
+      if (consume(&tok, tok, "visibility")) {
+        tok = skip(tok, "(");
+        tok = tok->next;
+        tok = skip(tok, ")");
+        continue;
+      }
+
+      if (consume(&tok, tok, "__nonnull__")) {
+        tok = skip(tok, "(");
+        const_expr(&tok, tok);
+        while (consume(&tok, tok, ",")) {
+          const_expr(&tok, tok);
+        }
+        tok = skip(tok, ")");
+        continue;
+      }
+
+      if (consume(&tok, tok, "__mode__")) {
+        tok = skip(tok, "(");
+        tok = tok->next;
         tok = skip(tok, ")");
         continue;
       }
@@ -2543,31 +2652,12 @@ static Token *attribute_list(Token *tok, Type *ty) {
   return tok;
 }
 
-// Consume __attribute__((...)) blocks at points where attributes are not
-// semantically meaningful (e.g. after a function declarator). Unknown
-// attributes are silently skipped instead of triggering an error.
-static Token *skip_attributes(Token *tok) {
-  while (consume(&tok, tok, "__attribute__")) {
-    tok = skip(tok, "(");
-    tok = skip(tok, "(");
-    int depth = 1;
-    while (depth > 0 && !equal(tok, ";") && tok->kind != TK_EOF) {
-      if (equal(tok, "("))
-        depth++;
-      else if (equal(tok, ")"))
-        depth--;
-      tok = tok->next;
-    }
-    if (depth == 0)
-      tok = skip(tok, ")");
-  }
-  return tok;
-}
-
 // struct-union-decl = attribute? ident? ("{" struct-members)?
 static Type *struct_union_decl(Token **rest, Token *tok) {
   Type *ty = struct_type();
-  tok = attribute_list(tok, ty);
+  if (tok->kind == TK___ATTRIBUTE__) {
+    tok = attribute_list(tok, ty);
+  }
 
   // Read a tag.
   Token *tag = NULL;
@@ -2592,7 +2682,11 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
 
   // Construct a struct object.
   struct_members(&tok, tok, ty);
-  *rest = attribute_list(tok, ty);
+  if (tok->kind == TK___ATTRIBUTE__) {
+    tok = attribute_list(tok, ty);
+  }
+
+  *rest = tok;
 
   if (tag) {
     // If this is a redefinition, overwrite a previous type.
@@ -3117,6 +3211,9 @@ static Token *parse_typedef(Token *tok, Type *basety) {
     Type *ty = declarator(&tok, tok, basety);
     if (!ty->name)
       error_tok(ty->name_pos, "typedef name omitted");
+    if (tok->kind == TK___ATTRIBUTE__) {
+      tok = attribute_list(tok, ty);
+    }
     push_scope(get_ident(ty->name))->type_def = ty;
   }
   return tok;
@@ -3184,6 +3281,8 @@ static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
       var->align = attr->align;
   }
 
+  tok = after_declaration(tok, var);
+
   if (equal(tok, "=")) {
     if (attr->is_extern)
       error_tok(tok, "%s initialized and declared 'extern'", name_str);
@@ -3196,11 +3295,10 @@ static Token *parse_gvar_decl(Token *tok, Type *basety, VarAttr *attr,
     var->is_tentative = false;
 
   var->is_live = true;
-  tok = skip_attributes(tok);
   return tok;
 }
 
-// "asm" "(" <string> ")"
+// asm-label = "asm" "(" <string> ")"
 static Token *parse_asm_label(Token *tok, Obj *fn) {
   tok = skip(tok, "(");
   if (tok->kind != TK_STR) {
@@ -3243,16 +3341,8 @@ static bool parse_func_decl(Token **rest, Token *tok, Type *basety,
     fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
     fn->is_inline = attr->is_inline;
   }
-  while (true) {
-    if (consume2(&tok, tok, TK_ASM)) {
-      tok = parse_asm_label(tok, fn);
-      continue;
-    } else if (tok->kind == TK___ATTRIBUTE__) {
-      tok = skip_attributes(tok);
-      continue;
-    }
-    break;
-  }
+  tok = after_declaration(tok, fn);
+
   if (!equal(tok, "{")) {
     *rest = tok;
     return true;
