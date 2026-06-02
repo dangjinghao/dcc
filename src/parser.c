@@ -1386,6 +1386,17 @@ static Type *copy_struct_type(Type *ty) {
 static Initializer *initializer(Token **rest, Token *tok, Type *ty,
                                 Type **new_ty) {
   Initializer *init = new_initializer(ty, true);
+
+  if (ty->kind == TY_ARRAY && ty->base->kind == TY_CHAR && equal(tok, "{") &&
+      tok->next->kind == TK_STR) {
+    // char v[] = { "str" }; -> char v[] = "str";
+    string_initializer(&tok, tok->next, init);
+    consume(&tok, tok, ",");
+    *rest = skip(tok, "}");
+    *new_ty = init->ty;
+    return init;
+  }
+
   initializer2(rest, tok, init);
 
   if (is_agg_type(ty) && ty->is_flexible) {
