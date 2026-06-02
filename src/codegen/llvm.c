@@ -130,6 +130,125 @@ static bool is_struct_bitfield(Type *ty) {
   return false;
 }
 
+enum { CLASS_INT = 0, CLASS_SSE = 1 };
+
+static int eightbyte_class(Type *ty, int start_offset) {
+  bool has_int = false, has_sse = false;
+  for (Member *m = ty->members; m; m = m->next) {
+    int begin = m->offset < start_offset ? start_offset : m->offset;
+    int end = m->offset + m->ty->size < start_offset + 8
+                  ? m->offset + m->ty->size
+                  : start_offset + 8;
+    if (begin >= end)
+      continue;
+    Type *mt = m->ty;
+    while (mt->kind == TY_ARRAY)
+      mt = mt->base;
+    if (is_flonum(mt))
+      has_sse = true;
+    else if (is_agg_type(mt)) {
+      int sub = eightbyte_class(mt, start_offset - m->offset);
+      if (sub == CLASS_SSE)
+        has_sse = true;
+      else
+        has_int = true; // CLASS_INT or mixed: INTEGER dominates per ABI
+    } else
+      has_int = true;
+  }
+  if (has_int)
+    return CLASS_INT; // INTEGER dominates SSE per ABI rule (e)
+  if (has_sse)
+    return CLASS_SSE;
+  return CLASS_INT;
+}
+
+static int eightbyte_data_size(Type *ty, int start_offset) {
+  int bytes = 0;
+  for (Member *m = ty->members; m; m = m->next) {
+    int begin = m->offset < start_offset ? start_offset : m->offset;
+    int end = m->offset + m->ty->size < start_offset + 8
+                  ? m->offset + m->ty->size
+                  : start_offset + 8;
+    if (begin < end)
+      bytes += end - begin;
+  }
+  return bytes;
+}
+
+static LLVMTypeRef sse_eightbyte_type(Type *ty, int start_offset) {
+  int sse_bytes = 0;
+  for (Member *m = ty->members; m; m = m->next) {
+    Type *mt = m->ty;
+    while (mt->kind == TY_ARRAY)
+      mt = mt->base;
+    int offset = m->offset, size = m->ty->size;
+    int begin = offset < start_offset ? start_offset : offset;
+    int end =
+        offset + size < start_offset + 8 ? offset + size : start_offset + 8;
+    if (begin < end) {
+      int overlap = end - begin;
+      if (mt->kind == TY_FLOAT)
+        sse_bytes += overlap;
+      else if (mt->kind == TY_DOUBLE || mt->kind == TY_LDOUBLE)
+        return LLVMDoubleTypeInContext(C);
+      else if (is_agg_type(mt) && !is_large_agg_type(mt)) {
+        LLVMTypeRef sub = sse_eightbyte_type(mt, start_offset - offset);
+        if (sub)
+          return sub;
+      }
+    }
+  }
+  if (sse_bytes == 8)
+    return LLVMVectorType(LLVMFloatTypeInContext(C), 2);
+  if (sse_bytes > 0)
+    return LLVMFloatTypeInContext(C);
+  return LLVMDoubleTypeInContext(C); // pure double eightbyte
+}
+
+static LLVMTypeRef abi_coerce_arg_type(Type *ty) {
+  if (!is_agg_type(ty) || is_large_agg_type(ty) || ty->size > 16)
+    return type_convert(ty);
+
+  int cls0 = eightbyte_class(ty, 0);
+  LLVMTypeRef t0;
+  if (cls0 == CLASS_SSE)
+    t0 = sse_eightbyte_type(ty, 0);
+  else
+    t0 = LLVMIntTypeInContext(C, eightbyte_data_size(ty, 0) * 8);
+
+  if (ty->size <= 8)
+    return t0;
+
+  int cls1 = eightbyte_class(ty, 8);
+  LLVMTypeRef t1;
+  if (cls1 == CLASS_SSE)
+    t1 = sse_eightbyte_type(ty, 8);
+  else
+    t1 = LLVMIntTypeInContext(C, eightbyte_data_size(ty, 8) * 8);
+
+  LLVMTypeRef fields[2] = {t0, t1};
+  return LLVMStructTypeInContext(C, fields, 2, false);
+}
+
+static LLVMValueRef coerce_value(LLVMValueRef v, Type *ty,
+                                 LLVMTypeRef to_type) {
+
+  LLVMValueRef tmp = LLVMBuildAlloca(B, type_convert(ty), "coerce_tmp");
+  store(ty, tmp, v);
+  return LLVMBuildLoad2(B, to_type, tmp, "");
+}
+
+static LLVMValueRef uncoerce_value(LLVMValueRef v, Type *ty,
+                                   LLVMTypeRef from_type) {
+  LLVMValueRef tmp = LLVMBuildAlloca(B, from_type, "uncoerce_tmp");
+  LLVMBuildStore(B, v, tmp);
+  return LLVMBuildLoad2(B, type_convert(ty), tmp, "");
+}
+
+static bool needs_abi_coercion(Type *ty) {
+  return is_agg_type(ty) && !is_large_agg_type(ty);
+}
+
 static char *get_var_real_name(Obj *var) { return var->asm_label ?: var->name; }
 
 static LLVMTypeRef type_convert(Type *ty) {
@@ -197,23 +316,27 @@ static LLVMTypeRef type_convert(Type *ty) {
       }
       for (Type *p = ty->params; p; p = p->next) {
         if (is_agg_type(p)) {
-          // large struct type -> struct pointer type
           if (is_large_agg_type(p)) {
             params[params_idx++] = type_convert(pointer_to(p));
             continue;
           }
-          // else: for small struct type, treat them as normal type, LLVM
-          // basically support this
+          if (needs_abi_coercion(p)) {
+            params[params_idx++] = abi_coerce_arg_type(p);
+            continue;
+          }
         }
         params[params_idx++] = type_convert(p);
       }
       assert(params_idx == param_count);
     }
 
-    LLVMTypeRef ret_ty = is_large_agg_type(ty->return_ty)
-                             ? LLVMVoidTypeInContext(C)
-                             : type_convert(ty->return_ty);
-
+    LLVMTypeRef ret_ty;
+    if (is_large_agg_type(ty->return_ty))
+      ret_ty = LLVMVoidTypeInContext(C);
+    else if (needs_abi_coercion(ty->return_ty))
+      ret_ty = abi_coerce_arg_type(ty->return_ty);
+    else
+      ret_ty = type_convert(ty->return_ty);
     LLVMTypeRef r =
         LLVMFunctionType(ret_ty, params, param_count, ty->is_variadic);
     free(params);
@@ -1220,7 +1343,10 @@ static LLVMValueRef gen_expr_funcall(Node *node) {
   }
 
   for (Node *arg = node->args; arg; arg = arg->next) {
-    args[arg_idx++] = gen_expr(arg);
+    LLVMValueRef v = gen_expr(arg);
+    if (needs_abi_coercion(arg->ty))
+      v = coerce_value(v, arg->ty, abi_coerce_arg_type(arg->ty));
+    args[arg_idx++] = v;
   }
 
   bool ret_void =
@@ -1258,6 +1384,8 @@ static LLVMValueRef gen_expr_funcall(Node *node) {
     LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
     assert(ptr);
     if (!is_large_agg_type(node->ty)) {
+      if (needs_abi_coercion(node->ty))
+        r = uncoerce_value(r, node->ty, abi_coerce_arg_type(node->ty));
       store(node->ty, ptr, r);
       return r;
     }
@@ -2074,13 +2202,12 @@ static LLVMValueRef gen_stmt(Node *node) {
     if (is_agg_type(node->lhs->ty)) {
       LLVMValueRef v = gen_expr(node->lhs);
       if (is_large_agg_type(node->lhs->ty)) {
-        // it's not very standard
-        // now v is agg ptr
         llvm_memcpy(LLVMGetParam(F, 0), v, node->lhs->ty->size, false);
         LLVMBuildRetVoid(B);
         return NULL;
       }
-      // small agg, v is value
+      if (needs_abi_coercion(node->lhs->ty))
+        v = coerce_value(v, node->lhs->ty, abi_coerce_arg_type(node->lhs->ty));
       LLVMBuildRet(B, v);
       return NULL;
     }
@@ -2369,8 +2496,6 @@ static void codegen_alloca_function_local_argument(Obj *args) {
         arg_vr = LLVMBuildInBoundsGEP2(B, type_convert(p->ty), arg, NULL, 0,
                                        "lagg_arg_gep");
       } else {
-        // same as normal variable
-        // TODO: correct system v implementation
         arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
         // store arg to alloca variable
         store(alloc_ty, arg_vr, arg);
@@ -2500,7 +2625,6 @@ static void codegen_global_init(Obj *prog) {
         LLVMValueRef init_val = init_global_data(var->ty, var->init);
         LLVMTypeRef init_ty = LLVMTypeOf(init_val);
         LLVMTypeRef declared_ty = type_convert(var->ty);
-        // used to resolve fucking union init problem
         if (init_ty != declared_ty) {
           // create a new variable with new specific type
           LLVMValueRef new_v = LLVMAddGlobal(M, init_ty, "");
