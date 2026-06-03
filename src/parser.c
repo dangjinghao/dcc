@@ -2615,6 +2615,10 @@ static Token *attribute_list(Token *tok, Type *ty) {
         continue;
       }
 
+      if (consume(&tok, tok, "noreturn")) {
+        continue;
+      }
+
       if (consume(&tok, tok, "deprecated") ||
           consume(&tok, tok, "__deprecated__")) {
         continue;
