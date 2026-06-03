@@ -1,13 +1,14 @@
 #!/bin/bash
 repo='https://github.com/git/git.git'
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 . "$SCRIPT_DIR/common"
 
-git checkout .
-git checkout 54e85e7af1ac9e9a92888060d6811ae767fea1bc
+git_checkout 54e85e7af1ac9e9a92888060d6811ae767fea1bc
 
-git apply << EOF
+echo 'Fixing macro'
+
+git apply << 'EOF'
 diff --git a/http.h b/http.h
 index 5de792ef3f..02a4198b0a 100644
 --- a/http.h

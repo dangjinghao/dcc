@@ -12,6 +12,7 @@ PROJECT_ROOT="$COMMON_DIR/../.."
 # use build/dcc if dcc not defined
 dcc="${dcc:-$PROJECT_ROOT/build/dcc}"
 make="make -j$(nproc)"
+rm="rm -f"
 
 repo_name=$(basename -s .git $repo)
 
@@ -21,3 +22,8 @@ if [ ! -d "$COMMON_DIR/$repo_name" ]; then
 fi
 
 cd "$COMMON_DIR/$repo_name"
+
+function git_checkout() {
+    git restore . && git clean -fd
+    git checkout "$1"
+}

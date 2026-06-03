@@ -1,10 +1,10 @@
 #!/bin/bash
 repo='https://github.com/python/cpython.git'
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 . "$SCRIPT_DIR/common"
 
-git checkout c75330605d4795850ec74fdc4d69aa5d92f76c00
+git_checkout c75330605d4795850ec74fdc4d69aa5d92f76c00
 
 CC=$dcc ./configure --without-ensurepip
 
