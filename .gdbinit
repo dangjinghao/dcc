@@ -1,4 +1,3 @@
-
 define rcc1
   run -cc1 -cc1-input $arg0 -cc1-output /tmp/dcc_$(basename $arg0).o -cc1-filename $arg0
 end

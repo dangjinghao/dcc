@@ -1389,10 +1389,9 @@ static Initializer *initializer(Token **rest, Token *tok, Type *ty,
 
   if (ty->kind == TY_ARRAY && ty->base->kind == TY_CHAR && equal(tok, "{") &&
       tok->next->kind == TK_STR) {
-    // char v[] = { "str" }; -> char v[] = "str";
+    // special string initializer: char v[] = { "str" }; -> char v[] = "str";
     string_initializer(&tok, tok->next, init);
-    consume(&tok, tok, ",");
-    *rest = skip(tok, "}");
+    consume_end(rest, tok);
     *new_ty = init->ty;
     return init;
   }

@@ -411,7 +411,6 @@ struct Obj {
 // can be nested (e.g. `int x[2][2] = {{1, 2}, {3, 4}}`), this struct
 // is a tree data structure.
 struct Initializer {
-  Initializer *next;
   Type *ty;
   Token *tok;
   bool is_flexible;
