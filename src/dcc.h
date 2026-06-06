@@ -75,10 +75,11 @@ struct Token {
   char *loc; // token location
   int len;
   Type *ty; // TK_NUM or TK_STR
-  char *str;
-  uint64_t val;     // TK_NUM
-  long double fval; // TK_NUM
-
+  union {
+    char *str;
+    uint64_t val;     // TK_NUM
+    long double fval; // TK_NUM
+  };
   DFile *file; // Source location
   int line_no;
   char *filename;
@@ -512,6 +513,7 @@ typedef enum {
   FILETYPE_AR,
   FILETYPE_DSO,
 } InputFileType;
+
 typedef struct {
   char *path;
   InputFileType type;
@@ -534,7 +536,7 @@ extern bool opt_emit_llvm;
 extern bool opt_static;
 extern bool opt_shared;
 extern bool opt_fcommon;
-extern bool opt_fpic; // unused
+extern bool opt_fpic;
 
 extern char *opt_cc1_output;
 extern char *opt_cc1_filename;
