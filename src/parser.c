@@ -1856,7 +1856,7 @@ int64_t eval(Node *node) { return eval2(node, NULL); }
 // number. The latter form is accepted only as an initialization
 // expression for a global variable.
 int64_t eval2(Node *node, Node **label_node) {
-  add_type(node, false);
+  add_type(node, true);
 
   if (is_flonum(node->ty))
     return eval_double(node);

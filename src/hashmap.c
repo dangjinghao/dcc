@@ -110,7 +110,7 @@ static HashEntry *get_or_insert_entry(HashMap *map, char *key, int keylen) {
     }
   }
   if (tombstone) {
-    // if we don't find a empty slot but we found a tombstone
+    // if we don't find an empty slot but we found a tombstone
     // use this tombstone
     // See: https://github.com/rui314/chibicc/issues/135
     tombstone->key = key;
