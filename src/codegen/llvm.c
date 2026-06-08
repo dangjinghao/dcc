@@ -25,7 +25,7 @@ static LLVMValueRef cmp_ez(LLVMValueRef v);
 static LLVMTypeRef type_convert(Type *ty);
 static LLVMValueRef load(Type *ty, LLVMValueRef ptr);
 static void store(Type *ty, LLVMValueRef ptr, LLVMValueRef v);
-
+static LLVMValueRef llvm_build_alloca_at_entry(LLVMTypeRef ty, char *name);
 static void gen_switch_cmp_algo_rev_direct(Node *node,
                                            LLVMBasicBlockRef bb_after);
 
@@ -233,14 +233,14 @@ static LLVMTypeRef abi_coerce_arg_type(Type *ty) {
 static LLVMValueRef coerce_value(LLVMValueRef v, Type *ty,
                                  LLVMTypeRef to_type) {
 
-  LLVMValueRef tmp = LLVMBuildAlloca(B, type_convert(ty), "coerce_tmp");
+  LLVMValueRef tmp = llvm_build_alloca_at_entry(type_convert(ty), "coerce_tmp");
   store(ty, tmp, v);
   return LLVMBuildLoad2(B, to_type, tmp, "");
 }
 
 static LLVMValueRef uncoerce_value(LLVMValueRef v, Type *ty,
                                    LLVMTypeRef from_type) {
-  LLVMValueRef tmp = LLVMBuildAlloca(B, from_type, "uncoerce_tmp");
+  LLVMValueRef tmp = llvm_build_alloca_at_entry(from_type, "uncoerce_tmp");
   LLVMBuildStore(B, v, tmp);
   return LLVMBuildLoad2(B, type_convert(ty), tmp, "");
 }
@@ -1034,7 +1034,8 @@ static LLVMValueRef gen_addr(Node *node) {
     if (is_agg_type(node->ty)) {
       if (!is_large_agg_type(node->ty)) {
         LLVMValueRef val = gen_expr(node);
-        LLVMValueRef tmp = LLVMBuildAlloca(B, type_convert(node->ty), "tmp");
+        LLVMValueRef tmp =
+            llvm_build_alloca_at_entry(type_convert(node->ty), "tmp");
         store(node->ty, tmp, val);
         return tmp;
       }
@@ -1205,6 +1206,24 @@ static LLVMValueRef llvm_const_one(Type *ty) {
     return LLVMConstReal(type_convert(ty), 1);
   }
   return LLVMConstInt(type_convert(ty), 1, false);
+}
+
+static LLVMValueRef llvm_build_alloca_at_entry(LLVMTypeRef ty, char *name) {
+  LLVMBasicBlockRef bb_prev = LLVMGetInsertBlock(B);
+  LLVMBasicBlockRef bb_entry = LLVMGetFirstBasicBlock(F);
+  assert(bb_entry);
+  LLVMValueRef inst_terminator = LLVMGetBasicBlockTerminator(bb_entry);
+  if (inst_terminator) {
+    LLVMPositionBuilderBefore(B, inst_terminator);
+  } else {
+    LLVMPositionBuilderAtEnd(B, bb_entry);
+  }
+
+  LLVMValueRef v = LLVMBuildAlloca(B, ty, name);
+
+  LLVMPositionBuilderAtEnd(B, bb_prev);
+
+  return v;
 }
 
 static LLVMValueRef gen_expr_post_inc_dec(Node *node, bool is_inc) {
@@ -2495,12 +2514,12 @@ static void codegen_alloca_function_local_argument(Obj *args) {
         arg_vr = LLVMBuildInBoundsGEP2(B, type_convert(p->ty), arg, NULL, 0,
                                        "lagg_arg_gep");
       } else {
-        arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
+        arg_vr = llvm_build_alloca_at_entry(type_convert(alloc_ty), p->name);
         // store arg to alloca variable
         store(alloc_ty, arg_vr, arg);
       }
     } else {
-      arg_vr = LLVMBuildAlloca(B, type_convert(alloc_ty), p->name);
+      arg_vr = llvm_build_alloca_at_entry(type_convert(alloc_ty), p->name);
       // store arg to alloca variable
       store(alloc_ty, arg_vr, arg);
     }
@@ -2520,7 +2539,7 @@ static void alloca_function_local_variable(Obj *local_vars) {
                        ? pointer_to(local_vars->ty->base)
                        : local_vars->ty;
   LLVMValueRef lv =
-      LLVMBuildAlloca(B, type_convert(alloc_ty), local_vars->name);
+      llvm_build_alloca_at_entry(type_convert(alloc_ty), local_vars->name);
   local_vars->codegen_data = (intptr_t)lv;
 }
 
@@ -2567,10 +2586,6 @@ static void build_function_body(Obj *fn) {
   hashmap_clear(&func_labels_as_values);
 }
 
-static void ensure_function_entry_block(LLVMValueRef fn) {
-  LLVMAppendBasicBlockInContext(C, fn, "entry");
-}
-
 // stage 1. Only declare global variable to avoid dependency order
 // problem.
 // Recurisvely declare them in reversed order, so that the codegen result will
@@ -2601,7 +2616,7 @@ static void codegen_global_declare(Obj *var) {
       // }
       // it will create v41, v42, v43 block in global declare process and if
       // there isn't entry block those block will be the first block
-      ensure_function_entry_block(vr);
+      LLVMAppendBasicBlockInContext(C, vr, "entry");
     }
   } else {
     LLVMTypeRef ty = type_convert(var->ty);

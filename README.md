@@ -21,11 +21,12 @@
 
     Failed tests:
 
+    - 00162.c: `const` type qualifier in array size
     - 00170.c: anonymous enumeration
     - 00209.c: anonymous enumeration
     - 00210.c: `stdcall` attribute
     - 00214.c: `__builtin_expect`
-    - 00216.c: unnamed struct/union members
+    - 00216.c: unnamed struct/union member initializer
 
 - [rui314/chibicc](https://github.com/rui314/chibicc/tree/90d1f7f199cc55b13c7fdb5839d1409806633fdb)
 - [rui314/libpng](https://github.com/rui314/libpng/tree/dbe3e0c43e549a1602286144d94b0666549b18e6)
