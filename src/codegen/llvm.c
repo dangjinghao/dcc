@@ -1017,11 +1017,15 @@ static LLVMValueRef gen_addr(Node *node) {
   }
   case ND_FUNCALL:
     if (is_agg_type(node->ty)) {
-      gen_expr(node);
-      assert(node->ret_buffer);
-      LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
-      assert(ptr);
-      return ptr;
+      LLVMValueRef v = gen_expr(node);
+      if (is_large_agg_type(node->ty)) {
+        return v;
+      }
+
+      LLVMValueRef sagg_addr = llvm_build_alloca_at_entry(
+          type_convert(node->ty), "small_agg_funcall_addr");
+      store(node->ty, sagg_addr, v);
+      return sagg_addr;
     }
     break;
   case ND_ASSIGN:
@@ -1344,6 +1348,7 @@ static LLVMValueRef gen_expr_cond(Node *node) {
 
 static LLVMValueRef gen_expr_funcall(Node *node) {
   LLVMValueRef F = gen_expr(node->lhs);
+  LLVMValueRef large_agg_ptr = NULL;
   // extract the function type from ponter because LLVM only can recognise
   // this format
   Type *F_ty = node->lhs->ty->base;
@@ -1353,11 +1358,11 @@ static LLVMValueRef gen_expr_funcall(Node *node) {
   }
   LLVMValueRef *args = calloc(arg_count, sizeof(LLVMValueRef));
   size_t arg_idx = 0;
-  if (is_large_agg_type(F_ty->return_ty)) {
-    // pass the ret_buffer ptr as the 1st argument
-    assert(node->ret_buffer);
-    assert(node->ret_buffer->codegen_data);
-    args[arg_idx++] = (LLVMValueRef)node->ret_buffer->codegen_data;
+  if (is_agg_type(F_ty->return_ty) && is_large_agg_type(F_ty->return_ty)) {
+    large_agg_ptr = llvm_build_alloca_at_entry(type_convert(F_ty->return_ty),
+                                               "funcall_agg_ptr");
+    // passed as first argument
+    args[arg_idx++] = large_agg_ptr;
   }
 
   for (Node *arg = node->args; arg; arg = arg->next) {
@@ -1399,17 +1404,13 @@ static LLVMValueRef gen_expr_funcall(Node *node) {
   }
 
   if (is_agg_type(node->ty)) {
-    LLVMValueRef ptr = (LLVMValueRef)node->ret_buffer->codegen_data;
-    assert(ptr);
     if (!is_large_agg_type(node->ty)) {
       if (needs_abi_coercion(node->ty))
         r = uncoerce_value(r, node->ty, abi_coerce_arg_type(node->ty));
-      store(node->ty, ptr, r);
       return r;
     }
-    // if it's large agg type, when codegen return statement it will memcpy
-    // data to ret_buffer ptr
-    return ptr;
+    assert(large_agg_ptr);
+    return large_agg_ptr;
   }
 
   return r;

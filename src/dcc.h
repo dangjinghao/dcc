@@ -327,7 +327,6 @@ struct Node {
   // Function call
   Type *func_ty;
   Node *args;
-  Obj *ret_buffer;
 
   // Goto or labeled statement, or labels-as-values
   char *label;

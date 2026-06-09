@@ -2965,10 +2965,6 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
   node->ty = ty->return_ty;
   node->args = head.next;
 
-  // If a function returns a struct, it is caller's responsibility
-  // to allocate a space for the return value.
-  if (is_agg_type(node->ty))
-    node->ret_buffer = new_lvar("", node->ty);
   return node;
 }
 
