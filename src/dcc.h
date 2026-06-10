@@ -152,23 +152,26 @@ struct Type {
   // declaration
   Token *name;
   Token *name_pos;
-  // array
-  // array_len < 0 means array size inference
-  int array_len;
-  // vla
-  Node *vla_len;
-  Obj *vla_size;
-
-  // Struct
-  Member *members;
-  bool is_flexible;
-  bool is_packed;
-
-  // Function type
-  Type *return_ty;
-  Type *params;
-  bool is_variadic;
-
+  union {
+    struct {
+      // array/VLA
+      int array_len;
+      Node *vla_len;
+      Obj *vla_size;
+    };
+    struct {
+      // struct
+      Member *members;
+      bool is_flexible;
+      bool is_packed;
+    };
+    struct {
+      // func
+      Type *return_ty;
+      Type *params;
+      bool is_variadic;
+    };
+  };
   Type *next;
 };
 
@@ -351,10 +354,6 @@ struct Node {
   Node *cas_addr;
   Node *cas_old;
   Node *cas_new;
-
-  // Atomic op= operators
-  Obj *atomic_addr;
-  Node *atomic_expr;
 
   // Variable
   Obj *var;
