@@ -368,33 +368,32 @@ struct Node {
 
 struct Obj {
   Obj *next;
-  char *name;    // Variable name
-  Type *ty;      // Type
-  Token *tok;    // representative token
-  bool is_local; // local or global/function
-  int align;     // alignment
-
-  // Local variable
-
+  char *name; // Variable name
+  Type *ty;   // Type
+  Token *tok; // representative token
   // Could be used to store codegen data
   // e.g. offset for x86 asm backend
   // or LLVMValueRef(pointer) saved the reference to this obj for llvm backend
   intptr_t codegen_data;
 
+  uint32_t is_local : 1; // local(on stack) variable or global variable/function
   // Global variable or function
-  bool is_function;
-  bool is_definition;
-  bool is_static;
-  bool is_live;
-  // Global variable
+  uint32_t is_function : 1;
+  uint32_t is_definition : 1;
+  uint32_t is_static : 1;
+  uint32_t is_live : 1;
+  // common linkage attribute
+  uint32_t is_tentative : 1;
+  uint32_t is_tls : 1; // thread local
+  uint32_t is_inline : 1;
 
-  // common linkage
-  bool is_tentative;
-  bool is_tls; // thread local
+  uint32_t __unused__ : 24;
+
+  int align; // alignment
+
+  // global variable initializer
   Initializer *init;
-
   // Function
-  bool is_inline;
   Obj *params; // positive order
   Node *body;
   // asm-label, e.g.
@@ -403,6 +402,7 @@ struct Obj {
   char *asm_label;
   // locals is special. the local variables are reversed order but the param
   // variables are positive ordered. Both of them are stored in this variable
+  // layout:
   // [local var new] -- [local var old] [param old] -- [param new]
   Obj *locals;
 };
